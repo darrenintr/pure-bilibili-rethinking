@@ -74,6 +74,7 @@ final class PlaybackAndDesignTests: XCTestCase {
         try await waitUntil { controller.player.currentTime().seconds > 0.25 }
         try await waitUntil(seconds: 8) {
             PlayerController.hasReachedEnd(currentTime: controller.player.currentTime().seconds, duration: item.duration.seconds)
+                && controller.player.timeControlStatus == .paused
         }
         controller.play()
         try await waitUntil {

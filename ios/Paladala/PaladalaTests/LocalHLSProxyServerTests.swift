@@ -79,6 +79,22 @@ final class LocalHLSProxyServerTests: XCTestCase {
                        "prewarm must wait for listener.ready, got \(String(describing: state))")
     }
 
+    func test_listenerRestartKeepsTheNewURLAfterOldCancellation() async throws {
+        let proxy = LocalHLSProxyServer(port: 0)
+        defer { proxy.stop() }
+        try await proxy.ensureListenerAsync()
+        try await proxy.waitForListener(timeoutMs: 2_000)
+        proxy.stop()
+        try await proxy.ensureListenerAsync()
+        try await proxy.waitForListener(timeoutMs: 2_000)
+        let url = try XCTUnwrap(proxy.baseURL)
+        let (_, response) = try await URLSession.shared.data(from: url.appendingPathComponent("playlist.m3u8"))
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 503,
+                       "The fresh listener must answer HTTP, even without a prepared stream")
+        XCTAssertEqual(proxy.listenerState, .ready)
+        XCTAssertNotNil(proxy.baseURL)
+    }
+
     // MARK: - PR-A Group 5: resolveSegmentationMode cache fix (item 6)
 
     /// Minimal `BiliDashSource.Track` for exercising
