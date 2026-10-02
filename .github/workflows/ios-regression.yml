@@ -22,6 +22,10 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - name: Create unsigned test configuration
+        run: |
+          cp ios/Paladala/Config/Opspad.xcconfig.example ios/Paladala/Config/Opspad.Debug.xcconfig
+          cp ios/Paladala/Config/Opspad.xcconfig.example ios/Paladala/Config/Opspad.Release.xcconfig
       - name: Select an available iPhone simulator
         run: |
           DEVICE=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if d["name"].startswith("iPhone")))')
