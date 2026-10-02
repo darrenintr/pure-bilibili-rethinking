@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 import UIKit
 
@@ -624,7 +625,11 @@ struct VideoDetailView: View {
         //   - `autoPlayNext` off → still surface the overlay
         //     but no countdown; the user has to tap "立即播放"
         //     or "取消" to dismiss.
-        .onReceive(NotificationCenter.default.publisher(for: .paladalaVideoDidPlayToEnd)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .paladalaVideoDidPlayToEnd)) { notification in
+            guard let item = notification.object as? AVPlayerItem,
+                  let controller = playerController,
+                  controller.player.currentItem === item,
+                  controller.playbackState == .ready else { return }
             handleVideoDidEnd()
         }
         // Reset the auto-play cursor on first appear so a
@@ -1597,7 +1602,7 @@ struct VideoDetailView: View {
     }
 
     private var commentPreview: some View {
-        let isNative = PaladalaTheme.activeVariant == .iosNative
+        let isNative = PaladalaTheme.usesNativeLayout
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Comments")
@@ -1904,7 +1909,6 @@ struct VideoDetailView: View {
                         // stranded.  Always offer replay + back.
                         Button {
                             Haptics.tap()
-                            playerController?.seek(to: 0)
                             playerController?.play()
                             withAnimation(.easeInOut(duration: 0.22)) {
                                 isShowingNextUp = false

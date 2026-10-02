@@ -311,7 +311,7 @@ private struct MiniPlayerChromeModifier: ViewModifier {
             // on 0pt (a no-op) because the chrome is hard-edged.
             .clipShape(
                 RoundedRectangle(
-                    cornerRadius: PaladalaTheme.activeVariant == .iosNative ? 20 : 0,
+                    cornerRadius: PaladalaTheme.usesNativeLayout ? 20 : 0,
                     style: .continuous
                 )
             )
@@ -358,7 +358,7 @@ private struct MiniPlayerChromeModifier: ViewModifier {
     /// expose it.  Street → paper fill + 4pt ink hard shadow.
     @ViewBuilder
     private var chromeBackground: some View {
-        if PaladalaTheme.activeVariant == .iosNative {
+        if PaladalaTheme.usesNativeLayout {
             Color.clear
                 .background(.regularMaterial)
         } else {

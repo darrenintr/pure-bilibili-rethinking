@@ -1,5 +1,6 @@
 import ImageIO
 import SwiftUI
+import DesignSystem
 
 struct VideoCard: View {
     let video: BiliVideo
@@ -18,6 +19,7 @@ struct VideoCard: View {
     /// rows) pass `nil` and the cover renders as before.
     let heroNamespace: Namespace.ID?
 
+    @AppStorage("paladala.designVariant") private var designVariant: DesignVariant = .expressive
     @AppStorage("paladala.materialDesign") private var materialDesign: MaterialDesign = .liquidGlass
 
     /// Convenience init for call sites that don't need the
@@ -61,11 +63,32 @@ struct VideoCard: View {
     /// impression analytics) so the change is purely visual.
     @ViewBuilder
     private var contentView: some View {
-        if PaladalaTheme.activeVariant == .iosNative {
+        if designVariant == .expressive {
+            expressiveBody
+        } else if PaladalaTheme.usesNativeLayout {
             iosNativeBody
         } else {
             streetBody
         }
+    }
+
+    private var expressiveBody: some View {
+        Button {
+            Analytics.log("card_select", ["bvid": video.id, "duration": video.duration])
+            Haptics.tap()
+            action()
+        } label: {
+            DSVideoCard(
+                title: video.title, author: video.ownerName,
+                viewsText: "\(video.viewCount.compactCount) 次播放",
+                durationText: video.duration.mmss, authorID: String(video.ownerMid)
+            ) {
+                CoverImage(url: video.coverURL)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .modifier(HeroSourceModifier(videoID: video.id, namespace: heroNamespace))
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     /// Street Minimal body — 街頭硬影視頻卡片
@@ -455,7 +478,7 @@ struct LiveRoomCard: View {
     /// Twitch / Apple TV live rows).
     @ViewBuilder
     private var liveBadge: some View {
-        if PaladalaTheme.activeVariant == .iosNative {
+        if PaladalaTheme.usesNativeLayout {
             HStack(spacing: 4) {
                 Text("LIVE")
                     .font(.caption2.weight(.bold))

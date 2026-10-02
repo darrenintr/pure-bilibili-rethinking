@@ -1,4 +1,5 @@
 import SwiftUI
+import DesignSystem
 
 struct PaladalaGlassButtonStyle: ButtonStyle {
     let materialDesign: MaterialDesign
@@ -264,7 +265,7 @@ extension View {
         stroke: Color? = nil,
         strokeWidth: CGFloat = 0.5
     ) -> some View {
-        let isNative = PaladalaTheme.activeVariant == .iosNative
+        let isNative = PaladalaTheme.usesNativeLayout
         let shape = RoundedRectangle(
             cornerRadius: isNative ? PaladalaTheme.cornerRadius : cornerRadius,
             style: PaladalaTheme.cornerStyle
@@ -314,7 +315,7 @@ extension View {
     /// `DynamicFeedToolbarGlassModifier` (5 call sites).
     @ViewBuilder
     func paladalaNavBarGlass(_ design: MaterialDesign = .liquidGlass) -> some View {
-        if PaladalaTheme.activeVariant == .iosNative {
+        if PaladalaTheme.usesNativeLayout {
             self
         } else {
             self
@@ -329,7 +330,7 @@ extension View {
     /// on iOS 26+).
     @ViewBuilder
     func paladalaToolbarGlass(_ design: MaterialDesign = .liquidGlass) -> some View {
-        if PaladalaTheme.activeVariant == .iosNative {
+        if PaladalaTheme.usesNativeLayout {
             self
         } else {
             self
@@ -350,7 +351,7 @@ extension View {
     ///   *not* apply their own `paladalaStreetPanel`.
     @ViewBuilder
     func paladalaListChrome() -> some View {
-        if PaladalaTheme.activeVariant == .iosNative {
+        if PaladalaTheme.usesNativeLayout {
             self
                 .scrollContentBackground(.hidden)
                 .listStyle(.insetGrouped)
@@ -374,7 +375,7 @@ extension View {
     ///   trying to hide them would defeat the HIG card look.
     @ViewBuilder
     func paladalaListRowChrome() -> some View {
-        if PaladalaTheme.activeVariant == .iosNative {
+        if PaladalaTheme.usesNativeLayout {
             self
         } else {
             self
@@ -395,7 +396,9 @@ extension View {
     /// concrete style type that SwiftUI is happy with.
     @ViewBuilder
     func paladalaToggleStyle() -> some View {
-        if PaladalaTheme.activeVariant == .iosNative {
+        if PaladalaTheme.activeVariant == .expressive {
+            self.toggleStyle(.dsSwitch)
+        } else if PaladalaTheme.usesNativeLayout {
             self.toggleStyle(.switch)
         } else {
             self.toggleStyle(PaladalaStreetToggleStyle())
@@ -420,7 +423,7 @@ extension View {
         isSelected: Bool,
         design: MaterialDesign
     ) -> some View {
-        if PaladalaTheme.activeVariant == .iosNative {
+        if PaladalaTheme.usesNativeLayout {
             // iOS Native: capsule + systemFill background.
             // Selected state uses Color.accentColor (follows the
             // user's iOS tint setting).  SF Pro subheadline, no
@@ -579,7 +582,7 @@ extension View {
         fill: Color = PaladalaTheme.paper,
         elevated: Bool = true
     ) -> some View {
-        let isNative = PaladalaTheme.activeVariant == .iosNative
+        let isNative = PaladalaTheme.usesNativeLayout
         let shape = RoundedRectangle(
             cornerRadius: PaladalaTheme.cornerRadius,
             style: PaladalaTheme.cornerStyle
@@ -632,7 +635,7 @@ extension View {
     /// row) and the variant switch handles itself.
     @ViewBuilder
     func paladalaActionPill(accent: Color = PaladalaTheme.biliPink) -> some View {
-        if PaladalaTheme.activeVariant == .iosNative {
+        if PaladalaTheme.usesNativeLayout {
             self
         } else {
             self.buttonStyle(PaladalaActionPillStyle(accent: accent))

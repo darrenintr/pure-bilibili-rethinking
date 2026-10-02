@@ -1,0 +1,48 @@
+name: iOS playback and design regression
+
+on:
+  push:
+    branches: [fix/design-and-video-playback]
+  pull_request:
+    branches: [working]
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-regression.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulator-tests:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select an available iPhone simulator
+        run: |
+          DEVICE=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if d["name"].startswith("iPhone")))')
+          echo "SIMULATOR_ID=$DEVICE" >> "$GITHUB_ENV"
+      - name: Build and run playback and design regressions
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project ios/Paladala/Paladala.xcodeproj \
+            -scheme Paladala \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -derivedDataPath build/regression \
+            -resultBundlePath build/Regression.xcresult \
+            -parallel-testing-enabled NO \
+            -only-testing:PaladalaTests/PlaybackAndDesignTests \
+            -only-testing:PaladalaTests/LocalHLSProxyServerTests \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee build-regression.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-regression-results
+          path: |
+            build-regression.log
+            build/Regression.xcresult

@@ -99,7 +99,7 @@ struct UISearchFieldBridge: UIViewRepresentable {
     ///   iconography is consistent with the rest of the app.
     private func applyStreetChrome(to bar: UISearchBar) {
         let field = bar.searchTextField
-        if PaladalaTheme.activeVariant == .iosNative {
+        if PaladalaTheme.usesNativeLayout {
             // System default chrome — `.minimal` already
             // provides a tinted, rounded field.
             field.backgroundColor = nil

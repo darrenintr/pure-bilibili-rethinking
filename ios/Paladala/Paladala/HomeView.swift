@@ -52,11 +52,12 @@ struct HomeView: View {
         // more screen real estate).
         if horizontalSizeClass == .regular {
             return Array(
-                repeating: GridItem(.flexible(), spacing: 32, alignment: .top),
+                repeating: GridItem(.flexible(), spacing: 16, alignment: .top),
                 count: max(2, iPadColumns)
             )
         }
-        return [GridItem(.flexible(), alignment: .top)]
+        return Array(repeating: GridItem(.flexible(), spacing: 16, alignment: .top),
+                     count: PaladalaTheme.activeVariant == .expressive ? 2 : 1)
     }
 
     /// Street-style search bar extracted out of `body` so the
@@ -138,7 +139,7 @@ struct HomeView: View {
                 // style works better with a permanently compact
                 // title.
                 .navigationBarTitleDisplayMode(
-                    PaladalaTheme.activeVariant == .iosNative ? .large : .inline
+                    PaladalaTheme.usesNativeLayout ? .large : .inline
                 )
                 // PR-fix-2026-07-10: replace `.searchable` with
                 // a hand-rolled `UISearchFieldBridge` so the
@@ -178,7 +179,7 @@ struct HomeView: View {
                 .toolbarBackground(.visible, for: .navigationBar)
                 .toolbar {
                     ToolbarItemGroup(placement: .topBarTrailing) {
-                        if PaladalaTheme.activeVariant == .iosNative {
+                        if PaladalaTheme.usesNativeLayout {
                             // iOS Native: 2 icons (refresh + profile).
                             // Downloads / short-video / notifications
                             // live in a "..." Menu (or in the iOS Native
@@ -365,13 +366,13 @@ struct HomeView: View {
                     // and use the inline "加载更多" spinner at the
                     // bottom for paginated loads.
                     SkeletonGrid(
-                        columns: horizontalSizeClass == .regular ? 2 : 1,
+                        columns: horizontalSizeClass == .regular || PaladalaTheme.activeVariant == .expressive ? 2 : 1,
                         columnSpacing: 32,
                         rowSpacing: 32
                     )
                         .padding(.top, 4)
                 } else if model.category == .live && !model.liveRooms.isEmpty {
-                    LazyVGrid(columns: columns, spacing: 32) {
+                    LazyVGrid(columns: columns, spacing: 24) {
                         ForEach(model.liveRooms) { room in
                             LiveRoomCard(room: room)
                         }
@@ -392,7 +393,7 @@ struct HomeView: View {
                         SearchUserResultsStrip(users: model.searchUsers)
                             .padding(.bottom, 2)
                     }
-                    LazyVGrid(columns: columns, spacing: 32) {
+                    LazyVGrid(columns: columns, spacing: 24) {
                         ForEach(Array(model.videos.enumerated()), id: \.element.id) { index, video in
                             VideoCard(
                                 video: video,

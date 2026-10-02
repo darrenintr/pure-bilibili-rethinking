@@ -409,7 +409,7 @@ private struct FavoriteFolderRow: View {
     let folder: FavoriteFolderSummary
 
     var body: some View {
-        let isNative = PaladalaTheme.activeVariant == .iosNative
+        let isNative = PaladalaTheme.usesNativeLayout
         Group {
             if isNative {
                 rowContent
@@ -422,7 +422,7 @@ private struct FavoriteFolderRow: View {
     }
 
     private var rowContent: some View {
-        let isNative = PaladalaTheme.activeVariant == .iosNative
+        let isNative = PaladalaTheme.usesNativeLayout
         return HStack(spacing: 12) {
             ResilientImage(url: folder.coverURL, maximumPixelSize: 360)
                 .frame(width: 88, height: 56)
@@ -465,7 +465,7 @@ private struct VideoListRow: View {
     let subtitle: String
 
     var body: some View {
-        let isNative = PaladalaTheme.activeVariant == .iosNative
+        let isNative = PaladalaTheme.usesNativeLayout
         Group {
             if isNative {
                 rowContent
@@ -478,7 +478,7 @@ private struct VideoListRow: View {
     }
 
     private var rowContent: some View {
-        let isNative = PaladalaTheme.activeVariant == .iosNative
+        let isNative = PaladalaTheme.usesNativeLayout
         return HStack(spacing: 12) {
             ResilientImage(url: video.coverURL, maximumPixelSize: 480)
                 .frame(width: 112, height: 70)

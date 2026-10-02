@@ -21,7 +21,7 @@ struct OnboardingView: View {
         // gates that obscure both paths.  The shared state lives in
         // `currentPage`; each variant owns its own page content and
         // page indicator.
-        if PaladalaTheme.activeVariant == .iosNative {
+        if PaladalaTheme.usesNativeLayout {
             OnboardingViewNative(
                 currentPage: $currentPage,
                 pages: Self.pages
@@ -708,13 +708,13 @@ private struct OnboardingNativePageView: View {
 }
 
 private struct OnboardingNativePreferencesView: View {
-    @AppStorage("paladala.designVariant") private var designVariantRaw: String = DesignVariant.streetRedesign.rawValue
+    @AppStorage("paladala.designVariant") private var designVariantRaw: String = DesignVariant.expressive.rawValue
     @AppStorage("paladala.danmakuEnabled") private var danmakuEnabled = true
     @AppStorage("paladala.backgroundAudio") private var backgroundAudio = false
     @AppStorage("paladala.iCloudSync") private var iCloudSync = false
 
     private var designVariant: DesignVariant {
-        DesignVariant(rawValue: designVariantRaw) ?? .streetRedesign
+        DesignVariant(rawValue: designVariantRaw) ?? .expressive
     }
 
     var body: some View {
@@ -835,7 +835,7 @@ private struct OnboardingNativePreferencesView: View {
     private func cardIconColor(_ variant: DesignVariant) -> Color {
         switch variant {
         case .streetRedesign: return .black
-        case .iosNative: return Color.accentColor
+        case .iosNative, .expressive: return Color.accentColor
         case .classic: return Color(uiColor: .systemGray)
         }
     }
@@ -844,6 +844,7 @@ private struct OnboardingNativePreferencesView: View {
         switch variant {
         case .streetRedesign: return "rectangle"
         case .iosNative: return "globe"
+        case .expressive: return "sparkles"
         case .classic: return "circle.grid.cross"
         }
     }

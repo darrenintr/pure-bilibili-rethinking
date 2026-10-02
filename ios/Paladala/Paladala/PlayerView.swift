@@ -16,6 +16,7 @@
 import AVFoundation
 import AVKit
 import SwiftUI
+import DesignSystem
 
 // MARK: - Inline surface
 
@@ -77,7 +78,7 @@ struct PlayerView: View {
             // PlayerTimedTextOverlay is now hosted inside
             // contentOverlayView so it persists into native fullscreen.
             ZStack {
-                if controller.isBuffering && controller.playerError == nil {
+                if (controller.isBuffering || controller.playbackState == .preparing) && controller.playerError == nil {
                     loadingOverlay
                         .transition(.opacity)
                         .allowsHitTesting(false)
@@ -137,9 +138,11 @@ struct PlayerView: View {
     /// Spinner + KB/s readout shown during stalls.
     private var loadingOverlay: some View {
         VStack(spacing: 6) {
-            ProgressView()
-                .tint(.white)
-                .controlSize(.regular)
+            if PaladalaTheme.activeVariant == .expressive {
+                DSLoadingIndicator(size: 32, contained: true)
+            } else {
+                ProgressView().tint(.white).controlSize(.regular)
+            }
             Text(formatNetworkSpeed(controller.networkSpeed))
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(.white.opacity(0.9))
