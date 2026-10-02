@@ -287,11 +287,8 @@ final class LocalHLSProxyServerTests: XCTestCase {
     func test_parseContentRangeHeader_unsatisfiedRangeOnly() {
         // PR-B A6: "bytes */100" — RFC 7233 §4.4 unsatisfied
         // range form, signalling "the resource is 100 bytes
-        // long and your range request doesn't fit".  The
-        // parser must surface this as all-`-1` (existing
-        // contract) so the proxy can translate an upstream
-        // 416 response to a clean 416 for the loopback
-        // client without leaking the upstream error code.
+        // long and your range request doesn't fit". Preserve
+        // the resource size while marking the range unavailable.
         let parsed = LocalHLSProxyServer.parseContentRangeHeader(
             "bytes */100"
         )

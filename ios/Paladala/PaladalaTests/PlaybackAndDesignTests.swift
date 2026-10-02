@@ -117,7 +117,10 @@ private final class RangeFixtureServer: @unchecked Sendable {
     private let listener: NWListener
     private let data: Data
     private let queue = DispatchQueue(label: "PlaybackFixtureUpstream")
-    var port: UInt16? { listener.port?.rawValue }
+    var port: UInt16? {
+        guard listener.state == .ready, let port = listener.port?.rawValue, port > 0 else { return nil }
+        return port
+    }
 
     init(data: Data) throws {
         self.data = data
