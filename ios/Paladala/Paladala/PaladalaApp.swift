@@ -21,12 +21,16 @@ struct PaladalaApp: App {
 
     init() {
         let defaults = UserDefaults.standard
+        let needsExpressiveMigration = defaults.integer(forKey: "paladala.expressiveMigrationVersion") < 1
         let variant = DesignVariant.storedChoice(
             rawValue: defaults.string(forKey: "paladala.designVariant"),
             migrationVersion: defaults.integer(forKey: "paladala.expressiveMigrationVersion")
         )
         defaults.set(variant.rawValue, forKey: "paladala.designVariant")
         defaults.set(1, forKey: "paladala.expressiveMigrationVersion")
+        if needsExpressiveMigration {
+            ICloudSync.shared.mirror(key: "paladala.designVariant", value: variant.rawValue)
+        }
         PaladalaTheme.apply(variant)
         PaladalaTheme.expressiveTheme = DSTheme(seedHex: defaults.string(forKey: "paladala.expressiveSeed") ?? "#FF6194")
         Self.configureStreetAppearance()

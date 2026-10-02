@@ -310,17 +310,18 @@ final class LocalHLSProxyServer: @unchecked Sendable {
             // PR-C Task 4: explicit `[weak self]` so the
             // @Sendable Task closure doesn't capture a strong
             // reference to this non-MainActor final class.
+            // Poll off the UI actor: a busy first frame must not
+            // delay the listener deadline or playback startup.
             // `cont` is the Continuation, captured strongly on
             // purpose so the Task can resume it; the listener
             // check is the only self access.
-            Task { @MainActor [weak self] in
+            Task { [weak self] in
                 while true {
                     guard let self else {
                         cont.resume(throwing: CancellationError()); return
                     }
-                    // Check readiness before the deadline. The MainActor task
-                    // can be scheduled after the nominal timeout even though
-                    // NWListener already became ready on its own queue.
+                    // Check readiness before the deadline in case the executor
+                    // was scheduled after the listener became ready.
                     if self.listenerState == .ready {
                         cont.resume(); return
                     }

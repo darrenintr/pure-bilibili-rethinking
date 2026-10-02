@@ -1,4 +1,6 @@
 import AVFoundation
+import AVKit
+import UIKit
 import Foundation
 import Network
 import XCTest
@@ -61,6 +63,22 @@ final class PlaybackAndDesignTests: XCTestCase {
         let controller = PlayerController(playback: playback(url: URL(string: "http://127.0.0.1:\(port)/video.m4s")!, audioURL: audioURL), proxyServer: proxy)
         defer { controller.tearDown(); proxy.stop() }
 
+        // Silent video needs a real display surface, just like the app's
+        // inline AVPlayerViewController; there is no audio render clock.
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let previousWindow = scene.windows.first { $0.isKeyWindow }
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.coordinateSpace.bounds
+        let surface = AVPlayerViewController()
+        surface.player = controller.player
+        window.rootViewController = surface
+        window.makeKeyAndVisible()
+        defer {
+            surface.player = nil
+            window.isHidden = true
+            previousWindow?.makeKey()
+        }
+
         try await waitUntil(seconds: 15) {
             controller.player.currentItem?.status == .readyToPlay || controller.playerError != nil
         }
@@ -72,6 +90,13 @@ final class PlaybackAndDesignTests: XCTestCase {
                           "The DASH audio rendition must reach AVPlayer")
         }
         try await waitUntil { controller.player.currentTime().seconds > 0.25 }
+        let screenshot = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+            window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+        }
+        let attachment = XCTAttachment(image: screenshot)
+        attachment.name = withAudio ? "Playing DASH with audio" : "Playing silent DASH"
+        attachment.lifetime = .keepAlways
+        add(attachment)
         try await waitUntil(seconds: 8) {
             PlayerController.hasReachedEnd(currentTime: controller.player.currentTime().seconds, duration: item.duration.seconds)
                 && controller.player.timeControlStatus == .paused
