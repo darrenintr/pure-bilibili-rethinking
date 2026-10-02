@@ -17,7 +17,7 @@ final class LoginViewModel: ObservableObject {
     }
 
     @Published private(set) var state: State = .generating
-    @Published private(set) var statusText: String = "正在生成二维码…"
+    @Published private(set) var statusText: String = "正在生成二維碼…"
 
     private let authAPI: BilibiliAuthAPI
     private var authStore: AuthStore
@@ -56,23 +56,23 @@ final class LoginViewModel: ObservableObject {
     /// paths stay in the API client as forward-compat fallbacks.
     func start() {
         pollTask?.cancel()
-        statusText = "正在生成二维码…"
+        statusText = "正在生成二維碼…"
         state = .generating
         pollTask = Task { [weak self] in
             guard let self else { return }
             do {
                 let token = try await authAPI.webQrcodeGenerate()
                 guard let image = Self.renderQR(token.url) else {
-                    state = .error("二维码生成失败，请重试")
-                    statusText = "二维码生成失败"
+                    state = .error("二維碼生成失敗，請重試")
+                    statusText = "二維碼生成失敗"
                     return
                 }
                 state = .waiting(image: image, key: token.qrcodeKey)
-                statusText = "请使用 Bilibili App 扫码登录"
+                statusText = "請使用 Bilibili App 掃碼登入"
                 await self.pollLoop(key: token.qrcodeKey, image: image)
             } catch {
                 state = .error(error.localizedDescription)
-                statusText = "生成失败：\(error.localizedDescription)"
+                statusText = "生成失敗：\(error.localizedDescription)"
             }
         }
     }
@@ -98,13 +98,13 @@ final class LoginViewModel: ObservableObject {
                 let result = try await authAPI.webQrcodePoll(qrcodeKey: key)
                 switch result.state {
                 case .waiting:
-                    statusText = "请使用 Bilibili App 扫码登录"
+                    statusText = "請使用 Bilibili App 掃碼登入"
                 case .scanned:
                     state = .scanned(image: image, key: key)
-                    statusText = "请在手机上确认登录"
+                    statusText = "請在手機上確認登入"
                 case .expired:
                     state = .expired
-                    statusText = "二维码已过期，请刷新"
+                    statusText = "二維碼已過期，請重新整理"
                     return
                 case .success:
                     // Web flow carries no `access_key` — the
@@ -113,13 +113,13 @@ final class LoginViewModel: ObservableObject {
                     await completeLogin(cookies: result.cookies, accessKey: nil)
                     return
                 case .error(let message):
-                    statusText = "登录失败：\(message)"
+                    statusText = "登入失敗：\(message)"
                     return
                 }
             } catch is CancellationError {
                 return
             } catch {
-                statusText = "网络异常，正在重试…"
+                statusText = "網路異常，正在重試…"
                 // Continue the loop on transient failures.
             }
         }
@@ -128,8 +128,8 @@ final class LoginViewModel: ObservableObject {
     private func completeLogin(cookies: [String: String], accessKey: String?) async {
         guard let sessData = cookies["SESSDATA"], !sessData.isEmpty,
               let csrf = cookies["bili_jct"], !csrf.isEmpty else {
-            state = .error("登录成功但未返回 SESSDATA 凭证")
-            statusText = "登录成功但未返回凭证"
+            state = .error("登入成功但未返回 SESSDATA 憑證")
+            statusText = "登入成功但未返回憑證"
             return
         }
         var buvid3 = cookies["buvid3"]
@@ -182,10 +182,10 @@ final class LoginViewModel: ObservableObject {
             )
             authStore.completeLogin(account)
             state = .success(account)
-            statusText = "登录成功：\(info.name)"
+            statusText = "登入成功：\(info.name)"
         } catch {
-            state = .error("读取账号信息失败：\(error.localizedDescription)")
-            statusText = "登录成功但读取账号信息失败"
+            state = .error("讀取賬號資訊失敗：\(error.localizedDescription)")
+            statusText = "登入成功但讀取賬號資訊失敗"
         }
     }
 

@@ -90,7 +90,7 @@ struct OfflineBanner: View {
         if !monitor.isOnline {
             HStack(spacing: 8) {
                 Image(systemName: "wifi.slash")
-                Text("当前离线 · 显示缓存内容")
+                Text("當前離線 · 顯示快取內容")
                     .font(PaladalaTheme.FontRole.labelMono)
             }
             .foregroundStyle(PaladalaTheme.ink)
@@ -115,7 +115,7 @@ struct OfflineBanner: View {
             .padding(.top, 8)
             .transition(.move(edge: .top).combined(with: .opacity))
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("当前离线,显示缓存内容")
+            .accessibilityLabel("當前離線,顯示快取內容")
         }
     }
 }

@@ -75,12 +75,12 @@ final class CDNManager: ObservableObject {
     /// HK before reaching the user, while the hz-akamai
     /// edge connects directly to the nearest PoP.
     private static let fallbackNodes: [Node] = [
-        Node(host: "upos-sz-mirrorali.bilivideo.com", region: "默认"),
-        Node(host: "upos-sz-mirrorcosov.bilivideo.com", region: "华南 cosov"),
+        Node(host: "upos-sz-mirrorali.bilivideo.com", region: "預設"),
+        Node(host: "upos-sz-mirrorcosov.bilivideo.com", region: "華南 cosov"),
         Node(host: "upos-hz-mirrorakam.akamaized.net", region: "海外 akamai"),
-        Node(host: "upos-sz-mirrorhw.bilivideo.com", region: "华东 HW"),
-        Node(host: "upos-sz-upcdnbda2.bilivideo.com", region: "华东 UP"),
-        Node(host: "upos-bj2-206-3.bilivideo.com", region: "华北"),
+        Node(host: "upos-sz-mirrorhw.bilivideo.com", region: "華東 HW"),
+        Node(host: "upos-sz-upcdnbda2.bilivideo.com", region: "華東 UP"),
+        Node(host: "upos-bj2-206-3.bilivideo.com", region: "華北"),
     ]
 
     func nodes() async -> [Node] {
@@ -128,7 +128,7 @@ final class CDNManager: ObservableObject {
         let probe = await TLSHandshakeProbe.probe(host: node.host)
         guard probe.isReachable else {
             return SpeedResult(node: node, latencyMs: nil, statusCode: nil,
-                               error: probe.error ?? "TLS 握手失败")
+                               error: probe.error ?? "TLS 握手失敗")
         }
         return SpeedResult(node: node, latencyMs: probe.latencyMs,
                            statusCode: nil, error: nil)

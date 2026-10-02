@@ -60,7 +60,7 @@ struct DeepDiagnosticReportView: View {
                     ShareLink(item: shareURL) {
                         HStack {
                             Image(systemName: "square.and.arrow.up.on.square")
-                            Text("导出深度诊断报告")
+                            Text("匯出深度診斷報告")
                                 .font(.subheadline.weight(.semibold))
                             Spacer()
                         }
@@ -77,7 +77,7 @@ struct DeepDiagnosticReportView: View {
                             } else {
                                 Image(systemName: "square.and.arrow.up.on.square")
                             }
-                            Text("导出深度诊断报告")
+                            Text("匯出深度診斷報告")
                                 .font(.subheadline.weight(.semibold))
                             Spacer()
                         }
@@ -88,7 +88,7 @@ struct DeepDiagnosticReportView: View {
             } header: {
                 Text("操作")
             } footer: {
-                Text("报告包含系统信息、生命周期事件、最近 60 条下载日志、DownloadStore 清单快照、下载中状态、磁盘字节数与最近 100 行 bpLog。分享给开发者可直接定位下载卡顿 / 播放失败 / 推荐异常等问题。")
+                Text("報告包含系統資訊、生命週期事件、最近 60 條下載日誌、DownloadStore 清單快照、下載中狀態、磁碟位元組數與最近 100 行 bpLog。分享給開發者可直接定位下載卡頓 / 播放失敗 / 推薦異常等問題。")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -98,13 +98,13 @@ struct DeepDiagnosticReportView: View {
                     Haptics.tap()
                     copyReportToClipboard()
                 } label: {
-                    Label("复制完整报告到剪贴板", systemImage: "doc.on.clipboard")
+                    Label("複製完整報告到剪貼簿", systemImage: "doc.on.clipboard")
                 }
                 .disabled(generating)
             } header: {
-                Text("备用方案")
+                Text("備用方案")
             } footer: {
-                Text("如果分享面板无法使用，可直接复制完整报告文本并粘贴到对话中发送。")
+                Text("如果分享面板無法使用，可直接複製完整報告文字並貼上到對話中傳送。")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -112,7 +112,7 @@ struct DeepDiagnosticReportView: View {
         .scrollContentBackground(.hidden)
         .listStyle(.plain)
         .background(PaladalaTheme.canvas)
-        .navigationTitle("深度诊断报告")
+        .navigationTitle("深度診斷報告")
         .navigationBarTitleDisplayMode(.inline)
         .overlay(alignment: .bottom) {
             if let copyToast {
@@ -162,18 +162,18 @@ struct DeepDiagnosticReportView: View {
         return VStack(spacing: 8) {
             summaryRow(
                 icon: "doc.text.magnifyingglass",
-                title: "诊断事件",
-                value: "\(diagCount) 条"
+                title: "診斷事件",
+                value: "\(diagCount) 條"
             )
             summaryRow(
                 icon: "arrow.down.circle",
-                title: "已下载视频",
-                value: "\(dlRecords) 个"
+                title: "已下載影片",
+                value: "\(dlRecords) 個"
             )
             summaryRow(
                 icon: "arrow.triangle.2.circlepath",
-                title: "下载中",
-                value: "\(inFlight) 个"
+                title: "下載中",
+                value: "\(inFlight) 個"
             )
         }
     }
@@ -224,7 +224,7 @@ struct DeepDiagnosticReportView: View {
             activeAccount: authStore.activeAccount
         )
         UIPasteboard.general.string = report
-        flashToast("已复制 (\(report.count) 字符)")
+        flashToast("已複製 (\(report.count) 字元)")
     }
 
     private func flashToast(_ message: String) {

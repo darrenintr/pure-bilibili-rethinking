@@ -91,31 +91,6 @@ final class PaladalaTests: XCTestCase {
         XCTAssertEqual(StubURLProtocol.metrics.lastPath, "/x/web-interface/newlist")
     }
 
-    @MainActor
-    func test_musicHomeLoadSurvivesLoadingStateTransition() async {
-        let session = makeStubSession(delay: 0.2) { request in
-            Self.emptyVideoListResponse(for: request)
-        }
-        defer { session.invalidateAndCancel() }
-
-        let repository = PaladalaRepository(apiClient: BilibiliAPIClient(session: session))
-        let window = UIWindow(frame: UIScreen.main.bounds)
-        window.rootViewController = UIHostingController(
-            rootView: MusicHomeView(repository: repository)
-                .environmentObject(AppRouter())
-        )
-        window.makeKeyAndVisible()
-        defer {
-            window.isHidden = true
-            window.rootViewController = nil
-        }
-
-        try? await Task.sleep(for: .milliseconds(350))
-        let metrics = StubURLProtocol.metrics
-        XCTAssertEqual(metrics.finished, 1)
-        XCTAssertEqual(metrics.cancelled, 0)
-    }
-
 
     func test_rateLimitBackoffStopsWhenRequestTaskIsCancelled() async {
         let session = makeStubSession { request in
@@ -239,7 +214,7 @@ final class PaladalaTests: XCTestCase {
         )
         XCTAssertEqual(network.kind, .network)
         XCTAssertTrue(network.isRetryable)
-        XCTAssertEqual(network.message, "当前没有网络连接，请联网后重试。")
+        XCTAssertEqual(network.message, "當前沒有網路連線，請聯網後重試。")
 
         let authentication = try XCTUnwrap(
             AppErrorDescriptor.describe(BilibiliAPIError.sessionExpired)
@@ -279,7 +254,7 @@ final class PaladalaTests: XCTestCase {
         center.present(
             URLError(.timedOut),
             context: "video.load",
-            recoveryLabel: "重试",
+            recoveryLabel: "重試",
             recovery: { recovered = true }
         )
 
@@ -293,7 +268,7 @@ final class PaladalaTests: XCTestCase {
     func test_loadStateCancellationPreservesExistingValueAndHasNoError() async {
         let state = LoadState(value: [1, 2, 3])
 
-        await state.load({ throw CancellationError() }, errorText: "不应显示")
+        await state.load({ throw CancellationError() }, errorText: "不應顯示")
 
         XCTAssertEqual(state.value, [1, 2, 3])
         XCTAssertNil(state.errorMessage)

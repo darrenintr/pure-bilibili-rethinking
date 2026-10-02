@@ -314,16 +314,21 @@ final class LocalHLSProxyServer: @unchecked Sendable {
             // purpose so the Task can resume it; the listener
             // check is the only self access.
             Task { @MainActor [weak self] in
-                while Date() < deadline {
+                while true {
                     guard let self else {
                         cont.resume(throwing: CancellationError()); return
                     }
+                    // Check readiness before the deadline. The MainActor task
+                    // can be scheduled after the nominal timeout even though
+                    // NWListener already became ready on its own queue.
                     if let listener = self.listener, listener.state == .ready {
                         cont.resume(); return
                     }
+                    if Date() >= deadline {
+                        cont.resume(throwing: ProxyServerError.listenerTimeout); return
+                    }
                     try? await Task.sleep(nanoseconds: UInt64(pollIntervalMs) * 1_000_000)
                 }
-                cont.resume(throwing: ProxyServerError.listenerTimeout)
             }
         }
     }
@@ -378,7 +383,7 @@ final class LocalHLSProxyServer: @unchecked Sendable {
     /// path until the local file lands.
     ///
     /// Steps:
-    /// 1. `stop()` clears any in-flight prep / listener.
+    /// 1. Reset the previous playback state while keeping the listener bound.
     /// 2. `beginServing()` bumps the generation counter.
     /// 3. `preparePlayback(...)` fetches and validates SIDX
     ///    for both tracks in parallel.
@@ -398,9 +403,13 @@ final class LocalHLSProxyServer: @unchecked Sendable {
                     "cid": cid.map(String.init) ?? "",
                     "prefetchable": bvid != nil && cid != nil
                 ])
-        stop()
+        // Reset the previous VOD session without cancelling the process-wide
+        // loopback listener. Cold-start prewarm may already have published
+        // this port; cancelling it here lets the old NWListener's delayed
+        // .cancelled callback race the replacement listener and clear the
+        // new baseURL while manifest preparation is in flight.
+        resetPlaybackStateKeepingListener()
 
-        // Lazy rebuild — `stop()` invalidates `prepSession`.
         if prepSession == nil {
             prepSession = Self.makePrepSession()
         }
@@ -444,7 +453,20 @@ final class LocalHLSProxyServer: @unchecked Sendable {
             // not from the prefetch cache, so we don't want
             // segment requests to try to look up the wrong
             // bvid/cid.
-            setCurrentIdentity(bvid: bvid, cid: cid)
+            // Keep the same quality fallback used by the prefetch
+            // trigger.  Some playurl responses omit the selected
+            // track's `id`; in that case `selectedVideoQn` is nil,
+            // but the prefetch is keyed by the first accept-quality
+            // value.  Persisting the resolved qn here lets the
+            // segment router find that cache entry after it lands.
+            setCurrentIdentity(
+                bvid: bvid,
+                cid: cid,
+                qn: Self.resolvedPrefetchQuality(
+                    requested: playback.selectedVideoQn,
+                    acceptQuality: playback.acceptQuality
+                )
+            )
             let url = try await publishAndStart(
                 prepared: prepared,
                 generation: generation
@@ -539,13 +561,10 @@ final class LocalHLSProxyServer: @unchecked Sendable {
         // fallback just causes a one-time re-download
         // the first time the user picks a different
         // quality — not a correctness issue.
-        let resolvedQn: Int? = {
-            if let qn { return qn }
-            if let first = playback.acceptQuality?.first {
-                return first
-            }
-            return nil
-        }()
+        let resolvedQn = Self.resolvedPrefetchQuality(
+            requested: qn,
+            acceptQuality: playback.acceptQuality
+        )
         // **PR-C (Phase 2 — fix, take 2)**: route these
         // through `diagLog(.playback, ...)` rather than
         // `bpLog(...)`.  The previous take-1 fix used
@@ -591,6 +610,18 @@ final class LocalHLSProxyServer: @unchecked Sendable {
                 bvid: bvid, qn: resolvedQn, cid: cid, playback: playback
             )
         }
+    }
+
+    /// Resolves the quality used in the prefetch cache key. Bilibili
+    /// sometimes omits the selected track's representation id, while
+    /// still returning `accept_quality`; both the trigger and the
+    /// segment router must use this exact fallback to address the same
+    /// cache entry.
+    static func resolvedPrefetchQuality(
+        requested: Int?,
+        acceptQuality: [Int]?
+    ) -> Int? {
+        requested ?? acceptQuality?.first
     }
 
     /// Begin a new serving generation.  Bumps
@@ -641,11 +672,12 @@ final class LocalHLSProxyServer: @unchecked Sendable {
     /// (downloaded playback via `serveLocal(playback:)`,
     /// LAN share, live).
     private func setCurrentIdentity(
-        bvid: String?, cid: Int64?
+        bvid: String?, cid: Int64?, qn: Int?
     ) {
         lock.lock()
         currentBvid = bvid
         currentCid = cid
+        currentQn = qn
         lock.unlock()
     }
 
@@ -1041,6 +1073,42 @@ final class LocalHLSProxyServer: @unchecked Sendable {
         }
     }
 
+    /// Clear per-playback state while retaining the process-wide loopback
+    /// listener and its stable base URL. `serve(playback:)` uses this when
+    /// switching VOD sessions; full lifecycle teardown still goes through
+    /// `stop()`. Keeping the listener avoids an old NWListener cancellation
+    /// callback clearing the URL published by a newly-created listener.
+    private func resetPlaybackStateKeepingListener() {
+        var streamsToCancel: [StreamingProxyTask] = []
+        lock.lock()
+        currentPlayback = nil
+        localContext = nil
+        currentLivePlayback = nil
+        currentBvid = nil
+        currentCid = nil
+        currentQn = nil
+        probedSizes.removeAll()
+        probeInFlight.removeAll()
+        failedProbes.removeAll()
+        failoverIndex.removeAll()
+        trackSegmentIndex.removeAll()
+        decidedModes.removeAll()
+        inFlightRanges.removeAll()
+        streamsToCancel = Array(activeStreams.values)
+        activeStreams.removeAll()
+        if baseURL != nil, port != 0 {
+            state = .listening(port: port)
+        } else {
+            state = .idle
+        }
+        lock.unlock()
+        for stream in streamsToCancel {
+            stream.cancel()
+        }
+        diagLog(.playback, "LocalHLSProxyServer playback state reset",
+                details: ["keptListener": listener != nil])
+    }
+
     /// Stop the server.  After this call `baseURL` is `nil`
     /// and any in-flight connections are cancelled.  Calling
     /// `serve(playback:)` again will start a fresh listener
@@ -1083,6 +1151,7 @@ final class LocalHLSProxyServer: @unchecked Sendable {
         // the previous video's cache entry.
         currentBvid = nil
         currentCid = nil
+        currentQn = nil
         // Drop cached upstream probes too — after a long
         // background the cached byte sizes may belong to a
         // CDN file that has since been re-ranged.
@@ -1402,12 +1471,16 @@ final class LocalHLSProxyServer: @unchecked Sendable {
     private var port: UInt16 = 0
     private var currentPlayback: BiliPlayback?
     /// **PR-C (Phase 2)**: identity of the active prefetch
-    /// cache entry.  See `setCurrentIdentity(bvid:cid:)` for
+    /// cache entry.  See `setCurrentIdentity(bvid:cid:qn:)` for
     /// lifetime.  Read by `proxySegment` / `proxySegmentRange`
     /// to route a segment request to the on-disk bytes when
     /// the prefetch has completed.
     private var currentBvid: String?
     private var currentCid: Int64?
+    /// Resolved video quality used by the active prefetch entry.
+    /// This is usually `dash.video.qualityId`, but falls back to
+    /// `acceptQuality.first` when Bilibili omits the track id.
+    private var currentQn: Int?
     /// Live playback state.  Mirrors `currentPlayback` for the
     /// `/live/manifest.m3u8` + `/live/seg` routes; null when the
     /// last `serve(playback:)` was a VOD stream (or nothing).
@@ -4557,7 +4630,7 @@ fileprivate func proxySegmentRange(
         lock.lock(); defer { lock.unlock() }
         guard let bvid = currentBvid,
               let cid = currentCid,
-              let qn = currentPlayback?.selectedVideoQn
+              let qn = currentQn
         else { return nil }
         return (bvid, cid, qn)
     }

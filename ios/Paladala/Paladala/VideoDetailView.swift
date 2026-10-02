@@ -327,7 +327,7 @@ struct VideoDetailView: View {
                             .font(.body.weight(.medium))
                             .foregroundStyle(PaladalaTheme.biliPink)
                     }
-                    .accessibilityLabel("插件已固定 CDN 节点 \(pin)，点击前往设置")
+                    .accessibilityLabel("外掛已固定 CDN 節點 \(pin)，點選前往設定")
                 }
             }
             // Tappable owner-name button in the nav-bar centre.
@@ -353,8 +353,8 @@ struct VideoDetailView: View {
                         .foregroundStyle(.primary)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("查看 UP 主 \(model.detail.ownerName) 的个人主页")
-                    .accessibilityHint("打开 UP 主个人主页")
+                    .accessibilityLabel("檢視 UP 主 \(model.detail.ownerName) 的個人主頁")
+                    .accessibilityHint("開啟 UP 主個人主頁")
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -680,7 +680,7 @@ struct VideoDetailView: View {
                         .foregroundStyle(PaladalaTheme.ink)
                         .textCase(.uppercase)
                         .lineLimit(1)
-                    Text("查看 UP 主个人主页")
+                    Text("檢視 UP 主個人主頁")
                         .font(PaladalaTheme.FontRole.labelMono)
                         .foregroundStyle(PaladalaTheme.mutedInk)
                 }
@@ -705,7 +705,7 @@ struct VideoDetailView: View {
         }
         .buttonStyle(PaladalaPressBounceButtonStyle())
         .accessibilityElement(children: .combine)
-        .accessibilityHint("打开 UP 主个人主页")
+        .accessibilityHint("開啟 UP 主個人主頁")
     }
 
     private var commentsScrollView: some View {
@@ -886,7 +886,7 @@ struct VideoDetailView: View {
                     Button {
                         Task { await model.load(repository: repository) }
                     } label: {
-                        Label("重试播放", systemImage: "arrow.clockwise")
+                        Label("重試播放", systemImage: "arrow.clockwise")
                     }
                     .buttonStyle(PaladalaGlassButtonStyle(materialDesign: materialDesign))
                 }
@@ -990,7 +990,7 @@ struct VideoDetailView: View {
                       : "text.bubble")
                     .font(.body.weight(.black))
                     .contentTransition(.symbolEffect(.replace.downUp))
-                Text("弹幕")
+                Text("彈幕")
                     .font(PaladalaTheme.FontRole.labelMono)
             }
         }
@@ -1040,7 +1040,7 @@ struct VideoDetailView: View {
                 Image(systemName: "arrow.down.circle")
                     .font(.body.weight(.black))
                     .contentTransition(.symbolEffect(.replace.downUp))
-                Text("下载")
+                Text("下載")
                     .font(PaladalaTheme.FontRole.labelMono)
             }
         case .downloading(let p):
@@ -1056,7 +1056,7 @@ struct VideoDetailView: View {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.body.weight(.black))
                     .contentTransition(.symbolEffect(.replace.downUp))
-                Text("已下载")
+                Text("已下載")
                     .font(PaladalaTheme.FontRole.labelMono)
             }
         case .failed:
@@ -1064,7 +1064,7 @@ struct VideoDetailView: View {
                 Image(systemName: "exclamationmark.arrow.circlepath")
                     .font(.body.weight(.black))
                     .contentTransition(.symbolEffect(.replace.downUp))
-                Text("重试")
+                Text("重試")
                     .font(PaladalaTheme.FontRole.labelMono)
             }
         }
@@ -1131,7 +1131,7 @@ struct VideoDetailView: View {
                     scheduleCoinToastDismiss()
                 }
             } label: {
-                Label("投 1 枚硬币", systemImage: "bitcoinsign.circle")
+                Label("投 1 枚硬幣", systemImage: "bitcoinsign.circle")
             }
             Button {
                 Haptics.tap()
@@ -1140,7 +1140,7 @@ struct VideoDetailView: View {
                     scheduleCoinToastDismiss()
                 }
             } label: {
-                Label("投 2 枚硬币", systemImage: "bitcoinsign.circle.fill")
+                Label("投 2 枚硬幣", systemImage: "bitcoinsign.circle.fill")
             }
             if model.coinGiven > 0 {
                 Divider()
@@ -1164,7 +1164,7 @@ struct VideoDetailView: View {
                         .font(.body.weight(.black))
                         .contentTransition(.symbolEffect(.replace.downUp))
                 }
-                Text(model.coinGiven > 0 ? "已投 \(model.coinGiven)" : "投币")
+                Text(model.coinGiven > 0 ? "已投 \(model.coinGiven)" : "投幣")
                     .font(PaladalaTheme.FontRole.labelMono)
                     .contentTransition(.numericText(value: Double(model.coinGiven)))
             }
@@ -1301,7 +1301,7 @@ struct VideoDetailView: View {
                         .foregroundStyle(.primary)
                         .lineLimit(3)
                     if !chapter.partOutline.isEmpty {
-                        Text("\(chapter.partOutline.count) 个要点")
+                        Text("\(chapter.partOutline.count) 個要點")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -1714,14 +1714,14 @@ struct VideoDetailView: View {
                     if model.commentsLoadingMore {
                         ProgressView()
                             .controlSize(.small)
-                        Text("加载中…")
+                        Text("載入中…")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
                         Button {
                             Task { await model.loadMoreComments(repository: repository) }
                         } label: {
-                            Label("加载更多评论", systemImage: "arrow.down.circle")
+                            Label("載入更多評論", systemImage: "arrow.down.circle")
                         }
                         .buttonStyle(PaladalaGlassButtonStyle(materialDesign: materialDesign))
                     }
@@ -1729,7 +1729,7 @@ struct VideoDetailView: View {
                 }
                 .padding(.vertical, 12)
             } else if !model.comments.isEmpty {
-                Text("— 没有更多评论了 —")
+                Text("— 沒有更多評論了 —")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity)
@@ -1740,7 +1740,7 @@ struct VideoDetailView: View {
 
     private var commentInputField: some View {
         HStack(spacing: 12) {
-            TextField("说点什么…", text: $newCommentText)
+            TextField("說點什麼…", text: $newCommentText)
                 .font(PaladalaTheme.FontRole.bodySmall)
                 .textFieldStyle(.plain)
                 .padding(.horizontal, 12)
@@ -1801,13 +1801,13 @@ struct VideoDetailView: View {
     private var relatedVideosSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("相关推荐")
+                Text("相關推薦")
                     .font(PaladalaTheme.FontRole.sectionHeader)
                     .foregroundStyle(PaladalaTheme.ink)
                     .textCase(.uppercase)
                 Spacer()
                 if UserDefaults.standard.bool(forKey: "paladala.autoPlayNext") {
-                    Label("自动播放下一集", systemImage: "play.circle.fill")
+                    Label("自動播放下一集", systemImage: "play.circle.fill")
                         .font(.caption2)
                         .foregroundStyle(PaladalaTheme.biliPink)
                         .padding(.horizontal, 8)
@@ -1864,7 +1864,7 @@ struct VideoDetailView: View {
                 if hasQueue, let next = model.nextUpIndex,
                    next < model.relatedVideos.count {
                     let video = model.relatedVideos[next]
-                    Text("下一个视频")
+                    Text("下一個影片")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.85))
                     CoverImage(url: video.coverURL)
@@ -1877,7 +1877,7 @@ struct VideoDetailView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 12)
                 } else {
-                    Text("已经看完了")
+                    Text("已經看完了")
                         .font(.headline)
                         .foregroundStyle(.white)
                 }
@@ -1925,7 +1925,7 @@ struct VideoDetailView: View {
                             }
                             router.open(.home)
                         } label: {
-                            Label("回到首页", systemImage: "house.fill")
+                            Label("回到首頁", systemImage: "house.fill")
                                 .font(.caption.weight(.semibold))
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 8)
@@ -1935,7 +1935,7 @@ struct VideoDetailView: View {
                     }
                 }
                 if isCountingDownToNext && hasQueue {
-                    Text("\(nextUpCountdown) 秒后自动播放")
+                    Text("\(nextUpCountdown) 秒後自動播放")
                         .font(.caption2)
                         .foregroundStyle(.white.opacity(0.7))
                         .transition(.opacity)
@@ -2066,7 +2066,7 @@ private struct CommentRow: View {
                                     NestedReplyRow(comment: reply)
                                 }
                                 if comment.replyCount > comment.replies.count {
-                                    Text("查看全部 \(comment.replyCount) 条回复 >")
+                                    Text("檢視全部 \(comment.replyCount) 條回覆 >")
                                         .font(.caption.weight(.semibold))
                                         .foregroundStyle(PaladalaTheme.biliPink)
                                         .padding(.top, 2)
@@ -2074,7 +2074,7 @@ private struct CommentRow: View {
                             }
                             .padding(.top, 2)
                         } else if comment.replyCount > 0 {
-                            Text("查看全部 \(comment.replyCount) 条回复 >")
+                            Text("檢視全部 \(comment.replyCount) 條回覆 >")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(PaladalaTheme.biliPink)
                         }
@@ -2257,7 +2257,7 @@ private struct RelatedVideoCard: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 }
                 if isNextUp {
-                    Text("下一个")
+                    Text("下一個")
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 7)
@@ -2367,10 +2367,10 @@ private struct ResumePromptSheet: View {
                 .fill(PaladalaTheme.ink)
                 .frame(width: 36, height: 5)
                 .padding(.top, 8)
-            Text("继续观看 \(mmss)？")
+            Text("繼續觀看 \(mmss)？")
                 .font(.headline)
                 .multilineTextAlignment(.center)
-            Text("上次你看到这里了，要不要接着看？")
+            Text("上次你看到這裡了，要不要接著看？")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -2386,7 +2386,7 @@ private struct ResumePromptSheet: View {
                 Button {
                     onContinue()
                 } label: {
-                    Text("继续观看")
+                    Text("繼續觀看")
                         .frame(maxWidth: .infinity)
                         .fontWeight(.semibold)
                 }

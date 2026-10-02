@@ -42,7 +42,7 @@ enum DesignVariant: String, CaseIterable, Identifiable, Sendable {
         case .streetRedesign:
             "當前的硬邊極簡風格:無圓角、1.5pt 黑邊、4pt 實心硬影。"
         case .iosNative:
-            "純蘋果原生體驗,跟隨系統 tint、SF Pro text style、.searchable 系統搜索。"
+            "純蘋果原生體驗,跟隨系統 tint、SF Pro text style、.searchable 系統搜尋。"
         }
     }
 

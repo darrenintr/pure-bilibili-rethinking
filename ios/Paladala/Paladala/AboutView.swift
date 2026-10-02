@@ -97,7 +97,7 @@ struct AboutView: View {
         VStack(spacing: 0) {
             // Section header
             HStack {
-                Text("构建信息")
+                Text("構建資訊")
                     .font(.system(size: 11, weight: .black, design: .monospaced))
                     .foregroundStyle(PaladalaTheme.mutedInk)
                     .textCase(.uppercase)
@@ -133,7 +133,7 @@ struct AboutView: View {
             }
 
             // Footer note
-            Text("特别辨识号用于精确标识当前构建，反馈问题时附上它可以帮我们快速定位。")
+            Text("特別辨識號用於精確標識當前構建，反饋問題時附上它可以幫我們快速定位。")
                 .font(.system(size: 10, weight: .medium, design: .monospaced))
                 .foregroundStyle(PaladalaTheme.mutedInk)
                 .padding(.horizontal, PaladalaTheme.Spacing.l)
@@ -451,7 +451,7 @@ struct AboutView: View {
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
                         .foregroundStyle(PaladalaTheme.mutedInk)
                 }
-                Text("已為你打開源頁,喺 AltStore / SideStore 重新整理源後即可一鍵安裝。")
+                Text("已為你開啟源頁,喺 AltStore / SideStore 重新整理源後即可一鍵安裝。")
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundStyle(PaladalaTheme.mutedInk)
             }
@@ -477,7 +477,7 @@ struct AboutView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "wrench.and.screwdriver")
-                        Text("设置快捷指令")
+                        Text("設定快捷指令")
                     }
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .foregroundStyle(PaladalaTheme.biliPink)

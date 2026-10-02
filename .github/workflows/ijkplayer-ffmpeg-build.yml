@@ -56,12 +56,12 @@ jobs:
           git clone --depth 1 --branch master https://github.com/Bilibili/ijkplayer.git "$IJKPLAYER_SRC"
           cd "$IJKPLAYER_SRC"
           python3 - <<'PATCH_IJK_INIT'
-from pathlib import Path
-p = Path('init-ios.sh')
-s = p.read_text()
-s = s.replace('FF_ALL_ARCHS=$FF_ALL_ARCHS_IOS8_SDK', 'FF_ALL_ARCHS=arm64')
-p.write_text(s)
-PATCH_IJK_INIT
+          from pathlib import Path
+          p = Path('init-ios.sh')
+          s = p.read_text()
+          s = s.replace('FF_ALL_ARCHS=$FF_ALL_ARCHS_IOS8_SDK', 'FF_ALL_ARCHS=arm64')
+          p.write_text(s)
+          PATCH_IJK_INIT
           bash init-ios.sh
           test -f ffmpeg-arm64/libavcodec/aarch64/h264dsp_init_aarch64.c
           echo "IJKPlayer source configured"

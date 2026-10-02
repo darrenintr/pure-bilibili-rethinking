@@ -56,11 +56,11 @@ struct LoginSheet: View {
             }
             .padding(20)
             .background(PaladalaTheme.canvas)
-            .navigationTitle("登录 Bilibili")
+            .navigationTitle("登入 Bilibili")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("关闭") {
+                    Button("關閉") {
                         Haptics.tap()
                         dismiss()
                     }
@@ -105,11 +105,11 @@ struct LoginSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("登录 Bilibili")
+            .navigationTitle("登入 Bilibili")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("关闭") {
+                    Button("關閉") {
                         Haptics.tap()
                         dismiss()
                     }
@@ -120,11 +120,11 @@ struct LoginSheet: View {
 
     private var explanationStreet: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("扫码登录 Paladala")
+            Text("掃碼登入 Paladala")
                 .font(PaladalaTheme.FontRole.displayMedium)
                 .foregroundStyle(PaladalaTheme.ink)
                 .textCase(.uppercase)
-            Text("打开手机 Bilibili App，扫一扫下方二维码即可登录。\n登录后可查看评论、关注动态与个性化首页。")
+            Text("開啟手機 Bilibili App，掃一掃下方二維碼即可登入。\n登入後可檢視評論、關注動態與個性化首頁。")
                 .font(PaladalaTheme.FontRole.bodySmall)
                 .foregroundStyle(PaladalaTheme.mutedInk)
                 .multilineTextAlignment(.leading)
@@ -138,10 +138,10 @@ struct LoginSheet: View {
     /// so the title floats on the page's `systemGroupedBackground`.
     private var explanationNative: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("扫码登录 Paladala")
+            Text("掃碼登入 Paladala")
                 .font(.title2.weight(.bold))
                 .foregroundStyle(.primary)
-            Text("打开手机 Bilibili App，扫一扫下方二维码即可登录。登录后可查看评论、关注动态与个性化首页。")
+            Text("開啟手機 Bilibili App，掃一掃下方二維碼即可登入。登入後可檢視評論、關注動態與個性化首頁。")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.leading)
@@ -208,7 +208,7 @@ struct LoginSheet: View {
                 Image(systemName: "qrcode")
                     .font(.system(size: 40))
                     .foregroundStyle(.secondary)
-                Text("二维码已过期")
+                Text("二維碼已過期")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -244,7 +244,7 @@ struct LoginSheet: View {
                 Button {
                     model.regenerate()
                 } label: {
-                    Label("刷新二维码", systemImage: "arrow.clockwise")
+                    Label("重新整理二維碼", systemImage: "arrow.clockwise")
                 }
                 .buttonStyle(PaladalaGlassButtonStyle(materialDesign: .liquidGlass))
             }
@@ -263,7 +263,7 @@ struct LoginSheet: View {
             Button {
                 model.regenerate()
             } label: {
-                Label("刷新二维码", systemImage: "arrow.clockwise")
+                Label("重新整理二維碼", systemImage: "arrow.clockwise")
             }
             .buttonStyle(.bordered)
             .controlSize(.regular)

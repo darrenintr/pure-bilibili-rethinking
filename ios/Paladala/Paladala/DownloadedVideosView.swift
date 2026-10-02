@@ -52,7 +52,7 @@ struct DownloadedVideosView: View {
                                 Haptics.tap()
                                 DownloadStore.shared.remove(bvid: record.bvid)
                             } label: {
-                                Label("删除下载", systemImage: "trash")
+                                Label("刪除下載", systemImage: "trash")
                             }
                         }
                     }
@@ -62,7 +62,7 @@ struct DownloadedVideosView: View {
                 .background(PaladalaTheme.canvas)
             }
         }
-        .navigationTitle("离线缓存")
+        .navigationTitle("離線快取")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -75,8 +75,8 @@ struct DownloadedVideosView: View {
                     ShareLink(item: shareURL) {
                         Image(systemName: "square.and.arrow.up.on.square")
                     }
-                    .accessibilityLabel("导出诊断日志")
-                    .accessibilityHint("导出诊断日志可发送给开发者排查下载问题")
+                    .accessibilityLabel("匯出診斷日誌")
+                    .accessibilityHint("匯出診斷日誌可傳送給開發者排查下載問題")
                 } else {
                     Button {
                         Haptics.tap()
@@ -84,8 +84,8 @@ struct DownloadedVideosView: View {
                     } label: {
                         Image(systemName: "square.and.arrow.up.on.square")
                     }
-                    .accessibilityLabel("导出诊断日志")
-                    .accessibilityHint("导出诊断日志可发送给开发者排查下载问题")
+                    .accessibilityLabel("匯出診斷日誌")
+                    .accessibilityHint("匯出診斷日誌可傳送給開發者排查下載問題")
                 }
             }
         }
@@ -98,13 +98,13 @@ struct DownloadedVideosView: View {
     private var emptyState: some View {
         VStack(spacing: 18) {
             ContentUnavailableView(
-                "暂无下载视频",
+                "暫無下載影片",
                 systemImage: "arrow.down.circle",
-                description: Text("在视频页点击下载按钮保存到本地")
+                description: Text("在影片頁點選下載按鈕儲存到本地")
             )
             if let shareURL {
                 ShareLink(item: shareURL) {
-                    Label("导出诊断日志", systemImage: "square.and.arrow.up")
+                    Label("匯出診斷日誌", systemImage: "square.and.arrow.up")
                         .font(.footnote.weight(.semibold))
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
@@ -125,13 +125,13 @@ struct DownloadedVideosView: View {
                         }
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint("下载卡住时把日志发给开发者")
+                .accessibilityHint("下載卡住時把日誌發給開發者")
             } else {
                 Button {
                     Haptics.tap()
                     shareDiagnosticReport()
                 } label: {
-                    Label("导出诊断日志", systemImage: "square.and.arrow.up")
+                    Label("匯出診斷日誌", systemImage: "square.and.arrow.up")
                         .font(.footnote.weight(.semibold))
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
@@ -152,7 +152,7 @@ struct DownloadedVideosView: View {
                         }
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint("下载卡住时把日志发给开发者")
+                .accessibilityHint("下載卡住時把日誌發給開發者")
             }
         }
         .padding(.bottom, 24)

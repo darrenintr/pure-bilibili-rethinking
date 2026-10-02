@@ -292,8 +292,8 @@ final class HomeViewModel: ObservableObject {
             guard !AppErrorDescriptor.isCancellation(error) else { return }
 
             let fallback = replacing
-                ? "内容加载失败，下拉重试。"
-                : "加载更多失败，请重试。"
+                ? "內容載入失敗，下拉重試。"
+                : "載入更多失敗，請重試。"
             let descriptor = AppErrorCenter.shared.record(
                 error,
                 context: "home.\(category.rawValue).\(replacing ? "refresh" : "pagination")",
@@ -367,8 +367,8 @@ final class HomeViewModel: ObservableObject {
             guard isCurrentRequest(requestID) else { return }
             guard !AppErrorDescriptor.isCancellation(error) else { return }
             let fallback = replacing
-                ? "关注动态加载失败，下拉重试。"
-                : "加载更多关注动态失败，请重试。"
+                ? "關注動態載入失敗，下拉重試。"
+                : "載入更多關注動態失敗，請重試。"
             let descriptor = AppErrorCenter.shared.record(
                 error,
                 context: "home.follow.\(replacing ? "refresh" : "pagination")",
@@ -754,7 +754,7 @@ final class VideoDetailViewModel: ObservableObject {
         guard !coinInFlight else { return }
         guard multiply >= 1, multiply <= 2 else { return }
         guard coinGiven < 2 else {
-            coinToast = "已经投过 2 枚硬币啦"
+            coinToast = "已經投過 2 枚硬幣啦"
             return
         }
         coinInFlight = true
@@ -764,13 +764,13 @@ final class VideoDetailViewModel: ObservableObject {
                 to: detail, multiply: multiply, alsoLike: false
             )
             coinGiven = min(2, coinGiven + multiply)
-            coinToast = "投了 \(coinGiven) 枚硬币 · 感谢支持 UP 主"
+            coinToast = "投了 \(coinGiven) 枚硬幣 · 感謝支援 UP 主"
         } catch {
             // The upstream returns a structured reason on rejection
             // (e.g. 硬币余额不足); surface it directly so the user
             // sees why the action didn't take.
             let message = error.localizedDescription
-            coinToast = message.isEmpty ? "投币失败，请稍后再试" : message
+            coinToast = message.isEmpty ? "投幣失敗，請稍後再試" : message
         }
     }
 
@@ -1065,11 +1065,11 @@ final class VideoDetailViewModel: ObservableObject {
             case .api(let message):
                 errorMessage = message
             case .missingData:
-                errorMessage = "该视频暂无可播放源。"
+                errorMessage = "該影片暫無可播放源。"
             case .missingIdentity:
-                errorMessage = "无法识别该视频（缺少 aid/bvid）。"
+                errorMessage = "無法識別該影片（缺少 aid/bvid）。"
             case .noPlayableFormat:
-                errorMessage = "该视频的可用清晰度均不可播放（可能为地区限制或大会员专享）。"
+                errorMessage = "該影片的可用清晰度均不可播放（可能為地區限制或大會員專享）。"
             case .vipRequired:
                 // Same shape as `.noPlayableFormat` from the
                 // user's perspective — every reachable qn was
@@ -1081,7 +1081,7 @@ final class VideoDetailViewModel: ObservableObject {
             case .vipExpired:
                 errorMessage = L10n.vip.expiredHint
             case .invalidURL, .http:
-                errorMessage = "网络异常，请检查连接后重试。"
+                errorMessage = "網路異常，請檢查連線後重試。"
             case .sessionExpired:
                 // The `onAuthFailure` latch on the API client has
                 // already kicked the AppRouter to present the
@@ -1089,7 +1089,7 @@ final class VideoDetailViewModel: ObservableObject {
                 // surface a coherent inline error so the user
                 // is not staring at a stale spinner while the
                 // sheet slides in.
-                errorMessage = "登录状态已过期，请重新登录。"
+                errorMessage = "登入狀態已過期，請重新登入。"
             }
             diagLog(.playback,
                     "VideoDetailViewModel.load failed (BilibiliAPIError)",
@@ -1107,7 +1107,7 @@ final class VideoDetailViewModel: ObservableObject {
                 "bvid": detail.bvid,
                 "kind": "unknown"
             ])
-            errorMessage = "播放失败：\(error.localizedDescription)"
+            errorMessage = "播放失敗：\(error.localizedDescription)"
             diagLog(.playback,
                     "VideoDetailViewModel.load failed (unknown)",
                     details: [
@@ -1168,7 +1168,7 @@ final class VideoDetailViewModel: ObservableObject {
             // app) — a misleading "log in" CTA on a logged-in
             // account is worse than a generic retry prompt.
             bpLog("loadComments: caught BilibiliAPIError.missingIdentity")
-            commentsErrorMessage = "评论加载失败，请稍后重试"
+            commentsErrorMessage = "評論載入失敗，請稍後重試"
             comments = []
         } catch is CancellationError {
             // The user navigated away mid-load (typical: rapidly
@@ -1186,7 +1186,7 @@ final class VideoDetailViewModel: ObservableObject {
             // specific failure mode instead of the generic
             // banner shown in the UI.
             bpLog("loadComments: caught error type=\(type(of: error)) message=\(error)")
-            commentsErrorMessage = "评论加载失败，请稍后重试"
+            commentsErrorMessage = "評論載入失敗，請稍後重試"
             comments = []
         }
         commentsLoading = false
@@ -1354,7 +1354,7 @@ final class VideoDetailViewModel: ObservableObject {
             // any other failure gets the English fallback that has
             // been on the screen for the previous builds.
             commentsErrorMessage = (error is BilibiliAPIError)
-                ? "评论加载失败，请稍后重试"
+                ? "評論載入失敗，請稍後重試"
                 : "Could not load more comments."
         }
     }
@@ -1397,7 +1397,7 @@ final class VideoDetailViewModel: ObservableObject {
             // AVPlayer.
             switch error {
             case .noPlayableFormat:
-                errorMessage = "该清晰度不可用，已切换回原画质。"
+                errorMessage = "該清晰度不可用，已切換回原畫質。"
             case .vipRequired, .vipExpired:
                 // 大会员 business code returned. Roll the
                 // pick back to whatever the qnChain landed
@@ -1425,21 +1425,21 @@ final class VideoDetailViewModel: ObservableObject {
             case .api(let message):
                 errorMessage = message
             case .missingData:
-                errorMessage = "该视频暂无可播放源。"
+                errorMessage = "該影片暫無可播放源。"
             case .missingIdentity:
-                errorMessage = "无法识别该视频（缺少 aid/bvid）。"
+                errorMessage = "無法識別該影片（缺少 aid/bvid）。"
             case .invalidURL, .http:
-                errorMessage = "网络异常，请检查连接后重试。"
+                errorMessage = "網路異常，請檢查連線後重試。"
             case .sessionExpired:
                 // Same latch contract as `load()` above: the
                 // app router already has the login sheet on
                 // screen, the inline error just keeps the UI
                 // honest while the quality pick resets to the
                 // previous value on the next playback call.
-                errorMessage = "登录状态已过期，请重新登录。"
+                errorMessage = "登入狀態已過期，請重新登入。"
             }
         } catch {
-            errorMessage = "切换清晰度失败：\(error.localizedDescription)"
+            errorMessage = "切換清晰度失敗：\(error.localizedDescription)"
         }
     }
 
@@ -1468,7 +1468,7 @@ final class VideoDetailViewModel: ObservableObject {
         } catch let error as BilibiliAPIError {
             switch error {
             case .noPlayableFormat:
-                errorMessage = "该音质不可用，已切换回原音质。"
+                errorMessage = "該音質不可用，已切換回原音質。"
             case .vipRequired, .vipExpired:
                 // Mirror the video path: drop the pick
                 // back to the highest non-gated audio id
@@ -1483,16 +1483,16 @@ final class VideoDetailViewModel: ObservableObject {
             case .api(let message):
                 errorMessage = message
             case .missingData:
-                errorMessage = "该视频暂无可播放源。"
+                errorMessage = "該影片暫無可播放源。"
             case .missingIdentity:
-                errorMessage = "无法识别该视频（缺少 aid/bvid）。"
+                errorMessage = "無法識別該影片（缺少 aid/bvid）。"
             case .invalidURL, .http:
-                errorMessage = "网络异常，请检查连接后重试。"
+                errorMessage = "網路異常，請檢查連線後重試。"
             case .sessionExpired:
-                errorMessage = "登录状态已过期，请重新登录。"
+                errorMessage = "登入狀態已過期，請重新登入。"
             }
         } catch {
-            errorMessage = "切换音质失败：\(error.localizedDescription)"
+            errorMessage = "切換音質失敗：\(error.localizedDescription)"
         }
     }
 
@@ -1542,7 +1542,7 @@ final class VideoDetailViewModel: ObservableObject {
             await loadComments(repository: repository)
             return true
         } catch {
-            errorMessage = "评论失败：\(error.localizedDescription)"
+            errorMessage = "評論失敗：\(error.localizedDescription)"
             return false
         }
     }
@@ -1640,7 +1640,7 @@ final class ReplyListViewModel: ObservableObject {
             hasMore = !pageResult.isEnd
             totalCount = pageResult.totalCount
         } catch {
-            errorMessage = "无法加载回复。"
+            errorMessage = "無法載入回覆。"
         }
         isLoading = false
     }
@@ -1668,7 +1668,7 @@ final class ReplyListViewModel: ObservableObject {
             await load(repository: repository)
             return true
         } catch {
-            errorMessage = "回复失败：\(error.localizedDescription)"
+            errorMessage = "回覆失敗：\(error.localizedDescription)"
             return false
         }
     }

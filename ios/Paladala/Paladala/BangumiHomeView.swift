@@ -111,7 +111,7 @@ struct BangumiHomeView: View {
                         }
                     }
                 } else {
-                    Text("该日无更新")
+                    Text("該日無更新")
                         .font(PaladalaTheme.FontRole.body)
                         .foregroundStyle(PaladalaTheme.mutedInk)
                         .padding(.top, 48)
@@ -168,7 +168,7 @@ struct BangumiHomeView: View {
             Image(systemName: "calendar")
                 .font(.system(size: 32, weight: .light))
                 .foregroundStyle(PaladalaTheme.mutedInk)
-            Text("\(day.weekdayLabel)暂无番剧更新")
+            Text("\(day.weekdayLabel)暫無番劇更新")
                 .font(PaladalaTheme.FontRole.body)
                 .foregroundStyle(PaladalaTheme.mutedInk)
         }
@@ -179,7 +179,7 @@ struct BangumiHomeView: View {
             Image(systemName: "play.rectangle")
                 .font(.system(size: 32, weight: .light))
                 .foregroundStyle(PaladalaTheme.mutedInk)
-            Text("暂无番剧时间表")
+            Text("暫無番劇時間表")
                 .font(PaladalaTheme.FontRole.sectionHeader)
                 .foregroundStyle(PaladalaTheme.ink)
         }
@@ -303,7 +303,7 @@ struct BangumiSeasonDetailView: View {
                 Color.clear
             }
         }
-        .navigationTitle(detail?.title ?? "番剧详情")
+        .navigationTitle(detail?.title ?? "番劇詳情")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(PaladalaTheme.paper, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
@@ -383,7 +383,7 @@ struct BangumiSeasonDetailView: View {
                     .padding(8)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("关闭播放器")
+            .accessibilityLabel("關閉播放器")
         }
         .padding(.horizontal, PaladalaTheme.Spacing.l)
         .padding(.vertical, PaladalaTheme.Spacing.s)
@@ -394,7 +394,7 @@ struct BangumiSeasonDetailView: View {
             ProgressView()
                 .progressViewStyle(.circular)
                 .tint(PaladalaTheme.ink)
-            Text("准备播放器…")
+            Text("準備播放器…")
                 .font(PaladalaTheme.FontRole.bodySmall)
                 .foregroundStyle(PaladalaTheme.mutedInk)
             Spacer()
@@ -408,7 +408,7 @@ struct BangumiSeasonDetailView: View {
             Image(systemName: "exclamationmark.triangle")
                 .foregroundStyle(PaladalaTheme.biliPink)
             VStack(alignment: .leading, spacing: 2) {
-                Text("无法在此设备播放")
+                Text("無法在此裝置播放")
                     .font(PaladalaTheme.FontRole.bodySmall)
                     .foregroundStyle(PaladalaTheme.ink)
                 Text(message)
@@ -422,7 +422,7 @@ struct BangumiSeasonDetailView: View {
                     fallbackURL = IdentifiableURL(url: url)
                 }
             } label: {
-                Text("在 Safari 打开")
+                Text("在 Safari 開啟")
                     .font(PaladalaTheme.FontRole.labelMono)
                     .foregroundStyle(PaladalaTheme.ink)
                     .padding(.horizontal, PaladalaTheme.Spacing.m)
@@ -470,7 +470,7 @@ struct BangumiSeasonDetailView: View {
                         .foregroundStyle(PaladalaTheme.mutedInk)
                         .lineLimit(4)
                 }
-                Text("共 \(detail.episodes.count) 话")
+                Text("共 \(detail.episodes.count) 話")
                     .font(PaladalaTheme.FontRole.labelMono)
                     .foregroundStyle(PaladalaTheme.mutedInk)
                     .padding(.top, 2)
