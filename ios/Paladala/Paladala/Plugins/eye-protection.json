@@ -1,6 +1,6 @@
 {
   "id": "com.paladala.builtin.eye-protection",
-  "name": "护眼调光",
+  "name": "護眼調光",
   "version": 1,
   "enabled": false,
   "scope": ["brightness"],

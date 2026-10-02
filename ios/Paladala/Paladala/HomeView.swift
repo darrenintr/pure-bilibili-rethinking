@@ -67,7 +67,7 @@ struct HomeView: View {
     private var searchBar: some View {
         UISearchFieldBridge(
             text: $model.searchQuery,
-            prompt: "搜索 Bilibili 视频和 UP 主",
+            prompt: "搜尋 Bilibili 影片和 UP 主",
             onSubmit: {
                 model.clearSuggestions()
                 model.category = .search
@@ -198,20 +198,20 @@ struct HomeView: View {
                                     Haptics.tap()
                                     router.open(.downloads)
                                 } label: {
-                                    Label("离线缓存", systemImage: "arrow.down.circle")
+                                    Label("離線快取", systemImage: "arrow.down.circle")
                                 }
                                 .badge(downloadStore.records.count)
                                 Button {
                                     Haptics.tap()
                                     isShortVideoFeedPresented = true
                                 } label: {
-                                    Label("短视频", systemImage: "rectangle.portrait.on.rectangle.portrait")
+                                    Label("短影片", systemImage: "rectangle.portrait.on.rectangle.portrait")
                                 }
                                 Button {
                                     Haptics.tap()
                                     router.open(.dynamic)
                                 } label: {
-                                    Label("动态", systemImage: "bell")
+                                    Label("動態", systemImage: "bell")
                                 }
                             } label: {
                                 Image(systemName: "ellipsis.circle")
@@ -233,14 +233,14 @@ struct HomeView: View {
                                 Haptics.tap()
                                 router.open(.downloads)
                             } label: {
-                                Label("离线缓存", systemImage: "arrow.down.circle")
+                                Label("離線快取", systemImage: "arrow.down.circle")
                             }
                             .badge(downloadStore.records.count)
                             Button {
                                 Haptics.tap()
                                 isShortVideoFeedPresented = true
                             } label: {
-                                Label("短视频", systemImage: "rectangle.portrait.on.rectangle.portrait")
+                                Label("短影片", systemImage: "rectangle.portrait.on.rectangle.portrait")
                             }
                             Button {
                                 Haptics.tap()
@@ -255,7 +255,7 @@ struct HomeView: View {
                             } label: {
                                 Image(systemName: "bell")
                             }
-                            .accessibilityLabel("动态")
+                            .accessibilityLabel("動態")
                             Button {
                                 Haptics.tap()
                                 router.open(.profile)
@@ -341,7 +341,7 @@ struct HomeView: View {
                         Button {
                             model.showBundledFallback(repository: repository)
                         } label: {
-                            Label("查看离线样例", systemImage: "wifi.slash")
+                            Label("檢視離線樣例", systemImage: "wifi.slash")
                                 .font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.bordered)
@@ -492,7 +492,7 @@ struct HomeView: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
-                Text("加载更多…")
+                Text("載入更多…")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -506,7 +506,7 @@ struct HomeView: View {
             // current list is the bundled offline sample set.
             VStack(spacing: 10) {
                 if model.isShowingBundledFallback {
-                    Text("当前展示离线样例数据")
+                    Text("當前展示離線樣例資料")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -514,7 +514,7 @@ struct HomeView: View {
                     Button {
                         Task { await model.load(repository: repository, accountMid: accountMid) }
                     } label: {
-                        Label("刷新", systemImage: "arrow.clockwise")
+                        Label("重新整理", systemImage: "arrow.clockwise")
                             .font(.caption.weight(.semibold))
                     }
                     .buttonStyle(.bordered)
@@ -523,7 +523,7 @@ struct HomeView: View {
                     Button {
                         Task { await model.loadNextBatch(repository: repository, accountMid: accountMid) }
                     } label: {
-                        Label("换一批", systemImage: "infinity")
+                        Label("換一批", systemImage: "infinity")
                             .font(.caption.weight(.semibold))
                     }
                     .buttonStyle(.borderedProminent)
@@ -536,7 +536,7 @@ struct HomeView: View {
             Button {
                 Task { await model.loadMore(repository: repository, accountMid: accountMid) }
             } label: {
-                Label("查看更多关注动态", systemImage: "arrow.down.circle")
+                Label("檢視更多關注動態", systemImage: "arrow.down.circle")
                     .font(.caption.weight(.semibold))
             }
             .buttonStyle(.bordered)
@@ -566,14 +566,14 @@ private struct HomeOfflineBanner: View {
                 .font(.title3)
                 .foregroundStyle(PaladalaTheme.biliPink)
             VStack(alignment: .leading, spacing: 2) {
-                Text("网络异常 · 当前为离线样例")
+                Text("網路異常 · 當前為離線樣例")
                     .font(.subheadline.weight(.semibold))
-                Text("下拉或点“重新加载”即可拉取 Bilibili 公共内容源。")
+                Text("下拉或點“重新載入”即可拉取 Bilibili 公共內容源。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Button("重新加载", action: onRetry)
+            Button("重新載入", action: onRetry)
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
         }
@@ -589,7 +589,7 @@ private struct SearchUserResultsStrip: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("相关 UP 主", systemImage: "person.2")
+            Label("相關 UP 主", systemImage: "person.2")
                 .font(.subheadline.weight(.semibold))
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
@@ -617,7 +617,7 @@ private struct SearchUserResultsStrip: View {
                                         Text(user.name)
                                             .font(.subheadline.weight(.semibold))
                                             .lineLimit(1)
-                                        Text("\(user.fans.compactCount) 粉丝 · \(user.videos.compactCount) 视频")
+                                        Text("\(user.fans.compactCount) 粉絲 · \(user.videos.compactCount) 影片")
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
                                             .lineLimit(1)
@@ -666,7 +666,7 @@ private final class ShortVideoFeedViewModel: ObservableObject {
                 videos.append(contentsOf: next.filter { !existing.contains($0.id) })
             }
         } catch {
-            errorMessage = "短视频加载失败：\(error.localizedDescription)"
+            errorMessage = "短影片載入失敗：\(error.localizedDescription)"
         }
         isLoading = false
     }
@@ -809,7 +809,7 @@ private struct HomeEmptyState: View {
                         Haptics.tap()
                         onRetry()
                     } label: {
-                        Label("重试", systemImage: "arrow.clockwise")
+                        Label("重試", systemImage: "arrow.clockwise")
                             .font(.subheadline.weight(.semibold))
                     }
                     .buttonStyle(.bordered)
@@ -822,7 +822,7 @@ private struct HomeEmptyState: View {
                     // the action via the environment instead.
                     NotificationCenter.default.post(name: .homeShowBundledFallback, object: nil)
                 } label: {
-                    Label("查看离线样例", systemImage: "wifi.slash")
+                    Label("檢視離線樣例", systemImage: "wifi.slash")
                         .font(.subheadline.weight(.semibold))
                 }
                 .buttonStyle(.bordered)
@@ -832,13 +832,13 @@ private struct HomeEmptyState: View {
     }
 
     private var title: String {
-        if hasError { return "内容加载失败" }
-        if category == .follow { return isLoggedIn ? "暂无关注动态" : "关注内容需要登录" }
-        if category == .live { return "暂无直播间" }
+        if hasError { return "內容載入失敗" }
+        if category == .follow { return isLoggedIn ? "暫無關注動態" : "關注內容需要登入" }
+        if category == .live { return "暫無直播間" }
         if category == .search && searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return "搜索 Bilibili"
+            return "搜尋 Bilibili"
         }
-        return "暂无视频"
+        return "暫無影片"
     }
 
     private var systemImage: String {
@@ -849,19 +849,19 @@ private struct HomeEmptyState: View {
     }
 
     private var description: String {
-        if hasError { return "下拉重试或查看离线样例。" }
+        if hasError { return "下拉重試或檢視離線樣例。" }
         if category == .follow {
             return isLoggedIn
-                ? "当前账号暂时没有可展示的关注动态，下拉刷新或稍后再试。"
-                : "登录账号后查看关注 UP 主的视频、专栏、番剧和直播开播动态。"
+                ? "當前賬號暫時沒有可展示的關注動態，下拉重新整理或稍後再試。"
+                : "登入賬號後檢視關注 UP 主的影片、專欄、番劇和直播開播動態。"
         }
         if category == .live {
-            return "下拉刷新 Bilibili 公共直播列表。"
+            return "下拉重新整理 Bilibili 公共直播列表。"
         }
         if category == .search && searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return "输入关键词后加载 Bilibili 公共搜索结果。"
+            return "輸入關鍵詞後載入 Bilibili 公共搜尋結果。"
         }
-        return "换个关键词，或切换到热门、排行榜、分区内容。"
+        return "換個關鍵詞，或切換到熱門、排行榜、分割槽內容。"
     }
 }
 
@@ -959,15 +959,15 @@ private struct DynamicPostCard: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         if post.kind == .liveStarted {
-                            Text("· 开播")
+                            Text("· 開播")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(PaladalaTheme.biliPink)
                         } else if post.kind == .article {
-                            Text("· 专栏")
+                            Text("· 專欄")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.secondary)
                         } else if post.kind == .forward {
-                            Text("· 转发")
+                            Text("· 轉發")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.secondary)
                         }

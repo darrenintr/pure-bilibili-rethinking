@@ -214,7 +214,7 @@ final class PaladalaTests: XCTestCase {
         )
         XCTAssertEqual(network.kind, .network)
         XCTAssertTrue(network.isRetryable)
-        XCTAssertEqual(network.message, "当前没有网络连接，请联网后重试。")
+        XCTAssertEqual(network.message, "當前沒有網路連線，請聯網後重試。")
 
         let authentication = try XCTUnwrap(
             AppErrorDescriptor.describe(BilibiliAPIError.sessionExpired)
@@ -254,7 +254,7 @@ final class PaladalaTests: XCTestCase {
         center.present(
             URLError(.timedOut),
             context: "video.load",
-            recoveryLabel: "重试",
+            recoveryLabel: "重試",
             recovery: { recovered = true }
         )
 
@@ -268,7 +268,7 @@ final class PaladalaTests: XCTestCase {
     func test_loadStateCancellationPreservesExistingValueAndHasNoError() async {
         let state = LoadState(value: [1, 2, 3])
 
-        await state.load({ throw CancellationError() }, errorText: "不应显示")
+        await state.load({ throw CancellationError() }, errorText: "不應顯示")
 
         XCTAssertEqual(state.value, [1, 2, 3])
         XCTAssertNil(state.errorMessage)

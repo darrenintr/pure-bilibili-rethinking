@@ -32,7 +32,7 @@
     <key>CFBundleVersion</key>
     <string>2</string>
     <!--
-      Per-build fingerprint inputs surfaced on the 关于 page.
+      Per-build fingerprint inputs surfaced on the 關於 page.
       Populated at build time:
         - CI (ios-unsigned-ipa.yml): sets all four to git SHA,
           ISO date, and Unix epoch so each prerelease gets a

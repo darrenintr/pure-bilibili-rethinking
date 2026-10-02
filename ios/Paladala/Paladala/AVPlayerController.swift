@@ -72,11 +72,11 @@ enum PlayerPlaybackError: Equatable, Error, Sendable {
 
     var title: String {
         switch self {
-        case .itemFailed:                   return "无法播放此视频"
-        case .stoppedMidStream:             return "播放中断"
-        case .proxyFailed:                  return "服务器连接失败"
-        case .prolongedStall:               return "加载缓慢"
-        case .playbackSourceUnavailable:    return "视频源不可用"
+        case .itemFailed:                   return "無法播放此影片"
+        case .stoppedMidStream:             return "播放中斷"
+        case .proxyFailed:                  return "伺服器連線失敗"
+        case .prolongedStall:               return "載入緩慢"
+        case .playbackSourceUnavailable:    return "影片源不可用"
         }
     }
 
@@ -86,12 +86,12 @@ enum PlayerPlaybackError: Equatable, Error, Sendable {
             if let d = detail, !d.isEmpty {
                 return d
             }
-            return "视频格式不支持或播放源已失效。"
+            return "影片格式不支援或播放源已失效。"
         case .stoppedMidStream(let detail):
             if let d = detail, !d.isEmpty {
                 return d
             }
-            return "网络连接中断，请检查网络后重试。"
+            return "網路連線中斷，請檢查網路後重試。"
         case .proxyFailed(let code):
             // Bilibili's live CDN returns 403 when the cookie
             // is rejected, when the room is region-restricted,
@@ -99,16 +99,16 @@ enum PlayerPlaybackError: Equatable, Error, Sendable {
             // that out for the user so the recovery action
             // (re-login) makes sense.
             if code == 403 {
-                return "视频源拒绝请求（HTTP 403）。可能是登录已过期或地区受限。"
+                return "影片源拒絕請求（HTTP 403）。可能是登入已過期或地區受限。"
             }
-            return "视频代理服务器返回错误（HTTP \(code)），请稍后重试。"
+            return "影片代理伺服器返回錯誤（HTTP \(code)），請稍後重試。"
         case .prolongedStall:
-            return "加载时间过长，可能是网络问题。"
+            return "載入時間過長，可能是網路問題。"
         case .playbackSourceUnavailable(let detail):
             if let d = detail, !d.isEmpty {
                 return d
             }
-            return "该视频当前无法播放，可能已下架或地区受限。"
+            return "該影片當前無法播放，可能已下架或地區受限。"
         }
     }
 
@@ -143,8 +143,8 @@ enum RecoveryAction: Sendable {
     var buttonLabel: String {
         switch self {
         case .retryPlayback: return "重新播放"
-        case .retrySeek:     return "重新加载"
-        case .signInAgain:   return "重新登录"
+        case .retrySeek:     return "重新載入"
+        case .signInAgain:   return "重新登入"
         }
     }
 }

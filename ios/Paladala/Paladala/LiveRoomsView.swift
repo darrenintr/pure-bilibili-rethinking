@@ -36,11 +36,11 @@ struct LiveRoomsView: View {
                         .padding(.top, 4)
                 } else if model.rooms.isEmpty {
                     ContentUnavailableView(
-                        model.errorMessage == nil ? "暂无直播间" : "直播间列表暂不可用",
+                        model.errorMessage == nil ? "暫無直播間" : "直播間列表暫不可用",
                         systemImage: "play.tv",
                         description: Text(model.errorMessage == nil
-                                          ? "稍后再来，下拉刷新试试。"
-                                          : "Bilibili 未返回公开的直播列表。")
+                                          ? "稍後再來，下拉重新整理試試。"
+                                          : "Bilibili 未返回公開的直播列表。")
                     )
                     .frame(maxWidth: .infinity, minHeight: 260)
                     .overlay(alignment: .bottom) {
@@ -48,7 +48,7 @@ struct LiveRoomsView: View {
                             Haptics.tap()
                             Task { await model.load(repository: repository) }
                         } label: {
-                            Label("重试", systemImage: "arrow.clockwise")
+                            Label("重試", systemImage: "arrow.clockwise")
                         }
                         .buttonStyle(PaladalaGlassButtonStyle(materialDesign: materialDesign))
                         .padding(.bottom, 24)
@@ -178,7 +178,7 @@ private struct LivePlayerView: View {
             VideoPlayer(player: controller.player)
         } else if let errorMessage {
             ContentUnavailableView(
-                "无法播放该直播间",
+                "無法播放該直播間",
                 systemImage: "exclamationmark.triangle",
                 description: Text(errorMessage)
             )
@@ -305,12 +305,12 @@ private struct LivePlayerView: View {
                     controller = PlayerController(playback: livePlayback)
                 }
             } else {
-                errorMessage = "该直播间仅提供 FLV 流，AVPlayer 暂不支持。请改用支持 FLV 的客户端。"
+                errorMessage = "該直播間僅提供 FLV 流，AVPlayer 暫不支援。請改用支援 FLV 的客戶端。"
                 controller = nil
             }
             errorMessage = nil
         } catch {
-            errorMessage = "直播间地址解析失败：\(error.localizedDescription)"
+            errorMessage = "直播間地址解析失敗：\(error.localizedDescription)"
         }
     }
 }

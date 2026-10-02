@@ -24,7 +24,7 @@ struct ReplyListView: View {
                             .environmentObject(model)
                             .environmentObject(repository)
                         Divider()
-                        Text("全部回复 (\(model.totalCount))")
+                        Text("全部回覆 (\(model.totalCount))")
                             .font(PaladalaTheme.FontRole.sectionHeader)
                             .foregroundStyle(PaladalaTheme.ink)
                             .textCase(.uppercase)
@@ -78,7 +78,7 @@ struct ReplyListView: View {
                 .overlay(Divider(), alignment: .top)
         }
         .background(PaladalaTheme.canvas)
-        .navigationTitle("回复详情")
+        .navigationTitle("回覆詳情")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await model.load(repository: repository)
@@ -90,7 +90,7 @@ struct ReplyListView: View {
 
     private var commentInputField: some View {
         HStack(spacing: 12) {
-            TextField("发表你的回复…", text: $newReplyText)
+            TextField("發表你的回覆…", text: $newReplyText)
                 .font(PaladalaTheme.FontRole.bodySmall)
                 .textFieldStyle(.plain)
                 .padding(.horizontal, 12)
@@ -117,7 +117,7 @@ struct ReplyListView: View {
                 if isSubmitting {
                     ProgressView().controlSize(.small)
                 } else {
-                    Text("回复")
+                    Text("回覆")
                         .font(PaladalaTheme.FontRole.labelMono)
                         .foregroundStyle(PaladalaTheme.ink)
                 }

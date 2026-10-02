@@ -137,7 +137,7 @@ final class VipUpgradeHintTests: XCTestCase {
         // The body must not embed a `gatedLabel` — that
         // would be misleading ("登录后可解锁 4K" implies
         // the user's account has 4K, which we cannot know).
-        let body = VipUpgradeReason.loggedOut.alertMessage(gatedLabel: "4K · 大会员")
+        let body = VipUpgradeReason.loggedOut.alertMessage(gatedLabel: "4K · 大會員")
         XCTAssertFalse(
             body.contains("4K"),
             "loggedOut body must not interpolate the gated label, got: \(body)"
@@ -150,17 +150,17 @@ final class VipUpgradeHintTests: XCTestCase {
         // unlocks. The exact format is `(label)` —
         // changing the brackets would be a copy
         // regression we want to catch.
-        let body = VipUpgradeReason.notVIP.alertMessage(gatedLabel: "4K · 大会员")
+        let body = VipUpgradeReason.notVIP.alertMessage(gatedLabel: "4K · 大會員")
         XCTAssertTrue(
-            body.contains("（4K · 大会员）"),
+            body.contains("（4K · 大會員）"),
             "notVIP body should embed the gated label in parens, got: \(body)"
         )
     }
 
     func test_upgradeReason_expiredBody_appendsGatedLabel_whenProvided() {
-        let body = VipUpgradeReason.expired.alertMessage(gatedLabel: "1080P60 · 大会员")
+        let body = VipUpgradeReason.expired.alertMessage(gatedLabel: "1080P60 · 大會員")
         XCTAssertTrue(
-            body.contains("（1080P60 · 大会员）"),
+            body.contains("（1080P60 · 大會員）"),
             "expired body should embed the gated label in parens, got: \(body)"
         )
     }

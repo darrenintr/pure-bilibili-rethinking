@@ -53,7 +53,7 @@ struct LogViewerView: View {
             eventList
         }
         .background(PaladalaTheme.canvas)
-        .navigationTitle("诊断日志")
+        .navigationTitle("診斷日誌")
         .navigationBarTitleDisplayMode(.inline)
         // System-provided search bar. Replaces the hand-rolled
         // pill surface — gets the magnifying-glass icon, clear
@@ -61,7 +61,7 @@ struct LogViewerView: View {
         .searchable(
             text: $searchText,
             placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "搜索消息 / 详情"
+            prompt: "搜尋訊息 / 詳情"
         )
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
@@ -70,13 +70,13 @@ struct LogViewerView: View {
                 } label: {
                     Image(systemName: "trash")
                 }
-                .accessibilityLabel("清除日志")
+                .accessibilityLabel("清除日誌")
                 Button {
                     copyToClipboard()
                 } label: {
                     Image(systemName: "doc.on.clipboard")
                 }
-                .accessibilityLabel("复制报告")
+                .accessibilityLabel("複製報告")
                 if let shareURL {
                     // Once the URL is prepared, the system
                     // `ShareLink` takes over — gives AirDrop /
@@ -86,14 +86,14 @@ struct LogViewerView: View {
                     ShareLink(item: shareURL) {
                         Image(systemName: "square.and.arrow.up")
                     }
-                    .accessibilityLabel("分享报告")
+                    .accessibilityLabel("分享報告")
                 } else {
                     Button {
                         exportAndShare()
                     } label: {
                         Image(systemName: "square.and.arrow.up")
                     }
-                    .accessibilityLabel("分享报告")
+                    .accessibilityLabel("分享報告")
                 }
                 // 上报日志到 Telegram channel。图标用
                 // `paperplane.fill` 与 share 图标做视觉区分
@@ -110,36 +110,36 @@ struct LogViewerView: View {
                         Image(systemName: "paperplane.fill")
                     }
                 }
-                .accessibilityLabel("上报日志到频道")
+                .accessibilityLabel("上報日誌到頻道")
                 .disabled(isUploading)
             }
         }
         .confirmationDialog(
-            "清除以往日志？",
+            "清除以往日誌？",
             isPresented: $showingClearConfirmation,
             titleVisibility: .visible
         ) {
-            Button("清除日志", role: .destructive) {
+            Button("清除日誌", role: .destructive) {
                 clearLogs()
             }
             Button("取消", role: .cancel) {}
         } message: {
-            Text("会清空当前诊断日志、磁盘历史日志和 bpLog 缓冲。")
+            Text("會清空當前診斷日誌、磁碟歷史日誌和 bpLog 緩衝。")
         }
         // 上报日志的二次确认。放在独立 dialog 里（不与
         // 清除日志的合并）—— 两者语义不同，分开能避免
         // 误触。同时 `isUploading` 会让按钮 disable，
         // 这里是最后一道用户主动确认的门槛。
         .confirmationDialog(
-            "上传日志到频道？",
+            "上傳日誌到頻道？",
             isPresented: $showUploadConfirm
         ) {
-            Button("上传") {
+            Button("上傳") {
                 Task { await uploadToTelegram() }
             }
             Button("取消", role: .cancel) {}
         } message: {
-            Text("会把当前诊断日志（含设备信息、App 版本、bpLog 尾部）作为文件发送到 Telegram 频道。")
+            Text("會把當前診斷日誌（含裝置資訊、App 版本、bpLog 尾部）作為檔案傳送到 Telegram 頻道。")
         }
         .overlay(alignment: .bottom) {
             if let copyToast {
@@ -229,9 +229,9 @@ struct LogViewerView: View {
         return Group {
             if rows.isEmpty {
                 ContentUnavailableView(
-                    "暂无日志",
+                    "暫無日誌",
                     systemImage: "doc.text.magnifyingglass",
-                    description: Text("打开任意视频或回到首页即可触发新的事件。")
+                    description: Text("開啟任意影片或回到首頁即可觸發新的事件。")
                 )
             } else {
                 List(rows) { event in
@@ -255,7 +255,7 @@ struct LogViewerView: View {
             activeAccount: authStore.activeAccount
         )
         UIPasteboard.general.string = report
-        flashToast("已复制 (\(report.count) 字符)")
+        flashToast("已複製 (\(report.count) 字元)")
     }
 
     private func exportAndShare() {
@@ -268,7 +268,7 @@ struct LogViewerView: View {
                 activeAccount: authStore.activeAccount
             )
             UIPasteboard.general.string = report
-            flashToast("已复制 (\(report.count) 字符)")
+            flashToast("已複製 (\(report.count) 字元)")
             return
         }
         // Set the URL so the toolbar's `ShareLink` picks it up
@@ -281,7 +281,7 @@ struct LogViewerView: View {
         DiagnosticLogger.shared.clearHistory()
         Logger.shared.clear()
         shareURL = nil
-        flashToast("日志已清除")
+        flashToast("日誌已清除")
     }
 
     private func uploadToTelegram() async {
@@ -296,7 +296,7 @@ struct LogViewerView: View {
         guard let url = DiagnosticLogger.shared.export(
             activeAccount: authStore.activeAccount
         ) else {
-            flashToast("导出失败")
+            flashToast("匯出失敗")
             return
         }
         // caption 是 Telegram 消息下方显示的小字。带上
@@ -311,11 +311,11 @@ struct LogViewerView: View {
             )
             // 把 Telegram 的 message_id 拼到 toast 里——用户
             // 与开发者同步时能直接说"我发的是 #1234"。
-            flashToast("已上传（#\(result.messageID)）")
+            flashToast("已上傳（#\(result.messageID)）")
         } catch {
             // `error.localizedDescription` 走 ReporterError
             // 的中文文案，AppError 之类的也会原样上抛。
-            flashToast("上传失败：\(error.localizedDescription)")
+            flashToast("上傳失敗：\(error.localizedDescription)")
         }
     }
 

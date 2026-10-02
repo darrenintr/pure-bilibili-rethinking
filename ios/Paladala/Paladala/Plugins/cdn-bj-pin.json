@@ -1,6 +1,6 @@
 {
   "id": "com.paladala.builtin.cdn-bj-pin",
-  "name": "强制北京 CDN 节点",
+  "name": "強制北京 CDN 節點",
   "version": 1,
   "enabled": false,
   "scope": ["cdn"],
