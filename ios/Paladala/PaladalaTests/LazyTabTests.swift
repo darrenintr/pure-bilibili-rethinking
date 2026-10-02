@@ -9,6 +9,7 @@ import SwiftUI
 /// (the view never appears in a hierarchy), so we cannot assert
 /// the eventual "armed" state here. The behaviour is instead covered
 /// by the integration check in Task 8 (LazyTab wired into RootView).
+@MainActor
 final class LazyTabTests: XCTestCase {
     func test_body_notInvoked_untilArmed() {
         // Even with `activeTag == tag` at construction (so the

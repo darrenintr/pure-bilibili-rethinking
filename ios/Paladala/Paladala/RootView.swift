@@ -1,4 +1,5 @@
 import SwiftUI
+import DesignSystem
 
 struct RootView: View {
     let repository: PaladalaRepository
@@ -484,6 +485,7 @@ private struct PhoneRootView: View {
                 .tag(MainTab.profile)
             }
             .paladalaTabBarBehavior()
+            .modifier(ExpressivePhoneNavigation(selection: $router.selectedTab))
             .navigationDestination(for: BiliVideo.self) { video in
                 VideoDetailView(video: video, repository: repository, heroNamespace: heroNamespace)
             }
@@ -791,7 +793,7 @@ private struct PadSidebar: View {
 
     @ViewBuilder
     private var sidebarAvatar: some View {
-        let isNative = PaladalaTheme.activeVariant == .iosNative
+        let isNative = PaladalaTheme.usesNativeLayout
         if let url = authStore.activeAccount?.faceURL {
             ResilientImage(url: url)
                 .clipShape(
@@ -871,7 +873,7 @@ private struct StreetSidebarSurface: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if PaladalaTheme.activeVariant == .iosNative {
+        if PaladalaTheme.usesNativeLayout {
             // iOS Native: rounded corner, no border, no hard shadow,
             // system `fill` background. The active tab still uses
             // `PaladalaTheme.biliPink` as the accent fill so the
@@ -943,13 +945,39 @@ private func profileRouteView(_ route: ProfileRoute, repository: PaladalaReposit
 private struct StreetTabBarModifier: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
-        if PaladalaTheme.activeVariant == .iosNative {
+        if PaladalaTheme.usesNativeLayout {
             content
         } else {
             content
                 .toolbarBackground(PaladalaTheme.paper, for: .tabBar)
                 .toolbarBackground(.visible, for: .tabBar)
                 .tint(PaladalaTheme.biliPink)
+        }
+    }
+}
+
+private struct ExpressivePhoneNavigation: ViewModifier {
+    @Binding var selection: MainTab
+    @DSPalette private var colors
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if PaladalaTheme.activeVariant == .expressive {
+            content
+                .toolbar(.hidden, for: .tabBar)
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    DSNavBar([
+                        DSNavItem(tab: MainTab.home, title: "探索", systemImage: "house", shape: .cookie9),
+                        DSNavItem(tab: MainTab.dynamic, title: "動態", systemImage: "person.2", shape: .clover8),
+                        DSNavItem(tab: MainTab.live, title: "直播", systemImage: "play.tv", shape: .puffy),
+                        DSNavItem(tab: MainTab.profile, title: "我的", systemImage: "person", shape: .sunny)
+                    ], selection: $selection)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(colors.surface)
+                }
+        } else {
+            content
         }
     }
 }

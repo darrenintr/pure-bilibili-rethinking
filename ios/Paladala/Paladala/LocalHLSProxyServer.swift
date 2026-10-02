@@ -310,18 +310,19 @@ final class LocalHLSProxyServer: @unchecked Sendable {
             // PR-C Task 4: explicit `[weak self]` so the
             // @Sendable Task closure doesn't capture a strong
             // reference to this non-MainActor final class.
+            // Poll off the UI actor: a busy first frame must not
+            // delay the listener deadline or playback startup.
             // `cont` is the Continuation, captured strongly on
             // purpose so the Task can resume it; the listener
             // check is the only self access.
-            Task { @MainActor [weak self] in
+            Task { [weak self] in
                 while true {
                     guard let self else {
                         cont.resume(throwing: CancellationError()); return
                     }
-                    // Check readiness before the deadline. The MainActor task
-                    // can be scheduled after the nominal timeout even though
-                    // NWListener already became ready on its own queue.
-                    if let listener = self.listener, listener.state == .ready {
+                    // Check readiness before the deadline in case the executor
+                    // was scheduled after the listener became ready.
+                    if self.listenerState == .ready {
                         cont.resume(); return
                     }
                     if Date() >= deadline {
@@ -1031,7 +1032,6 @@ final class LocalHLSProxyServer: @unchecked Sendable {
     /// Async variant of `ensureListener()`.  Idempotent;
     /// starts the listener if not already running.
     func ensureListenerAsync() async throws {
-        if listener != nil { return }
         try ensureListener()
     }
 
@@ -1251,7 +1251,19 @@ final class LocalHLSProxyServer: @unchecked Sendable {
     /// `serve(playback:)` so `serveLocal(playback:)` can
     /// reuse the exact same listener setup.
     private func ensureListener() throws {
-        if listener != nil { return }
+        lock.lock()
+        defer { lock.unlock() }
+        if let existing = listener {
+            switch existing.state {
+            case .cancelled, .failed:
+                existing.cancel()
+                listener = nil
+                port = 0
+                baseURL = nil
+            default:
+                return
+            }
+        }
         let params = NWParameters.tcp
         params.allowLocalEndpointReuse = true
         params.requiredLocalEndpoint = NWEndpoint.hostPort(
@@ -1260,11 +1272,15 @@ final class LocalHLSProxyServer: @unchecked Sendable {
         )
         let listener = try NWListener(using: params)
         self.listener = listener
-        listener.stateUpdateHandler = { [weak self] state in
-            guard let self else { return }
+        listener.stateUpdateHandler = { [weak self, weak listener] state in
+            guard let self, let listener else { return }
+            self.lock.lock()
+            defer { self.lock.unlock() }
+            // A cancelled listener must never clear a replacement's URL.
+            guard self.listener === listener else { return }
             switch state {
             case .ready:
-                if let p = self.listener?.port {
+                if let p = listener.port {
                     self.lock.lock()
                     self.port = p.rawValue
                     self.baseURL = URL(
@@ -1315,6 +1331,7 @@ final class LocalHLSProxyServer: @unchecked Sendable {
                         details: ["error": error.localizedDescription])
             case .cancelled:
                 self.lock.lock()
+                self.listener = nil
                 self.port = 0
                 self.baseURL = nil
                 if case .listening = self.state {
@@ -1462,12 +1479,21 @@ final class LocalHLSProxyServer: @unchecked Sendable {
     private var lanListener: NWListener?
     /// Test seam — exposes the listener's current state for XCTest assertions.
     /// Mirrors the `private(set) var baseURL: URL?` access pattern used elsewhere.
-    internal var listenerState: NWListener.State? { listener?.state }
+    internal var listenerState: NWListener.State? {
+        lock.lock(); defer { lock.unlock() }
+        return listener?.state
+    }
     /// Test seam — cancels the underlying `NWListener` so XCTest's `tearDown`
     /// can release the loopback port bound by `prewarmProxyServer()` without
     /// reaching into the still-`private` `listener` property (which is not
     /// visible across module boundaries even with `@testable import`).
-    internal func cancelListenerForTest() { listener?.cancel() }
+    internal func cancelListenerForTest() {
+        lock.lock(); defer { lock.unlock() }
+        listener?.cancel()
+        listener = nil
+        port = 0
+        baseURL = nil
+    }
     private var port: UInt16 = 0
     private var currentPlayback: BiliPlayback?
     /// **PR-C (Phase 2)**: identity of the active prefetch
@@ -2727,6 +2753,9 @@ final class LocalHLSProxyServer: @unchecked Sendable {
         let body = s.dropFirst("bytes ".count)
         let parts = body.split(separator: "/", maxSplits: 1)
         guard parts.count == 2 else { return (-1, -1, -1) }
+        if parts[0] == "*", let total = Int64(parts[1]), total >= 0 {
+            return (-1, -1, total)
+        }
         let rangeParts = parts[0].split(separator: "-", maxSplits: 1)
         guard rangeParts.count == 2,
               let start = Int64(rangeParts[0]),

@@ -1,4 +1,5 @@
 import SwiftUI
+import DesignSystem
 
 @MainActor
 final class ProfileViewModel: ObservableObject {
@@ -42,7 +43,8 @@ struct ProfileSettingsView: View {
     @StateObject private var profileModel = ProfileViewModel()
     @AppStorage("paladala.themeMode") private var themeMode: ThemeMode = .system
     @AppStorage("paladala.materialDesign") private var materialDesign: MaterialDesign = .liquidGlass
-    @AppStorage("paladala.designVariant") private var designVariant: DesignVariant = .streetRedesign
+    @AppStorage("paladala.expressiveSeed") private var expressiveSeed = "#FF6194"
+    @AppStorage("paladala.designVariant") private var designVariant: DesignVariant = .expressive
     @AppStorage("paladala.danmakuEnabled") private var danmakuEnabled = true
     @AppStorage("paladala.backgroundAudio") private var backgroundAudio = false
     /// When `true` (default), navigating away from a playing
@@ -86,7 +88,7 @@ struct ProfileSettingsView: View {
         // background, hairline separators).  Street keeps the
         // default style so the hard-edged chrome (1.5pt ink borders
         // from `paladalaCardSurface` etc.) reads as designed.
-        let isNative = PaladalaTheme.activeVariant == .iosNative
+        let isNative = PaladalaTheme.usesNativeLayout
         Group {
             if isNative {
                 listContent.listStyle(.insetGrouped)
@@ -188,6 +190,13 @@ struct ProfileSettingsView: View {
                         key: "paladala.designVariant",
                         value: newValue.rawValue
                     )
+                }
+                if designVariant == .expressive {
+                    Picker("主題色", selection: $expressiveSeed) {
+                        ForEach(DSTheme.seeds) { seed in
+                            Text(seed.name).tag(seed.rgb.hex)
+                        }
+                    }
                 }
                 Text(designVariant.blurb)
                     .font(PaladalaTheme.FontRole.bodySmall)
@@ -521,7 +530,7 @@ struct ProfileSettingsView: View {
 
     @ViewBuilder
     private var signedOutHeader: some View {
-        let isNative = PaladalaTheme.activeVariant == .iosNative
+        let isNative = PaladalaTheme.usesNativeLayout
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 14) {
                 RoundedRectangle(cornerRadius: isNative ? 16 : 0, style: .continuous)
@@ -615,7 +624,7 @@ struct ProfileSettingsView: View {
 
     @ViewBuilder
     private func signedInHeader(account: StoredAccount) -> some View {
-        let isNative = PaladalaTheme.activeVariant == .iosNative
+        let isNative = PaladalaTheme.usesNativeLayout
         let header = HStack(spacing: 14) {
             avatar(for: account)
             VStack(alignment: .leading, spacing: 5) {
@@ -677,7 +686,7 @@ struct ProfileSettingsView: View {
 
     @ViewBuilder
     private func avatar(for account: StoredAccount) -> some View {
-        let isNative = PaladalaTheme.activeVariant == .iosNative
+        let isNative = PaladalaTheme.usesNativeLayout
         let size: CGFloat = 62
         if let url = account.faceURL {
             ResilientImage(url: url, maximumPixelSize: 192)

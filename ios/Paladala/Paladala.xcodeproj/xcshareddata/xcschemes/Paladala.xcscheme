@@ -29,6 +29,12 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES">
       <Testables>
+         <TestableReference skipped="NO">
+            <BuildableReference BuildableIdentifier="primary"
+               BlueprintIdentifier="7E5C0A000000000000000007"
+               BuildableName="PaladalaTests.xctest" BlueprintName="PaladalaTests"
+               ReferencedContainer="container:Paladala.xcodeproj" />
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

@@ -1,5 +1,6 @@
 import AVFoundation
 import SwiftUI
+import DesignSystem
 import UIKit
 
 @main
@@ -13,10 +14,25 @@ struct PaladalaApp: App {
     @StateObject private var errorCenter = AppErrorCenter.shared
     @AppStorage("paladala.themeMode") private var themeMode: ThemeMode = .system
     @AppStorage("paladala.materialDesign") private var materialDesign: MaterialDesign = .liquidGlass
-    @AppStorage("paladala.designVariant") private var designVariant: DesignVariant = .streetRedesign
+    @AppStorage("paladala.designVariant") private var designVariant: DesignVariant = .expressive
     @AppStorage("paladala.streetMigrationVersion") private var streetMigrationVersion = 0
 
+    @AppStorage("paladala.expressiveSeed") private var expressiveSeed = "#FF6194"
+
     init() {
+        let defaults = UserDefaults.standard
+        let needsExpressiveMigration = defaults.integer(forKey: "paladala.expressiveMigrationVersion") < 1
+        let variant = DesignVariant.storedChoice(
+            rawValue: defaults.string(forKey: "paladala.designVariant"),
+            migrationVersion: defaults.integer(forKey: "paladala.expressiveMigrationVersion")
+        )
+        defaults.set(variant.rawValue, forKey: "paladala.designVariant")
+        defaults.set(1, forKey: "paladala.expressiveMigrationVersion")
+        if needsExpressiveMigration {
+            ICloudSync.shared.mirror(key: "paladala.designVariant", value: variant.rawValue)
+        }
+        PaladalaTheme.apply(variant)
+        PaladalaTheme.expressiveTheme = DSTheme(seedHex: defaults.string(forKey: "paladala.expressiveSeed") ?? "#FF6194")
         Self.configureStreetAppearance()
         // PR-fix-2026-07-10: apply the persisted design variant
         // before any view renders so the very first paint
@@ -38,8 +54,8 @@ struct PaladalaApp: App {
             // default) so old installs land on a supported
             // variant instead of a deprecated one.
             let variant = (raw == "classic")
-                ? .streetRedesign
-                : (DesignVariant(rawValue: raw) ?? .streetRedesign)
+                ? .expressive
+                : (DesignVariant(rawValue: raw) ?? .expressive)
             PaladalaTheme.apply(variant)
         }
         // PR-fix-2026-07-10: register the BG task handler during
@@ -141,8 +157,11 @@ struct PaladalaApp: App {
     }
 
     var body: some Scene {
+        let _ = PaladalaTheme.apply(designVariant)
+        let _ = { PaladalaTheme.expressiveTheme = DSTheme(seedHex: expressiveSeed) }()
         WindowGroup {
             RootView(repository: repository)
+                .id(designVariant)
                 .environmentObject(router)
                 .environmentObject(authStore)
                 .environmentObject(repository)
@@ -152,6 +171,10 @@ struct PaladalaApp: App {
                 .appErrorAlerts(errorCenter)
                 .font(PaladalaTheme.FontRole.body)
                 .tint(PaladalaTheme.biliPink)
+                .dsTheme(DSTheme(seedHex: expressiveSeed))
+                .onChange(of: expressiveSeed) { _, seed in
+                    PaladalaTheme.expressiveTheme = DSTheme(seedHex: seed)
+                }
                 .preferredColorScheme(themeMode.colorScheme)
                 // PR-fix-2026-07-10: reapply the design variant
                 // whenever the user flips the Settings toggle.
@@ -324,6 +347,18 @@ struct PaladalaApp: App {
     /// controls for accessibility, but their surrounding bars no longer
     /// reintroduce translucent material into the Street Minimal hierarchy.
     private static func configureStreetAppearance() {
+        if PaladalaTheme.activeVariant == .expressive {
+            let navigation = UINavigationBarAppearance()
+            navigation.configureWithDefaultBackground()
+            UINavigationBar.appearance().standardAppearance = navigation
+            UINavigationBar.appearance().compactAppearance = navigation
+            UINavigationBar.appearance().scrollEdgeAppearance = navigation
+            let tabs = UITabBarAppearance()
+            tabs.configureWithDefaultBackground()
+            UITabBar.appearance().standardAppearance = tabs
+            UITabBar.appearance().scrollEdgeAppearance = tabs
+            return
+        }
         let ink = UIColor { traits in
             traits.userInterfaceStyle == .dark ? .white : .black
         }

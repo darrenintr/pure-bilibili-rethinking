@@ -79,6 +79,22 @@ final class LocalHLSProxyServerTests: XCTestCase {
                        "prewarm must wait for listener.ready, got \(String(describing: state))")
     }
 
+    func test_listenerRestartKeepsTheNewURLAfterOldCancellation() async throws {
+        let proxy = LocalHLSProxyServer(port: 0)
+        defer { proxy.stop() }
+        try await proxy.ensureListenerAsync()
+        try await proxy.waitForListener(timeoutMs: 2_000)
+        proxy.stop()
+        try await proxy.ensureListenerAsync()
+        try await proxy.waitForListener(timeoutMs: 2_000)
+        let url = try XCTUnwrap(proxy.baseURL)
+        let (_, response) = try await URLSession.shared.data(from: url.appendingPathComponent("playlist.m3u8"))
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 503,
+                       "The fresh listener must answer HTTP, even without a prepared stream")
+        XCTAssertEqual(proxy.listenerState, .ready)
+        XCTAssertNotNil(proxy.baseURL)
+    }
+
     // MARK: - PR-A Group 5: resolveSegmentationMode cache fix (item 6)
 
     /// Minimal `BiliDashSource.Track` for exercising
@@ -100,7 +116,8 @@ final class LocalHLSProxyServerTests: XCTestCase {
             mediaStartOffset: 1280,
             totalDuration: 60.0,
             width: 1920,
-            height: 1080
+            height: 1080,
+            qualityId: nil
         )
     }
 
@@ -286,11 +303,8 @@ final class LocalHLSProxyServerTests: XCTestCase {
     func test_parseContentRangeHeader_unsatisfiedRangeOnly() {
         // PR-B A6: "bytes */100" — RFC 7233 §4.4 unsatisfied
         // range form, signalling "the resource is 100 bytes
-        // long and your range request doesn't fit".  The
-        // parser must surface this as all-`-1` (existing
-        // contract) so the proxy can translate an upstream
-        // 416 response to a clean 416 for the loopback
-        // client without leaking the upstream error code.
+        // long and your range request doesn't fit". Preserve
+        // the resource size while marking the range unavailable.
         let parsed = LocalHLSProxyServer.parseContentRangeHeader(
             "bytes */100"
         )
@@ -367,7 +381,7 @@ final class LocalHLSProxyServerTests: XCTestCase {
         startTime: Double = 0
     ) -> MediaFragment {
         MediaFragment(
-            byteRange: startTime..<(startTime + bytes),
+            byteRange: 0..<bytes,
             startTime: startTime,
             duration: duration,
             startsWithSAP: true,

@@ -118,6 +118,9 @@
 		OP0000000000000000000F132 /* ReporterGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = OP0000000000000000000F131 /* ReporterGate.swift */; };
 		OP0000000000000000000F142 /* ErrorSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = OP0000000000000000000F141 /* ErrorSink.swift */; };
 		OP0000000000000000000F152 /* LogReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = OP0000000000000000000F151 /* LogReporter.swift */; };
+        DA0000000000000000000002 /* PlaybackAndDesignTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000001 /* PlaybackAndDesignTests.swift */; };
+        DA0000000000000000000004 /* playback-video.m4s in Resources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000003 /* playback-video.m4s */; };
+        DA0000000000000000000007 /* playback-audio.m4s in Resources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000006 /* playback-audio.m4s */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -240,6 +243,9 @@
 		OP0000000000000000000F201 /* Opspad.Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig.file; path = Opspad.Debug.xcconfig; sourceTree = "<group>"; };
 		OP0000000000000000000F202 /* Opspad.Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig.file; path = Opspad.Release.xcconfig; sourceTree = "<group>"; };
 		OP0000000000000000000F203 /* Opspad.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig.file; path = Opspad.xcconfig.example; sourceTree = "<group>"; };
+        DA0000000000000000000001 /* PlaybackAndDesignTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackAndDesignTests.swift; sourceTree = "<group>"; };
+        DA0000000000000000000003 /* playback-video.m4s */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fixtures/playback-video.m4s"; sourceTree = "<group>"; };
+        DA0000000000000000000006 /* playback-audio.m4s */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fixtures/playback-audio.m4s"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -466,6 +472,9 @@
 			isa = PBXGroup;
 			children = (
 				7E5C0A000000000000000002 /* PaladalaTests.swift */,
+                DA0000000000000000000001 /* PlaybackAndDesignTests.swift */,
+                DA0000000000000000000003 /* playback-video.m4s */,
+                DA0000000000000000000006 /* playback-audio.m4s */,
 				7E5C0A00000000000000000D /* LocalHLSProxyServerTests.swift */,
 				7E5C0A000000000000000012 /* FeedCacheWarmerTests.swift */,
 				7E5C0A000000000000000016 /* LazyTabTests.swift */,
@@ -537,6 +546,7 @@
 			buildPhases = (
 				7E5C0A000000000000000005 /* Sources */,
 				7E5C0A000000000000000006 /* Frameworks */,
+                DA0000000000000000000005 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -662,6 +672,12 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+        DA0000000000000000000005 /* Resources */ = {
+            isa = PBXResourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (DA0000000000000000000004 /* playback-video.m4s in Resources */, DA0000000000000000000007 /* playback-audio.m4s in Resources */,);
+            runOnlyForDeploymentPostprocessing = 0;
+        };
 /* End PBXResourcesBuildPhase section */
 
 
@@ -783,6 +799,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7E5C0A000000000000000001 /* PaladalaTests.swift in Sources */,
+                DA0000000000000000000002 /* PlaybackAndDesignTests.swift in Sources */,
 				7E5C0A00000000000000000E /* LocalHLSProxyServerTests.swift in Sources */,
 				7E5C0A000000000000000011 /* FeedCacheWarmerTests.swift in Sources */,
 				7E5C0A000000000000000015 /* LazyTabTests.swift in Sources */,
@@ -1061,6 +1078,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.paladala.PaladalaTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
@@ -1086,6 +1104,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.paladala.PaladalaTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_COMPILATION_MODE = wholemodule;

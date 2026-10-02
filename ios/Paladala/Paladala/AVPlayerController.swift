@@ -467,6 +467,8 @@ final class PlayerController: ObservableObject {
 
     // MARK: network speed tracking
 
+    private let proxyServer: LocalHLSProxyServer
+
     private var lastBytesAt: Date = .distantPast
     private var lastBytes: Int64 = 0
 
@@ -507,7 +509,8 @@ final class PlayerController: ObservableObject {
 
     // MARK: lifecycle
 
-    init(playback: BiliPlayback, video: BiliVideo? = nil) {
+    init(playback: BiliPlayback, video: BiliVideo? = nil, proxyServer: LocalHLSProxyServer = .shared) {
+        self.proxyServer = proxyServer
         diagLog(.playback, "Initialising AVPlayerController", details: [
             "isDASH": playback.isDASH,
             "referer": playback.referer.absoluteString,
@@ -731,7 +734,10 @@ final class PlayerController: ObservableObject {
         // seeking on it is wasted; `startPlaybackSession`
         // runs after the real item is bound.
         self.playerItem = item
-        self.player = AVPlayer(playerItem: item)
+        // An empty composition has a zero-duration timeline. Never bind it
+        // to AVKit: pressing Play during preparation can otherwise emit an
+        // end notification before the real stream exists.
+        self.player = usesProxy ? AVPlayer() : AVPlayer(playerItem: item)
         // **B1**: explicit `automaticallyWaitsToMinimizeStalling`
         // on the player instance. Default is already true
         // on iOS 10+ for HLS, but setting it explicitly
@@ -813,7 +819,7 @@ final class PlayerController: ObservableObject {
         // item) and `loadPlayback` (real item) use the same
         // observer wiring with the `[weak self, weak item] +
         // currentItem === item` guard (item #10).
-        installObservers(on: item)
+        if !usesProxy { installObservers(on: item) }
 
         // **Build 182**: NotificationCenter observers are
         // installed via `installNotificationObservers(on:)`
@@ -821,7 +827,7 @@ final class PlayerController: ObservableObject {
         // (real item) re-attach them on the new item with
         // the same `[weak self]` + `currentItem === item`
         // guard pattern (item #10).
-        installNotificationObservers(on: item)
+        if !usesProxy { installNotificationObservers(on: item) }
 
         // Periodically poll: AVPlayer does not push a
         // "rate changed" event for the `rate=0 → rate=1`
@@ -1096,6 +1102,7 @@ final class PlayerController: ObservableObject {
         }
         loadTask?.cancel()
         playbackState = .preparing
+        isBuffering = true
         playerError = nil
         loadTask = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -1107,7 +1114,7 @@ final class PlayerController: ObservableObject {
     /// out so the public method reads cleanly.
     private func runLoadPlayback(_ playback: BiliPlayback) async {
         do {
-            let url = try await LocalHLSProxyServer.shared.serve(
+            let url = try await proxyServer.serve(
                 playback: playback,
                 bvid: nowPlayingBvid,
                 cid: nowPlayingCid
@@ -1585,8 +1592,15 @@ final class PlayerController: ObservableObject {
             Task { @MainActor in
                 guard let self, let item else { return }
                 guard self.player.currentItem === item else { return }
+                guard self.playbackState == .ready, item.status == .readyToPlay,
+                      Self.hasReachedEnd(currentTime: self.player.currentTime().seconds,
+                                         duration: item.duration.seconds) else {
+                    diagLog(.playback, "Ignored end event without a playable timeline")
+                    return
+                }
                 self.isPlaying = false
-                let totalSeconds = self.player.currentItem?.duration.seconds ?? 0
+                self.isBuffering = false
+                let totalSeconds = item.duration.seconds
                 Analytics.log("video_complete", [
                     "duration_seconds": totalSeconds
                 ])
@@ -1795,7 +1809,7 @@ final class PlayerController: ObservableObject {
         // default branch and returned 404.  Resolving
         // `path` against the base URL via URLComponents
         // produces the correct single-slash form.
-        let paths = ["/playlist.m3u8", "/video.m3u8", "/audio.m3u8"]
+        let paths = Self.proxyEndpointPaths(hasAudio: originalPlayback.dash?.audio != nil)
         let deadline = Date().addingTimeInterval(2.0)
         let session = URLSession.shared
         guard var components = URLComponents(
@@ -1862,9 +1876,31 @@ final class PlayerController: ObservableObject {
         }
     }
 
+    nonisolated static func hasReachedEnd(currentTime: Double, duration: Double) -> Bool {
+        duration.isFinite && duration > 0 && currentTime.isFinite
+            && currentTime >= max(0, duration - 0.1)
+    }
+
+    nonisolated static func proxyEndpointPaths(hasAudio: Bool) -> [String] {
+        ["/playlist.m3u8", "/video.m3u8"] + (hasAudio ? ["/audio.m3u8"] : [])
+    }
+
     func play() {
         wantsToPlay = true
-        player.play()
+        guard let item = player.currentItem else { return }
+        if Self.hasReachedEnd(currentTime: player.currentTime().seconds,
+                              duration: item.duration.seconds) {
+            player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self, weak item] finished in
+                Task { @MainActor in
+                    guard finished, let self, let item,
+                          self.player.currentItem === item, self.wantsToPlay else { return }
+                    self.currentTime = 0
+                    self.player.play()
+                }
+            }
+        } else {
+            player.play()
+        }
     }
 
     func pause() {
@@ -2459,7 +2495,7 @@ final class PlayerController: ObservableObject {
         let dt = now.timeIntervalSince(lastBytesAt)
         if dt >= 0.5 {
             let bytes = usesProxy
-                ? LocalHLSProxyServer.shared.byteCount : 0
+                ? proxyServer.byteCount : 0
             let delta = max(0, bytes - lastBytes)
             networkSpeed = Double(delta) / dt
             lastBytes = bytes
