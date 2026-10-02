@@ -1,9 +1,9 @@
 {
   "_meta": {
-    "generatedAt": "2026-10-02T03:42:50Z",
-    "githubRunId": "36961124597",
-    "githubRunNumber": "645",
-    "githubSha": "fd2abcba8ff5422fe2f5c7582dc08067eca90410",
+    "generatedAt": "2026-10-02T03:45:56Z",
+    "githubRunId": "36961260897",
+    "githubRunNumber": "646",
+    "githubSha": "c5b49a9d4a8cb4cc9986d617c78ea0bb3e0ae518",
     "sourceScript": "scripts/generate_apps_json.py"
   },
   "apps": [
@@ -23,6 +23,14 @@
       "subtitle": "純淨嘅第三方嗶哩嗶哩 iOS 客戶端",
       "tintColor": "#FB7299",
       "versions": [
+        {
+          "buildVersion": "343",
+          "date": "2026-10-02T03:45:56Z",
+          "downloadURL": "https://github.com/darrenintr/pure-bilibili-rethinking/releases/download/v0.5.43.343/Paladala-unsigned-v0.5.43.343.ipa",
+          "localizedDescription": "Merge pull request #4 from darrenintr/ijkplayer-final-dispatch\n\n\nIntegrate the final manual IJKPlayer workflow",
+          "size": 4304690,
+          "version": "0.5.43"
+        },
         {
           "buildVersion": "342",
           "date": "2026-10-02T03:42:50Z",
@@ -349,6 +357,15 @@
   "description": "Paladala 嘅官方 AltStore / SideStore 源。每次 push 到 working 分支都會自動出新版本,呢個 apps.json 都會同步更新。",
   "name": "Paladala",
   "news": [
+    {
+      "appID": "com.dt.paladala",
+      "caption": "Build 343 (c5b49a9)",
+      "date": "2026-10-02T03:45:56Z",
+      "identifier": "v0.5.43.343",
+      "tintColor": "#FB7299",
+      "title": "Paladala v0.5.43.343",
+      "url": "https://github.com/darrenintr/pure-bilibili-rethinking/releases/tag/v0.5.43.343"
+    },
     {
       "appID": "com.dt.paladala",
       "caption": "Build 342 (fd2abcb)",
