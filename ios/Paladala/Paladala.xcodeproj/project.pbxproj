@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AB0000000000000000000A02 /* DesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = AB0000000000000000000A01 /* DesignSystem */; };
 		100000000000000000000101 /* PaladalaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000201 /* PaladalaApp.swift */; };
 		100000000000000000000102 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000202 /* AppRouter.swift */; };
 		100000000000000000000103 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000203 /* Models.swift */; };
@@ -246,6 +247,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AB0000000000000000000A02 /* DesignSystem in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -523,6 +525,7 @@
 			);
 			name = Paladala;
 			packageProductDependencies = (
+				AB0000000000000000000A01 /* DesignSystem */,
 			);
 			productName = Paladala;
 			productReference = 100000000000000000000001 /* Paladala.app */;
@@ -582,6 +585,10 @@
 
 
 /* Begin XCSwiftPackageProductDependency section */
+		AB0000000000000000000A01 /* DesignSystem */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DesignSystem;
+		};
 /* End XCSwiftPackageProductDependency section */
 
 /* Begin PBXTargetDependency section */
@@ -623,6 +630,7 @@
 			);
 			mainGroup = 100000000000000000000401;
 			packageReferences = (
+				AB0000000000000000000A03 /* XCLocalSwiftPackageReference "Packages/DesignSystem" */,
 			);
 			productRefGroup = 100000000000000000000403 /* Products */;
 			projectDirPath = "";
@@ -1129,6 +1137,13 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		AB0000000000000000000A03 /* XCLocalSwiftPackageReference "Packages/DesignSystem" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/DesignSystem;
+		};
+/* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
 /* End XCRemoteSwiftPackageReference section */
