@@ -387,7 +387,7 @@ private final class AuthProviderProbe {
     func appConfig() -> BiliAppConfig? {
         appConfigCalls += 1
         allCallsWereOnMainThread = allCallsWereOnMainThread && Thread.isMainThread
-        return BiliAppConfig(buvid3: nil, mid: 0, csrf: nil)
+        return BiliAppConfig(buvid3: nil, mid: 0, csrf: nil, accessKey: nil)
     }
 }
 

@@ -100,7 +100,8 @@ final class LocalHLSProxyServerTests: XCTestCase {
             mediaStartOffset: 1280,
             totalDuration: 60.0,
             width: 1920,
-            height: 1080
+            height: 1080,
+            qualityId: nil
         )
     }
 
@@ -367,7 +368,7 @@ final class LocalHLSProxyServerTests: XCTestCase {
         startTime: Double = 0
     ) -> MediaFragment {
         MediaFragment(
-            byteRange: startTime..<(startTime + bytes),
+            byteRange: 0..<bytes,
             startTime: startTime,
             duration: duration,
             startsWithSAP: true,

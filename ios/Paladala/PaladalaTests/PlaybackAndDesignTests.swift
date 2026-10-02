@@ -68,8 +68,8 @@ final class PlaybackAndDesignTests: XCTestCase {
         let item = try XCTUnwrap(controller.player.currentItem)
         XCTAssertEqual(item.duration.seconds, 4, accuracy: 0.15)
         if withAudio {
-            let audioTracks = try await item.asset.loadTracks(withMediaType: .audio)
-            XCTAssertFalse(audioTracks.isEmpty, "The DASH audio rendition must reach AVPlayer")
+            XCTAssertTrue(item.tracks.contains { $0.assetTrack?.mediaType == .audio },
+                          "The DASH audio rendition must reach AVPlayer")
         }
         try await waitUntil { controller.player.currentTime().seconds > 0.25 }
         try await waitUntil(seconds: 8) {
@@ -87,13 +87,13 @@ final class PlaybackAndDesignTests: XCTestCase {
             baseURL: url, backupURLs: [], codecs: "avc1.4D400A", bandwidth: 500_000,
             mimeType: "video/mp4", initializationRange: .init(offset: 0, length: 777),
             indexRange: .init(offset: 777, length: 88), mediaStartOffset: 865,
-            totalDuration: 4, width: 160, height: 90
+            totalDuration: 4, width: 160, height: 90, qualityId: nil
         )
         let audio = audioURL.map {
             BiliDashSource.Track(baseURL: $0, backupURLs: [], codecs: "mp4a.40.2", bandwidth: 96_000,
                                  mimeType: "audio/mp4", initializationRange: .init(offset: 0, length: 733),
                                  indexRange: .init(offset: 733, length: 52), mediaStartOffset: 785,
-                                 totalDuration: 4.021333, width: nil, height: nil)
+                                 totalDuration: 4.021333, width: nil, height: nil, qualityId: nil)
         }
         return BiliPlayback(dash: BiliDashSource(video: video, audio: audio), fallbackURL: nil,
                             referer: URL(string: "https://www.bilibili.com/")!)
