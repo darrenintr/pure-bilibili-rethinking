@@ -5,7 +5,7 @@ import SwiftUI
         DSFeedGrid {
             ForEach(0..<6, id: \.self) { i in
                 DSVideoCard(
-                    title: "示例视频标题 \(i)：这是一个很长的标题用来测试两行截断效果",
+                    title: "示例影片標題 \(i)：這是一個很長的標題用來測試兩行截斷效果",
                     author: "UP 主",
                     viewsText: "\(DSFormat.count(123_456 * (i + 1)))播放",
                     durationText: DSFormat.duration(seconds: 215 + i * 400)
@@ -31,10 +31,10 @@ import SwiftUI
 #Preview("Controls – AX5") {
     VStack(spacing: DSSpacing.l) {
         HStack {
-            DSChip("推荐", isSelected: true) {}
-            DSChip("热门", isSelected: false) {}
+            DSChip("推薦", isSelected: true) {}
+            DSChip("熱門", isSelected: false) {}
         }
-        Button("登录") {}.buttonStyle(.dsPrimary)
+        Button("登入") {}.buttonStyle(.dsPrimary)
         Text("Mini player").padding().dsGlassBar()
     }
     .padding()

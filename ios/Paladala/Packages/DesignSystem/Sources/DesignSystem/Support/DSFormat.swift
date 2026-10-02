@@ -2,11 +2,11 @@ import Foundation
 
 /// Display formatting shared by every card and list row.
 public enum DSFormat {
-    /// 12345 → "1.2万", 123_456_789 → "1.2亿", 999 → "999".
+    /// 12345 → "1.2萬", 123_456_789 → "1.2億", 999 → "999".
     public static func count(_ value: Int) -> String {
         let n = max(value, 0)
-        if n >= 100_000_000 { return scaled(n, unit: 100_000_000) + "亿" }
-        if n >= 10_000 { return scaled(n, unit: 10_000) + "万" }
+        if n >= 100_000_000 { return scaled(n, unit: 100_000_000) + "億" }
+        if n >= 10_000 { return scaled(n, unit: 10_000) + "萬" }
         return String(n)
     }
 

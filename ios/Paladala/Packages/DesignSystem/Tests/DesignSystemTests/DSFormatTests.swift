@@ -8,10 +8,10 @@ final class DSFormatTests: XCTestCase {
     }
 
     func test_countUsesWanAndYi() {
-        XCTAssertEqual(DSFormat.count(10_000), "1万")
-        XCTAssertEqual(DSFormat.count(12_345), "1.2万")
-        XCTAssertEqual(DSFormat.count(99_999), "9.9万")
-        XCTAssertEqual(DSFormat.count(123_456_789), "1.2亿")
+        XCTAssertEqual(DSFormat.count(10_000), "1萬")
+        XCTAssertEqual(DSFormat.count(12_345), "1.2萬")
+        XCTAssertEqual(DSFormat.count(99_999), "9.9萬")
+        XCTAssertEqual(DSFormat.count(123_456_789), "1.2億")
     }
 
     func test_negativeCountClampsToZero() {

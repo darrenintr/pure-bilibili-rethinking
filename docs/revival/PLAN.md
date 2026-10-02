@@ -60,7 +60,7 @@ Ship behind a `Design v2` flag in onboarding/settings, then remove v1 after one 
 ### Navigation (5 → 4 tabs + search)
 | Tab | Replaces | Contents |
 |---|---|---|
-| **Discover** | Home + Bangumi + Live | Segmented top: 推荐 · 热门 · 追番 · 直播. Pull to refresh, feed cache already exists. |
+| **Discover** | Home + Bangumi + Live | Segmented top: 推薦 · 熱門 · 追番 · 直播. Pull to refresh, feed cache already exists. |
 | **Following** | Dynamic | Followed-UP stories row + timeline feed; unread dot. |
 | **Library** | Downloads + History + Favorites + Watch later | Segmented; offline items badged; continue-watching rail on top. |
 | **Me** | Profile/Settings | Account, coins/VIP chip, settings, plugins, CDN, about. |
@@ -76,9 +76,9 @@ Music tab is dropped from the bar; if kept it becomes a Library segment ("Audio"
 - **Motion**: spring (response 0.35, damping 0.85); matched-geometry cover → player; haptics on like/coin/follow.
 
 ### Key screens
-1. **Home/Discover card**: 16:9 cover (not 16:10 crop), duration pill bottom-right, UP avatar + name + views on one meta line, `⋯` menu (watch later, download, coin, not interested). Single-column list on iPhone for 推荐 with auto-preview muted on dwell; 2-column toggle in settings; adaptive grid on iPad.
+1. **Home/Discover card**: 16:9 cover (not 16:10 crop), duration pill bottom-right, UP avatar + name + views on one meta line, `⋯` menu (watch later, download, coin, not interested). Single-column list on iPhone for 推薦 with auto-preview muted on dwell; 2-column toggle in settings; adaptive grid on iPad.
 2. **Player**: cover expands to player; collapsed state = mini-player above the tab bar. Fullscreen controls: bottom scrub bar with SponsorBlock segments in accent tint, double-tap seek, long-press 2×, vertical swipe brightness/volume. Danmaku toggle + opacity in one popover. Below player: sticky tabs 简介 · 评论 (count) · 相关.
-3. **Comments**: threaded, collapsed replies ("查看 12 条回复") in a bottom sheet instead of a pushed page.
+3. **Comments**: threaded, collapsed replies ("查看 12 則回覆") in a bottom sheet instead of a pushed page.
 4. **Library**: continue-watching rail with progress bars; storage meter; swipe to delete.
 5. **Me**: header card (avatar, level, coins, VIP), then grouped list; Developer/Plugins/CDN moved under "Advanced".
 6. **Onboarding**: 3 screens max (value, sign in optional, pick density), no design picker.
