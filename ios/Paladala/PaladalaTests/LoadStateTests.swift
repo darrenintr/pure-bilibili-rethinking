@@ -75,7 +75,7 @@ final class LoadStateTests: XCTestCase {
         // not be called twice.
         let state = LoadState<[Int]>()
         var workInvocations = 0
-        let work: () async throws -> [Int] = {
+        let work: @MainActor () async throws -> [Int] = {
             workInvocations += 1
             // Yield so the second load has a chance to enter
             // while the first is still inside its critical
@@ -83,9 +83,10 @@ final class LoadStateTests: XCTestCase {
             await Task.yield()
             return [1]
         }
-        async let first: Void = state.load(work, errorText: "err")
-        async let second: Void = state.load(work, errorText: "err")
-        _ = await (first, second)
+        let first = Task { await state.load(work, errorText: "err") }
+        let second = Task { await state.load(work, errorText: "err") }
+        await first.value
+        await second.value
         XCTAssertEqual(workInvocations, 1, "second load must short-circuit while isLoading")
         XCTAssertEqual(state.value, [1])
     }

@@ -9,6 +9,7 @@ import SwiftUI
 /// `PaladalaBackdrop()` defaults to `.light`. The `scheme(_:)` static
 /// is a test seam that injects an explicit scheme, used to verify the
 /// Equatable comparison picks up scheme changes.
+@MainActor
 final class PaladalaBackdropTests: XCTestCase {
     func test_equatable_returnsTrue_whenColorSchemeMatches() {
         // Two default-constructed backdrops both resolve to .light

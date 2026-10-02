@@ -120,6 +120,7 @@
 		OP0000000000000000000F152 /* LogReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = OP0000000000000000000F151 /* LogReporter.swift */; };
         DA0000000000000000000002 /* PlaybackAndDesignTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000001 /* PlaybackAndDesignTests.swift */; };
         DA0000000000000000000004 /* playback-video.m4s in Resources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000003 /* playback-video.m4s */; };
+        DA0000000000000000000007 /* playback-audio.m4s in Resources */ = {isa = PBXBuildFile; fileRef = DA0000000000000000000006 /* playback-audio.m4s */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -244,6 +245,7 @@
 		OP0000000000000000000F203 /* Opspad.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig.file; path = Opspad.xcconfig.example; sourceTree = "<group>"; };
         DA0000000000000000000001 /* PlaybackAndDesignTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackAndDesignTests.swift; sourceTree = "<group>"; };
         DA0000000000000000000003 /* playback-video.m4s */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fixtures/playback-video.m4s"; sourceTree = "<group>"; };
+        DA0000000000000000000006 /* playback-audio.m4s */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fixtures/playback-audio.m4s"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -472,6 +474,7 @@
 				7E5C0A000000000000000002 /* PaladalaTests.swift */,
                 DA0000000000000000000001 /* PlaybackAndDesignTests.swift */,
                 DA0000000000000000000003 /* playback-video.m4s */,
+                DA0000000000000000000006 /* playback-audio.m4s */,
 				7E5C0A00000000000000000D /* LocalHLSProxyServerTests.swift */,
 				7E5C0A000000000000000012 /* FeedCacheWarmerTests.swift */,
 				7E5C0A000000000000000016 /* LazyTabTests.swift */,
@@ -672,7 +675,7 @@
         DA0000000000000000000005 /* Resources */ = {
             isa = PBXResourcesBuildPhase;
             buildActionMask = 2147483647;
-            files = (DA0000000000000000000004 /* playback-video.m4s in Resources */,);
+            files = (DA0000000000000000000004 /* playback-video.m4s in Resources */, DA0000000000000000000007 /* playback-audio.m4s in Resources */,);
             runOnlyForDeploymentPostprocessing = 0;
         };
 /* End PBXResourcesBuildPhase section */

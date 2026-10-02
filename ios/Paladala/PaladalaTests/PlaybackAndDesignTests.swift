@@ -36,13 +36,29 @@ final class PlaybackAndDesignTests: XCTestCase {
     }
 
     func testVideoOnlyDASHAdvancesToTheEndAndReplays() async throws {
+        try await assertDASHPlayback(withAudio: false)
+    }
+
+    func testVideoAndAudioDASHAdvancesToTheEndAndReplays() async throws {
+        try await assertDASHPlayback(withAudio: true)
+    }
+
+    private func assertDASHPlayback(withAudio: Bool) async throws {
         let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "playback-video", withExtension: "m4s"))
         let upstream = try RangeFixtureServer(data: Data(contentsOf: fixture))
         defer { upstream.stop() }
         try await waitUntil { upstream.port != nil }
         let port = try XCTUnwrap(upstream.port)
+        var audioUpstream: RangeFixtureServer?
+        if withAudio {
+            let audioFixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "playback-audio", withExtension: "m4s"))
+            audioUpstream = try RangeFixtureServer(data: Data(contentsOf: audioFixture))
+            try await waitUntil { audioUpstream?.port != nil }
+        }
+        defer { audioUpstream?.stop() }
+        let audioURL = audioUpstream?.port.flatMap { URL(string: "http://127.0.0.1:\($0)/audio.m4s") }
         let proxy = LocalHLSProxyServer(port: 0)
-        let controller = PlayerController(playback: playback(url: URL(string: "http://127.0.0.1:\(port)/video.m4s")!), proxyServer: proxy)
+        let controller = PlayerController(playback: playback(url: URL(string: "http://127.0.0.1:\(port)/video.m4s")!, audioURL: audioURL), proxyServer: proxy)
         defer { controller.tearDown(); proxy.stop() }
 
         try await waitUntil(seconds: 15) {
@@ -51,6 +67,10 @@ final class PlaybackAndDesignTests: XCTestCase {
         XCTAssertNil(controller.playerError)
         let item = try XCTUnwrap(controller.player.currentItem)
         XCTAssertEqual(item.duration.seconds, 4, accuracy: 0.15)
+        if withAudio {
+            let audioTracks = try await item.asset.loadTracks(withMediaType: .audio)
+            XCTAssertFalse(audioTracks.isEmpty, "The DASH audio rendition must reach AVPlayer")
+        }
         try await waitUntil { controller.player.currentTime().seconds > 0.25 }
         try await waitUntil(seconds: 8) {
             PlayerController.hasReachedEnd(currentTime: controller.player.currentTime().seconds, duration: item.duration.seconds)
@@ -62,14 +82,20 @@ final class PlaybackAndDesignTests: XCTestCase {
         XCTAssertNil(controller.playerError)
     }
 
-    private func playback(url: URL) -> BiliPlayback {
+    private func playback(url: URL, audioURL: URL? = nil) -> BiliPlayback {
         let video = BiliDashSource.Track(
-            baseURL: url, backupURLs: [], codecs: "avc1.4D400B", bandwidth: 500_000,
+            baseURL: url, backupURLs: [], codecs: "avc1.4D400A", bandwidth: 500_000,
             mimeType: "video/mp4", initializationRange: .init(offset: 0, length: 777),
             indexRange: .init(offset: 777, length: 88), mediaStartOffset: 865,
             totalDuration: 4, width: 160, height: 90
         )
-        return BiliPlayback(dash: BiliDashSource(video: video, audio: nil), fallbackURL: nil,
+        let audio = audioURL.map {
+            BiliDashSource.Track(baseURL: $0, backupURLs: [], codecs: "mp4a.40.2", bandwidth: 96_000,
+                                 mimeType: "audio/mp4", initializationRange: .init(offset: 0, length: 733),
+                                 indexRange: .init(offset: 733, length: 52), mediaStartOffset: 785,
+                                 totalDuration: 4.021333, width: nil, height: nil)
+        }
+        return BiliPlayback(dash: BiliDashSource(video: video, audio: audio), fallbackURL: nil,
                             referer: URL(string: "https://www.bilibili.com/")!)
     }
 
