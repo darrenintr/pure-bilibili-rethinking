@@ -119,6 +119,9 @@ docs/*
 !docs/superpowers/specs/*.md
 !docs/superpowers/plans/*.md
 !docs/portal/
+!docs/revival/
+!docs/revival/*.md
+!docs/sideload.md
 !docs/portal/specs/*.md
 !docs/portal/plans/*.md
 

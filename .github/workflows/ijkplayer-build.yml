@@ -74,12 +74,12 @@ jobs:
           set -euo pipefail
           cd "$IJKPLAYER_SRC/ios"
           python3 - <<'PATCH_FFMPEG_SCRIPT'
-from pathlib import Path
-script = Path('tools/do-compile-ffmpeg.sh')
-text = script.read_text()
-text = text.replace('FFMPEG_EXTRA_CFLAGS=', 'FFMPEG_EXTRA_CFLAGS=${FFMPEG_EXTRA_CFLAGS:-}', 1)
-script.write_text(text)
-PATCH_FFMPEG_SCRIPT
+          from pathlib import Path
+          script = Path('tools/do-compile-ffmpeg.sh')
+          text = script.read_text()
+          text = text.replace('FFMPEG_EXTRA_CFLAGS=', 'FFMPEG_EXTRA_CFLAGS=${FFMPEG_EXTRA_CFLAGS:-}', 1)
+          script.write_text(text)
+          PATCH_FFMPEG_SCRIPT
           FF_ALL_ARCHS=arm64 FFMPEG_EXTRA_CFLAGS="-Wno-error -Wno-error=incompatible-function-pointer-types" bash compile-ffmpeg.sh arm64
           test -f "build/ffmpeg-arm64/output/lib/libavformat.a"
           test -f "build/ffmpeg-arm64/output/lib/libavcodec.a"

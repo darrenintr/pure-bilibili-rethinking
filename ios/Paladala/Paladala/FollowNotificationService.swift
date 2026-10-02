@@ -297,7 +297,7 @@ final class FollowNotificationService: NSObject, UNUserNotificationCenterDelegat
             // title when the post is a video card. Use whichever
             // the upstream populated; fall back to "新动态".
             let raw = item.attachedVideo?.title ?? item.text
-            let title = raw.isEmpty ? "新动态" : raw
+            let title = raw.isEmpty ? "新動態" : raw
             return (item.id, title, item.author)
         }.prefix(5)
 
@@ -335,7 +335,7 @@ final class FollowNotificationService: NSObject, UNUserNotificationCenterDelegat
         id: String, title: String, author: String
     ) async {
         let content = UNMutableNotificationContent()
-        content.title = author.isEmpty ? "关注的 UP 主有新动态" : "\(author) 发布了新内容"
+        content.title = author.isEmpty ? "關注的 UP 主有新動態" : "\(author) 釋出了新內容"
         content.body = title
         content.sound = .default
         content.threadIdentifier = "paladala.follow"

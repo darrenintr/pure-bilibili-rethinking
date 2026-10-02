@@ -228,7 +228,7 @@ private struct SponsorSkipToast: View {
                     Image(systemName: "forward.fill")
                         .font(.caption.weight(.bold))
                         .symbolEffect(.bounce, value: show)
-                    Text("已跳过")
+                    Text("已跳過")
                         .font(.caption.weight(.medium))
                     Text(SponsorCategory(rawValue: segment.category)?.displayName ?? segment.category)
                         .font(.caption.weight(.bold))
@@ -618,7 +618,7 @@ private struct FullscreenPlayerOverlay: View {
                 if showingSpeedBadge {
                     HStack {
                         Spacer()
-                        Text("2.0x 快进中")
+                        Text("2.0x 快進中")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 12)
@@ -1064,12 +1064,12 @@ private struct GestureHint: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 14) {
-                hintIcon(symbol: "gobackward.10", title: "双击左侧", subtitle: "后退 10s")
-                hintIcon(symbol: "heart.fill", title: "双击中心", subtitle: "点赞")
-                hintIcon(symbol: "goforward.10", title: "双击右侧", subtitle: "前进 10s")
+                hintIcon(symbol: "gobackward.10", title: "雙擊左側", subtitle: "後退 10s")
+                hintIcon(symbol: "heart.fill", title: "雙擊中心", subtitle: "點贊")
+                hintIcon(symbol: "goforward.10", title: "雙擊右側", subtitle: "前進 10s")
             }
             .font(.caption2)
-            Text("底栏拖动可跳转进度")
+            Text("底欄拖動可跳轉進度")
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(.white.opacity(0.78))
         }
@@ -1328,7 +1328,7 @@ fileprivate struct InlineSpeedBadge: View {
             if controller.isLongPressingSpeed {
                 HStack {
                     Spacer()
-                    Text("2.0x 快进中")
+                    Text("2.0x 快進中")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 12)

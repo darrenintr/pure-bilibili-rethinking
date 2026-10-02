@@ -21,9 +21,9 @@ import CoreMedia
 /// 4. Manage the FFmpegPlaybackEngine lifecycle
 @MainActor
 final class FFmpegPlaybackBridge {
-    
+
     // MARK: - Types
-    
+
     /// Represents a prepared playback session.
     struct Session {
         /// The underlying FFmpeg playback engine.
@@ -35,7 +35,7 @@ final class FFmpegPlaybackBridge {
         /// Video information.
         let video: BiliVideo
     }
-    
+
     /// Errors that can occur during bridge operations.
     enum BridgeError: Error, LocalizedError {
         case noPlayableSource
@@ -43,7 +43,7 @@ final class FFmpegPlaybackBridge {
         case engineCreationFailed(String)
         case invalidURL(String)
         case streamingNotSupported(String)
-        
+
         var errorDescription: String? {
             switch self {
             case .noPlayableSource:
@@ -59,20 +59,20 @@ final class FFmpegPlaybackBridge {
             }
         }
     }
-    
+
     // MARK: - Properties
-    
+
     private let cdnManager: CDNManager
     private var activeSession: Session?
-    
+
     // MARK: - Initialization
-    
+
     init(cdnManager: CDNManager = .shared) {
         self.cdnManager = cdnManager
     }
-    
+
     // MARK: - Public API
-    
+
     /// Prepares a playback session from BiliPlayback metadata.
     ///
     /// This is the main entry point for starting FFmpeg-based playback
@@ -91,24 +91,24 @@ final class FFmpegPlaybackBridge {
     ) async throws -> Session {
         // Clean up any existing session
         await teardownSession()
-        
+
         // Validate that we have a playable source
         guard playback.dash != nil || playback.fallbackURL != nil else {
             throw BridgeError.noPlayableSource
         }
-        
+
         // Select CDN endpoint
         let endpoint = try await selectEndpoint(
             playback: playback,
             preferredHost: preferredHost
         )
-        
+
         // Create the FFmpeg playback engine with network configuration
         let engine = try await createEngine(
             playback: playback,
             endpoint: endpoint
         )
-        
+
         // Create and store the session
         let session = Session(
             engine: engine,
@@ -117,10 +117,10 @@ final class FFmpegPlaybackBridge {
             video: video
         )
         self.activeSession = session
-        
+
         return session
     }
-    
+
     /// Tears down the active session and releases resources.
     func teardownSession() async {
         if let session = activeSession {
@@ -128,14 +128,14 @@ final class FFmpegPlaybackBridge {
             activeSession = nil
         }
     }
-    
+
     /// Returns the currently active session, if any.
     var currentSession: Session? {
         activeSession
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func selectEndpoint(
         playback: BiliPlayback,
         preferredHost: String?
@@ -144,13 +144,13 @@ final class FFmpegPlaybackBridge {
         if let host = preferredHost {
             return CDNEndpoint(host: host, latencyMs: nil, isReachable: true)
         }
-        
+
         // Use CDNManager to get the best endpoint
         let cdnManager = CDNManager.shared
-        
+
         // Get available hosts from playback
         let availableHosts = playback.allCDNHosts
-        
+
         // If we have cached results, use the best one
         if let bestHost = cdnManager.currentBestHost,
            availableHosts.contains(bestHost) {
@@ -160,34 +160,34 @@ final class FFmpegPlaybackBridge {
                 isReachable: true
             )
         }
-        
+
         // Get the default host from playback
         if let defaultHost = playback.cdnHost {
             return CDNEndpoint(host: defaultHost, latencyMs: nil, isReachable: true)
         }
-        
+
         // Fallback to CDNManager's default
         let defaultHost = CDNManager.defaultHost
         return CDNEndpoint(host: defaultHost, latencyMs: nil, isReachable: true)
     }
-    
+
     private func createEngine(
         playback: BiliPlayback,
         endpoint: CDNEndpoint
     ) async throws -> FFmpegPlaybackEngine {
         // Create the playback engine
         let engine = FFmpegPlaybackEngine()
-        
+
         // Configure the engine with network-capable frame callback
         // Note: This is a simplified version - actual implementation
         // would need proper frame handling and display integration
-        
+
         // For Phase 1, we'll use a placeholder implementation
         // that loads the stream URL with custom headers
-        
+
         return engine
     }
-    
+
     /// Constructs the streaming URL with the selected CDN endpoint.
     private func constructStreamURL(
         playback: BiliPlayback,

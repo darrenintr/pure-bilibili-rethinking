@@ -46,7 +46,7 @@ struct SleepTimerHUDView: View {
         )
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            Text("\(timer.remainingSeconds / 60) 分 \(timer.remainingSeconds % 60) 秒后自动暂停")
+            Text("\(timer.remainingSeconds / 60) 分 \(timer.remainingSeconds % 60) 秒後自動暫停")
         )
     }
 

@@ -306,7 +306,7 @@ enum PluginError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidEncoding: return "无法解析为文本。"
+        case .invalidEncoding: return "無法解析為文字。"
         }
     }
 }

@@ -22,7 +22,7 @@ final class DynamicFeedViewModel: ObservableObject {
         } catch {
             posts = []
             hasMore = false
-            errorMessage = "动态加载失败"
+            errorMessage = "動態載入失敗"
         }
         isLoading = false
     }
@@ -38,7 +38,7 @@ final class DynamicFeedViewModel: ObservableObject {
             nextOffset = page.nextOffset
             hasMore = page.hasMore && !page.nextOffset.isEmpty
         } catch {
-            errorMessage = "动态加载更多失败"
+            errorMessage = "動態載入更多失敗"
         }
     }
 }
@@ -65,7 +65,7 @@ final class HistoryListViewModel: ObservableObject {
             items = []
             nextCursor = nil
             hasMore = false
-            errorMessage = "历史记录加载失败"
+            errorMessage = "歷史記錄載入失敗"
         }
         isLoading = false
     }
@@ -81,7 +81,7 @@ final class HistoryListViewModel: ObservableObject {
             nextCursor = page.nextCursor
             hasMore = page.nextCursor != nil
         } catch {
-            errorMessage = "历史记录加载更多失败"
+            errorMessage = "歷史記錄載入更多失敗"
         }
     }
 }
@@ -99,7 +99,7 @@ final class FavoriteFoldersViewModel: ObservableObject {
             folders = try await repository.favoriteFolders(mid: mid)
         } catch {
             folders = []
-            errorMessage = "收藏夹加载失败"
+            errorMessage = "收藏夾載入失敗"
         }
         isLoading = false
     }
@@ -107,7 +107,7 @@ final class FavoriteFoldersViewModel: ObservableObject {
 
 @MainActor
 final class FavoriteFolderVideosViewModel: ObservableObject {
-    @Published var title = "收藏夹"
+    @Published var title = "收藏夾"
     @Published var videos: [BiliVideo] = []
     @Published var isLoading = false
     @Published var isLoadingMore = false
@@ -128,7 +128,7 @@ final class FavoriteFolderVideosViewModel: ObservableObject {
         } catch {
             videos = []
             hasMore = false
-            errorMessage = "收藏内容加载失败"
+            errorMessage = "收藏內容載入失敗"
         }
         isLoading = false
     }
@@ -145,7 +145,7 @@ final class FavoriteFolderVideosViewModel: ObservableObject {
             hasMore = result.hasMore
         } catch {
             page = max(1, page - 1)
-            errorMessage = "收藏内容加载更多失败"
+            errorMessage = "收藏內容載入更多失敗"
         }
     }
 }
@@ -163,7 +163,7 @@ final class WatchLaterViewModel: ObservableObject {
             videos = try await repository.watchLaterVideos()
         } catch {
             videos = []
-            errorMessage = "稍后再看加载失败"
+            errorMessage = "稍後再看載入失敗"
         }
         isLoading = false
     }
@@ -182,7 +182,7 @@ struct HistoryListView: View {
                     message: error,
                     retry: { Task { await model.load(repository: repository) } },
                     primary: authStore.activeAccount == nil
-                        ? .init(label: "登录", action: { router.openLogin() })
+                        ? .init(label: "登入", action: { router.openLogin() })
                         : nil
                 )
                     .paladalaListRowChrome()
@@ -208,7 +208,7 @@ struct HistoryListView: View {
                         model.items.removeAll { $0.video.id == entry.video.id }
                         Haptics.tap()
                     } label: {
-                        Label("从历史记录中移除", systemImage: "trash")
+                        Label("從歷史記錄中移除", systemImage: "trash")
                     }
                 }
                 .swipeActions(edge: .leading) {
@@ -222,7 +222,7 @@ struct HistoryListView: View {
                             }
                         }
                     } label: {
-                        Label("稍后再看", systemImage: "clock.badge.checkmark")
+                        Label("稍後再看", systemImage: "clock.badge.checkmark")
                     }
                     .tint(PaladalaTheme.biliPink)
                 }
@@ -242,7 +242,7 @@ struct HistoryListView: View {
             }
         }
         .paladalaListChrome()
-        .navigationTitle("历史记录")
+        .navigationTitle("歷史記錄")
         .task { await model.load(repository: repository) }
         .refreshable { await model.load(repository: repository) }
         .onReceive(NotificationCenter.default.publisher(for: .historyDidRemove)) { note in
@@ -278,7 +278,7 @@ struct WatchLaterListView: View {
                     message: error,
                     retry: { Task { await model.load(repository: repository) } },
                     primary: authStore.activeAccount == nil
-                        ? .init(label: "登录", action: { router.openLogin() })
+                        ? .init(label: "登入", action: { router.openLogin() })
                         : nil
                 )
                     .paladalaListRowChrome()
@@ -305,13 +305,13 @@ struct WatchLaterListView: View {
                             }
                         }
                     } label: {
-                        Label("从稍后再看中移除", systemImage: "clock.badge.xmark")
+                        Label("從稍後再看中移除", systemImage: "clock.badge.xmark")
                     }
                 }
             }
         }
         .paladalaListChrome()
-        .navigationTitle("稍后再看")
+        .navigationTitle("稍後再看")
         .task { await model.load(repository: repository) }
         .refreshable { await model.load(repository: repository) }
         .onReceive(NotificationCenter.default.publisher(for: .watchLaterDidChange)) { _ in
@@ -334,7 +334,7 @@ struct FavoriteFoldersView: View {
                     message: error,
                     retry: { Task { await model.load(repository: repository, mid: mid) } },
                     primary: authStore.activeAccount == nil
-                        ? .init(label: "登录", action: { router.openLogin() })
+                        ? .init(label: "登入", action: { router.openLogin() })
                         : nil
                 )
                     .paladalaListRowChrome()
@@ -369,7 +369,7 @@ struct FavoriteFolderVideosView: View {
                     message: error,
                     retry: { Task { await model.load(repository: repository, mediaID: folder.id) } },
                     primary: authStore.activeAccount == nil
-                        ? .init(label: "登录", action: { router.openLogin() })
+                        ? .init(label: "登入", action: { router.openLogin() })
                         : nil
                 )
                     .paladalaListRowChrome()
@@ -447,7 +447,7 @@ private struct FavoriteFolderRow: View {
                     .foregroundStyle(isNative ? .primary : PaladalaTheme.ink)
                     .textCase(isNative ? nil : .uppercase)
                     .lineLimit(2)
-                Text("\(folder.mediaCount) 个内容")
+                Text("\(folder.mediaCount) 個內容")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if !folder.ownerName.isEmpty {

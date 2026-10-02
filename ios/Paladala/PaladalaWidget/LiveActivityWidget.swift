@@ -147,7 +147,7 @@ private extension Int {
         let absValue = abs(self)
         if absValue >= 10_000 {
             let wan = Double(self) / 10_000.0
-            return String(format: "%.1f 万", wan)
+            return String(format: "%.1f 萬", wan)
         }
         return String(self)
     }

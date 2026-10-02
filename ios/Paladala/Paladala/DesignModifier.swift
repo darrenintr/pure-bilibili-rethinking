@@ -144,7 +144,7 @@ struct PaladalaStreetToggleStyle: ToggleStyle {
         }
         .buttonStyle(.plain)
         .opacity(isEnabled ? 1 : 0.45)
-        .accessibilityValue(configuration.isOn ? "开启" : "关闭")
+        .accessibilityValue(configuration.isOn ? "開啟" : "關閉")
     }
 }
 

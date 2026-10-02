@@ -47,6 +47,30 @@ final class PlaybackPrefetchManagerTests: XCTestCase {
         XCTAssertNotEqual(lo, hi)
     }
 
+    func test_primaryUpstreamURL_prefersBaseURLOverBackup() {
+        let primary = URL(string: "https://primary.example/video.m4s")!
+        let backup = URL(string: "https://backup.example/video.m4s")!
+        let track = BiliDashSource.Track(
+            baseURL: primary,
+            backupURLs: [backup],
+            codecs: "avc1.640028",
+            bandwidth: 1_000_000,
+            mimeType: "video/mp4",
+            initializationRange: .init(offset: 0, length: 128),
+            indexRange: .init(offset: 128, length: 32),
+            mediaStartOffset: 160,
+            totalDuration: 10,
+            width: 1920,
+            height: 1080,
+            qualityId: 80
+        )
+
+        XCTAssertEqual(
+            PlaybackPrefetchManager.primaryUpstreamURL(track: track),
+            primary
+        )
+    }
+
     // MARK: - PrefetchEntry Codable
 
     func test_entry_codableRoundTrip() throws {

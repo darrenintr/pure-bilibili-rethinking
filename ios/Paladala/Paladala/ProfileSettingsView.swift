@@ -119,7 +119,7 @@ struct ProfileSettingsView: View {
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "arrow.clockwise")
-                            Text("刷新大会员状态")
+                            Text("重新整理大會員狀態")
                             if authStore.isRefreshingVip {
                                 Spacer()
                                 ProgressView()
@@ -129,9 +129,9 @@ struct ProfileSettingsView: View {
                     }
                     .disabled(authStore.isRefreshingVip)
                 } header: {
-                    Text("账号")
+                    Text("賬號")
                 } footer: {
-                    Text("从 B 站服务器拉取 大会员 状态。新开通 / 续费后可能需要几分钟生效，点此可立即刷新。")
+                    Text("從 B 站伺服器拉取 大會員 狀態。新開通 / 續費後可能需要幾分鐘生效，點此可立即重新整理。")
                 }
             }
 
@@ -141,17 +141,17 @@ struct ProfileSettingsView: View {
                     // the top-most landmark on the profile screen —
                     // discoverable from here AND from the Home tab
                     // top toolbar.
-                    .init(title: "离线缓存", subtitle: "Downloads", symbol: "arrow.down.circle", destination: .downloads),
-                    .init(title: "历史记录", subtitle: "History", symbol: "clock.arrow.circlepath", destination: .history),
+                    .init(title: "離線快取", subtitle: "Downloads", symbol: "arrow.down.circle", destination: .downloads),
+                    .init(title: "歷史記錄", subtitle: "History", symbol: "clock.arrow.circlepath", destination: .history),
                     .init(title: "我的收藏", subtitle: "Favorite", symbol: "star", destination: .favorites),
-                    .init(title: "稍后再看", subtitle: "Watch later", symbol: "clock.badge.checkmark", destination: .watchLater),
-                    .init(title: "消息中心", subtitle: "Inbox", symbol: "tray"),
-                    .init(title: "追番追剧", subtitle: "Bangumi", symbol: "play.square.stack", destination: .bangumi)
+                    .init(title: "稍後再看", subtitle: "Watch later", symbol: "clock.badge.checkmark", destination: .watchLater),
+                    .init(title: "訊息中心", subtitle: "Inbox", symbol: "tray"),
+                    .init(title: "追番追劇", subtitle: "Bangumi", symbol: "play.square.stack", destination: .bangumi)
                 ], repository: repository)
             }
 
-            Section("外观") {
-                Picker("主题", selection: $themeMode) {
+            Section("外觀") {
+                Picker("主題", selection: $themeMode) {
                     ForEach(ThemeMode.allCases) { mode in
                         Text(mode.title).tag(mode)
                     }
@@ -167,7 +167,7 @@ struct ProfileSettingsView: View {
                         value: newValue.rawValue
                     )
                 }
-                Picker("界面设计", selection: $designVariant) {
+                Picker("介面設計", selection: $designVariant) {
                     // Same legacy-classic filter as the onboarding
                     // picker — only the two shipped design languages
                     // are offered.
@@ -194,15 +194,15 @@ struct ProfileSettingsView: View {
                     .foregroundStyle(PaladalaTheme.mutedInk)
             }
 
-            Section("播放设置") {
-                Toggle("默认开启弹幕", isOn: $danmakuEnabled)
+            Section("播放設定") {
+                Toggle("預設開啟彈幕", isOn: $danmakuEnabled)
                     .onChange(of: danmakuEnabled) { _, newValue in
                         ICloudSync.shared.mirror(
                             key: "paladala.danmakuEnabled",
                             value: newValue
                         )
                     }
-                Toggle("后台音频", isOn: $backgroundAudio)
+                Toggle("後臺音訊", isOn: $backgroundAudio)
                     .onChange(of: backgroundAudio) { _, newValue in
                         ICloudSync.shared.mirror(
                             key: "paladala.backgroundAudio",
@@ -215,12 +215,12 @@ struct ProfileSettingsView: View {
                 // home feed context; users who enable it get the
                 // next-up card surfaced in the player overlay's
                 // last-30s phase.
-                Toggle("自动播放下一集", isOn: $autoPlayNext)
+                Toggle("自動播放下一集", isOn: $autoPlayNext)
                 // Keep the floating mini-player when the user
                 // navigates away from a playing video. Default
                 // on. Disabling tears the controller down on
                 // `VideoDetailView.onDisappear` instead.
-                Toggle("离开后保留小窗播放", isOn: $miniPlayerOnExit)
+                Toggle("離開後保留小窗播放", isOn: $miniPlayerOnExit)
             }
 
             Section {
@@ -255,11 +255,11 @@ struct ProfileSettingsView: View {
                     // iCloud account can fix that and come
                     // back — the toggle is otherwise
                     // permanently greyed out.
-                    Link("前往系统设置登录 iCloud",
+                    Link("前往系統設定登入 iCloud",
                          destination: URL(string: UIApplication.openSettingsURLString)!)
                         .font(.caption2)
                 } else {
-                    Text("开启后，主题、界面设计、弹幕与后台音频会同步到登录了同一 Apple ID 的其他设备。")
+                    Text("開啟後，主題、介面設計、彈幕與後臺音訊會同步到登入了同一 Apple ID 的其他裝置。")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -269,19 +269,19 @@ struct ProfileSettingsView: View {
                 NavigationLink {
                     CDNSettingsView()
                 } label: {
-                    PluginRow(title: "CDN 播放源", subtitle: "手动切换节点 · 测速并选择", symbol: "antenna.radiowaves.left.and.right")
+                    PluginRow(title: "CDN 播放源", subtitle: "手動切換節點 · 測速並選擇", symbol: "antenna.radiowaves.left.and.right")
                 }
             }
 
-            Section("插件中心") {
+            Section("外掛中心") {
                 NavigationLink {
                     SponsorBlockSettingsView()
                 } label: {
                     PluginRow(
-                        title: "拦截恰饭",
+                        title: "攔截恰飯",
                         subtitle: SponsorBlockManager.shared.isEnabled
-                            ? "SponsorBlock · 社区标注 · 已开启"
-                            : "SponsorBlock · 社区标注广告跳过",
+                            ? "SponsorBlock · 社群標註 · 已開啟"
+                            : "SponsorBlock · 社群標註廣告跳過",
                         symbol: "shield.lefthalf.filled"
                     )
                 }
@@ -295,8 +295,8 @@ struct ProfileSettingsView: View {
                     PluginsSettingsView()
                 } label: {
                     PluginRow(
-                        title: "我的插件",
-                        subtitle: "\(PluginManager.shared.plugins.count) 个已安装 · 含 \(PluginManager.shared.plugins.filter { $0.enabled }.count) 个已启用",
+                        title: "我的外掛",
+                        subtitle: "\(PluginManager.shared.plugins.count) 個已安裝 · 含 \(PluginManager.shared.plugins.filter { $0.enabled }.count) 個已啟用",
                         symbol: "puzzlepiece.extension"
                     )
                 }
@@ -308,13 +308,13 @@ struct ProfileSettingsView: View {
                         UserDefaults.standard.set(false, forKey: "paladala.didOnboard")
                     }
                 } label: {
-                    Label("重新查看引导", systemImage: "questionmark.circle")
+                    Label("重新檢視引導", systemImage: "questionmark.circle")
                 }
                 .buttonStyle(.plain)
             } header: {
-                Text("引导")
+                Text("引導")
             } footer: {
-                Text("重新展示首次使用的引导页，了解 Paladala 的各项功能。")
+                Text("重新展示首次使用的引導頁，了解 Paladala 的各項功能。")
             }
 
             // 关于 — push the dedicated AboutView so the
@@ -323,19 +323,19 @@ struct ProfileSettingsView: View {
             // tab.  Subtitle mirrors the version line on the
             // about page so the entry previews what's
             // inside.
-            Section("关于") {
+            Section("關於") {
                 NavigationLink {
                     AboutView()
                 } label: {
                     PluginRow(
-                        title: "关于 Paladala",
+                        title: "關於 Paladala",
                         subtitle: "\(AppVersion.current.versionLine) · \(AppVersion.current.identifierDisplay)",
                         symbol: "info.circle"
                     )
                 }
             }
 
-            Section("系统与诊断") {
+            Section("系統與診斷") {
                 // The previous implementation used a sheet with an
                 // `if let url = logExportURL` content closure
                 // which had a SwiftUI re-evaluation race: the
@@ -346,8 +346,8 @@ struct ProfileSettingsView: View {
                 NavigationLink {
                     LogViewerView()
                 } label: {
-                    PluginRow(title: "运行日志",
-                              subtitle: "查看 / 搜索 / 分享 bpLog 输出",
+                    PluginRow(title: "執行日誌",
+                              subtitle: "檢視 / 搜尋 / 分享 bpLog 輸出",
                               symbol: "doc.text")
                 }
                 // 深度诊断报告 — now lands on a dedicated screen
@@ -360,8 +360,8 @@ struct ProfileSettingsView: View {
                 NavigationLink {
                     DeepDiagnosticReportView()
                 } label: {
-                    PluginRow(title: "深度诊断报告",
-                              subtitle: "推荐算法 / 播放 / 全屏排查 · 一键导出",
+                    PluginRow(title: "深度診斷報告",
+                              subtitle: "推薦演算法 / 播放 / 全屏排查 · 一鍵匯出",
                               symbol: "doc.text.magnifyingglass")
                 }
 
@@ -371,9 +371,9 @@ struct ProfileSettingsView: View {
                 // what shape B站's HLS slot actually takes.
                 Toggle(isOn: $dumpPlayURL) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("记录 playurl 原始响应")
+                        Text("記錄 playurl 原始響應")
                             .font(.subheadline)
-                        Text("下次播放视频时,把 B 站返回的 JSON 前 4 KB 写入日志")
+                        Text("下次播放影片時,把 B 站返回的 JSON 前 4 KB 寫入日誌")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -388,16 +388,16 @@ struct ProfileSettingsView: View {
                 // through `LogViewerView`.
                 Toggle(isOn: $analyticsOptIn) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("分享使用统计")
+                        Text("分享使用統計")
                             .font(.subheadline)
-                        Text("在应用内诊断日志中记录使用统计,帮助改进 App")
+                        Text("在應用內診斷日誌中記錄使用統計,幫助改進 App")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
                 }
 
                 Link(destination: URL(string: "https://github.com/darrenintr/pure-bilibili-rethinking")!) {
-                    PluginRow(title: "GitHub 仓库", subtitle: "开源项目地址", symbol: "link")
+                    PluginRow(title: "GitHub 倉庫", subtitle: "開源專案地址", symbol: "link")
                 }
                 .buttonStyle(.plain)
             }
@@ -499,7 +499,7 @@ struct ProfileSettingsView: View {
                 HStack(spacing: 10) {
                     Image(systemName: "crown")
                         .foregroundStyle(.secondary)
-                    Text("当前账号未开通大会员")
+                    Text("當前賬號未開通大會員")
                         .font(PaladalaTheme.FontRole.bodySmall)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -542,11 +542,11 @@ struct ProfileSettingsView: View {
                         }
                     }
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("未登录")
+                    Text("未登入")
                         .font(isNative ? PaladalaTheme.IOSNative.headline
                                        : PaladalaTheme.FontRole.headline)
                         .textCase(isNative ? nil : .uppercase)
-                    Text("登录后同步历史、收藏、关注和稍后再看")
+                    Text("登入後同步歷史、收藏、關注和稍後再看")
                         .font(isNative ? PaladalaTheme.IOSNative.subheadline
                                        : PaladalaTheme.FontRole.bodySmall)
                         .foregroundStyle(isNative ? .secondary : PaladalaTheme.mutedInk)
@@ -558,7 +558,7 @@ struct ProfileSettingsView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "qrcode.viewfinder")
-                        Text("登录 Bilibili 账号")
+                        Text("登入 Bilibili 賬號")
                             .font(.body.weight(.semibold))
                         Spacer()
                         Image(systemName: "chevron.right")
@@ -579,7 +579,7 @@ struct ProfileSettingsView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "qrcode.viewfinder")
-                        Text("登录 Bilibili 账号")
+                        Text("登入 Bilibili 賬號")
                             .font(PaladalaTheme.FontRole.labelMono)
                         Spacer()
                         Image(systemName: "chevron.right")
@@ -637,23 +637,23 @@ struct ProfileSettingsView: View {
                                    : PaladalaTheme.FontRole.labelMono)
                     .foregroundStyle(.secondary)
                 HStack(spacing: 16) {
-                    ProfileStat(label: "关注", value: profileModel.followingCount)
-                    ProfileStat(label: "粉丝", value: profileModel.followerCount)
-                    ProfileStat(label: "动态", value: profileModel.dynamicCount)
+                    ProfileStat(label: "關注", value: profileModel.followingCount)
+                    ProfileStat(label: "粉絲", value: profileModel.followerCount)
+                    ProfileStat(label: "動態", value: profileModel.dynamicCount)
                 }
                 .padding(.top, 2)
                 Label(profileModel.coinBalance, systemImage: "bitcoinsign.circle.fill")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(PaladalaTheme.biliPink)
                     .padding(.top, 1)
-                    .accessibilityLabel("硬币余额 \(profileModel.coinBalance)")
+                    .accessibilityLabel("硬幣餘額 \(profileModel.coinBalance)")
             }
             Spacer()
             Menu {
                 Button(role: .destructive) {
                     authStore.signOut()
                 } label: {
-                    Label("退出登录", systemImage: "rectangle.portrait.and.arrow.right")
+                    Label("退出登入", systemImage: "rectangle.portrait.and.arrow.right")
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")

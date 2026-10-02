@@ -65,15 +65,15 @@ actor TelegramLogReporter {
         var errorDescription: String? {
             switch self {
             case .missingFile:
-                return "日志文件不存在"
+                return "日誌檔案不存在"
             case .http(let code):
-                return "上传失败：HTTP \(code)"
+                return "上傳失敗：HTTP \(code)"
             case .malformedResponse:
-                return "上传失败：响应格式异常"
+                return "上傳失敗：響應格式異常"
             case .telegramError(let msg):
-                return "Telegram 拒绝：\(msg)"
+                return "Telegram 拒絕：\(msg)"
             case .decoding(let msg):
-                return "响应解析失败：\(msg)"
+                return "響應解析失敗：\(msg)"
             }
         }
     }

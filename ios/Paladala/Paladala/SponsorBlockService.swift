@@ -120,12 +120,12 @@ enum SponsorError: LocalizedError, Sendable {
 
     var errorDescription: String? {
         switch self {
-        case .invalidURL: return "无效的 URL"
-        case .networkError: return "网络连接失败"
+        case .invalidURL: return "無效的 URL"
+        case .networkError: return "網路連線失敗"
         case .httpError(let code, let body):
-            if let body, !body.isEmpty { return "服务器错误 (\(code)): \(body)" }
-            return "服务器错误 (HTTP \(code))"
-        case .decodeError: return "数据解析失败"
+            if let body, !body.isEmpty { return "伺服器錯誤 (\(code)): \(body)" }
+            return "伺服器錯誤 (HTTP \(code))"
+        case .decodeError: return "資料解析失敗"
         }
     }
 }

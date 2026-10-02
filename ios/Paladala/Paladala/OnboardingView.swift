@@ -8,10 +8,10 @@ struct OnboardingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let pages: [OnboardingPage] = [
-        OnboardingPage(title: "为 B 站而生", subtitle: "首页 · 推荐 · 动态 · 直播，一个 App 走完", symbol: "play.rectangle.on.rectangle.fill", tint: PaladalaTheme.biliPink),
-        OnboardingPage(title: "顺手就走的播放", subtitle: "看到一半切走，视频缩成小窗继续放；想看再点开", symbol: "pip.exit", tint: PaladalaTheme.biliPink),
+        OnboardingPage(title: "為 B 站而生", subtitle: "首頁 · 推薦 · 動態 · 直播，一個 App 走完", symbol: "play.rectangle.on.rectangle.fill", tint: PaladalaTheme.biliPink),
+        OnboardingPage(title: "順手就走的播放", subtitle: "看到一半切走，影片縮成小窗繼續放；想看再點開", symbol: "pip.exit", tint: PaladalaTheme.biliPink),
         OnboardingPage.preferences,
-        OnboardingPage(title: "登录后更强", subtitle: "同步历史、收藏、追番和稍后再看", symbol: "person.crop.circle.badge.checkmark", tint: PaladalaTheme.biliPink),
+        OnboardingPage(title: "登入後更強", subtitle: "同步歷史、收藏、追番和稍後再看", symbol: "person.crop.circle.badge.checkmark", tint: PaladalaTheme.biliPink),
     ]
 
     var body: some View {
@@ -70,7 +70,7 @@ struct OnboardingView: View {
         Button {
             didOnboard = true
         } label: {
-            Text(currentPage == Self.pages.count - 1 ? "开始" : "跳过")
+            Text(currentPage == Self.pages.count - 1 ? "開始" : "跳過")
                 .font(PaladalaTheme.FontRole.labelMono)
                 .foregroundStyle(PaladalaTheme.ink)
                 .padding(.horizontal, 16)
@@ -173,7 +173,7 @@ private struct OnboardingPage: Identifiable {
         self.kind = kind; self.title = title; self.subtitle = subtitle; self.symbol = symbol; self.tint = tint
     }
 
-    static let preferences = OnboardingPage(kind: .preferences, title: "定制你的体验", subtitle: "挑你想用的功能，其余保持默认", symbol: "slider.horizontal.3", tint: PaladalaTheme.biliPink)
+    static let preferences = OnboardingPage(kind: .preferences, title: "定製你的體驗", subtitle: "挑你想用的功能，其餘保持預設", symbol: "slider.horizontal.3", tint: PaladalaTheme.biliPink)
 }
 
 // MARK: - Page view
@@ -259,7 +259,7 @@ private struct OnboardingPageView: View {
                     Haptics.tap()
                     router.openLogin()
                 } label: {
-                    Text("立即登录")
+                    Text("立即登入")
                         .font(PaladalaTheme.FontRole.labelMono)
                         .foregroundStyle(PaladalaTheme.ink)
                         .frame(maxWidth: .infinity)
@@ -328,14 +328,14 @@ private struct OnboardingPreferencesPage: View {
                     .opacity(appear ? 1 : 0)
                     .animation(reduceMotion ? nil : .easeOut(duration: 0.22).delay(0.1), value: appear)
 
-                Text("定制你的体验")
+                Text("定製你的體驗")
                     .font(PaladalaTheme.FontRole.displayMedium)
                     .foregroundStyle(PaladalaTheme.ink)
                     .textCase(.uppercase)
                     .opacity(appear ? 1 : 0)
                     .animation(reduceMotion ? nil : .easeOut(duration: 0.22).delay(0.14), value: appear)
 
-                Text("挑你想用的功能，其余保持默认")
+                Text("挑你想用的功能，其餘保持預設")
                     .font(PaladalaTheme.FontRole.bodySmall)
                     .foregroundStyle(PaladalaTheme.mutedInk)
                     .multilineTextAlignment(.leading)
@@ -369,7 +369,7 @@ private struct OnboardingPreferencesPage: View {
     private var preferencesCard: some View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 8) {
-                Label("主题", systemImage: themeIcon(themeMode))
+                Label("主題", systemImage: themeIcon(themeMode))
                     .font(PaladalaTheme.FontRole.labelMono)
                     .foregroundStyle(PaladalaTheme.ink)
                 HStack(spacing: 8) {
@@ -393,7 +393,7 @@ private struct OnboardingPreferencesPage: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                Label("界面设计", systemImage: "square.grid.3x3.square")
+                Label("介面設計", systemImage: "square.grid.3x3.square")
                     .font(PaladalaTheme.FontRole.labelMono)
                     .foregroundStyle(PaladalaTheme.ink)
                 HStack {
@@ -420,15 +420,15 @@ private struct OnboardingPreferencesPage: View {
             Divider().padding(.vertical, 4)
 
             VStack(alignment: .leading, spacing: 12) {
-                Label("功能开关", systemImage: "switch.2")
+                Label("功能開關", systemImage: "switch.2")
                     .font(PaladalaTheme.FontRole.labelMono)
                 featureToggle(
-                    title: "弹幕",
+                    title: "彈幕",
                     symbol: "text.bubble.fill",
                     isOn: $danmakuEnabled
                 )
                 featureToggle(
-                    title: "后台音频",
+                    title: "後臺音訊",
                     symbol: "speaker.wave.2.fill",
                     isOn: $backgroundAudio
                 )
@@ -478,7 +478,7 @@ private struct OnboardingPreferencesPage: View {
         }
         .buttonStyle(PaladalaPressBounceButtonStyle())
         .opacity(disabled ? 0.45 : 1)
-        .accessibilityValue(isOn.wrappedValue ? "开启" : "关闭")
+        .accessibilityValue(isOn.wrappedValue ? "開啟" : "關閉")
     }
 
     private func themeIcon(_ mode: ThemeMode) -> String {
@@ -528,7 +528,7 @@ private struct OnboardingPreferencesPage: View {
                     didOnboard = true
                 }
             } label: {
-                Text("跳过，使用默认")
+                Text("跳過，使用預設")
                     .font(PaladalaTheme.FontRole.labelMono)
                     .foregroundStyle(PaladalaTheme.mutedInk)
             }
@@ -723,7 +723,7 @@ private struct OnboardingNativePreferencesView: View {
                 Text("挑你喜歡的風格")
                     .font(.title2.weight(.bold))
                     .foregroundStyle(.primary)
-                Text("選擇後可在設置中隨時切換")
+                Text("選擇後可在設定中隨時切換")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -745,7 +745,7 @@ private struct OnboardingNativePreferencesView: View {
             VStack(spacing: 0) {
                 toggleRow("彈幕", symbol: "text.bubble.fill", isOn: $danmakuEnabled)
                 Divider().padding(.leading, 50)
-                toggleRow("後台音頻", symbol: "speaker.wave.2.fill", isOn: $backgroundAudio)
+                toggleRow("後臺音訊", symbol: "speaker.wave.2.fill", isOn: $backgroundAudio)
                 Divider().padding(.leading, 50)
                 toggleRow(
                     "iCloud 同步",

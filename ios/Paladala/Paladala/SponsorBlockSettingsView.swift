@@ -23,7 +23,7 @@ struct SponsorBlockSettingsView: View {
         .scrollContentBackground(.hidden)
         .listStyle(.plain)
         .background(PaladalaTheme.canvas)
-        .navigationTitle("拦截恰饭")
+        .navigationTitle("攔截恰飯")
         .sheet(isPresented: $showSubmitReport) { submitReportSheet }
     }
 
@@ -32,7 +32,7 @@ struct SponsorBlockSettingsView: View {
     private var masterToggleSection: some View {
         Section {
             Toggle(isOn: $manager.config.isEnabled) {
-                Label("启用拦截恰饭", systemImage: "shield.lefthalf.filled")
+                Label("啟用攔截恰飯", systemImage: "shield.lefthalf.filled")
                     .tint(PaladalaTheme.SemanticColor.accent)
                     .font(.subheadline.weight(.medium))
             }
@@ -40,13 +40,13 @@ struct SponsorBlockSettingsView: View {
 
             if manager.config.isEnabled {
                 Toggle(isOn: $manager.config.autoSkip) {
-                    Label("自动跳过", systemImage: "forward.fill")
+                    Label("自動跳過", systemImage: "forward.fill")
                         .font(.subheadline.weight(.medium))
                 }
                 .tint(PaladalaTheme.SemanticColor.accent)
             }
         } footer: {
-            Text("播放视频时自动查询社区标注的赞助/恰饭片段，并跳过或标记。")
+            Text("播放影片時自動查詢社群標註的贊助/恰飯片段，並跳過或標記。")
         }
     }
 
@@ -76,7 +76,7 @@ struct SponsorBlockSettingsView: View {
                 .tint(PaladalaTheme.SemanticColor.accent)
             }
         } header: {
-            Label("拦截类别", systemImage: "line.3.horizontal.decrease.circle")
+            Label("攔截類別", systemImage: "line.3.horizontal.decrease.circle")
         }
     }
 
@@ -87,7 +87,7 @@ struct SponsorBlockSettingsView: View {
             Button {
                 showSubmitReport = true
             } label: {
-                Label("上报恰饭片段", systemImage: "exclamationmark.bubble.fill")
+                Label("上報恰飯片段", systemImage: "exclamationmark.bubble.fill")
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .disabled(!manager.isEnabled)
@@ -96,11 +96,11 @@ struct SponsorBlockSettingsView: View {
                 NavigationLink {
                     SegmentListView(segments: manager.segments)
                 } label: {
-                    Label("已加载 \(manager.segments.count) 个片段", systemImage: "list.bullet")
+                    Label("已載入 \(manager.segments.count) 個片段", systemImage: "list.bullet")
                 }
             }
         } header: {
-            Label("数据操作", systemImage: "square.and.pencil")
+            Label("資料操作", systemImage: "square.and.pencil")
         }
     }
 
@@ -111,20 +111,20 @@ struct SponsorBlockSettingsView: View {
             if manager.totalTimeSaved > 0 || manager.segments.isEmpty == false {
                 Section {
                     HStack {
-                        Label("已跳过", systemImage: "clock.badge.checkmark")
+                        Label("已跳過", systemImage: "clock.badge.checkmark")
                         Spacer()
-                        Text("\(manager.skippedCount) 个片段")
+                        Text("\(manager.skippedCount) 個片段")
                             .foregroundStyle(.secondary)
                     }
                     HStack {
-                        Label("累积节省", systemImage: "hourglass")
+                        Label("累積節省", systemImage: "hourglass")
                         Spacer()
                         Text(formatTime(manager.totalTimeSaved))
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                     }
                 } header: {
-                    Label("统计", systemImage: "chart.bar.fill")
+                    Label("統計", systemImage: "chart.bar.fill")
                 }
             }
         }
@@ -134,7 +134,7 @@ struct SponsorBlockSettingsView: View {
 
     private var advancedSection: some View {
         Section {
-            Picker("最低票数", selection: $manager.config.minVotes) {
+            Picker("最低票數", selection: $manager.config.minVotes) {
                 Text("不限").tag(-1)
                 Text("≥ 1 票").tag(1)
                 Text("≥ 3 票").tag(3)
@@ -142,10 +142,10 @@ struct SponsorBlockSettingsView: View {
             }
 
             HStack {
-                Label("服务器", systemImage: "server.rack")
+                Label("伺服器", systemImage: "server.rack")
                     .font(.subheadline)
                 Spacer()
-                TextField("服务器地址", text: $manager.config.serverURL)
+                TextField("伺服器地址", text: $manager.config.serverURL)
                     .font(PaladalaTheme.FontRole.labelMono)
                     .textFieldStyle(.plain)
                     .padding(.horizontal, 8)
@@ -163,9 +163,9 @@ struct SponsorBlockSettingsView: View {
                     .autocorrectionDisabled()
             }
         } header: {
-            Label("高级设置", systemImage: "gearshape.2")
+            Label("高階設定", systemImage: "gearshape.2")
         } footer: {
-            Text("默认服务器为 BiliSponsorBlock 镜像站 (bsbsb.top)，支持 SponsorBlock 官方 API 兼容的任意服务器。")
+            Text("預設伺服器為 BiliSponsorBlock 映象站 (bsbsb.top)，支援 SponsorBlock 官方 API 相容的任意伺服器。")
         }
     }
 
@@ -175,7 +175,7 @@ struct SponsorBlockSettingsView: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("开始时间（秒）", text: $reportStartTime)
+                    TextField("開始時間（秒）", text: $reportStartTime)
                         .keyboardType(.decimalPad)
                         .textFieldStyle(.plain)
                         .padding(10)
@@ -186,7 +186,7 @@ struct SponsorBlockSettingsView: View {
                                     lineWidth: PaladalaTheme.borderWidth
                                 )
                         }
-                    TextField("结束时间（秒）", text: $reportEndTime)
+                    TextField("結束時間（秒）", text: $reportEndTime)
                         .keyboardType(.decimalPad)
                         .textFieldStyle(.plain)
                         .padding(10)
@@ -198,19 +198,19 @@ struct SponsorBlockSettingsView: View {
                                 )
                         }
                 } header: {
-                    Label("时间范围", systemImage: "timer")
+                    Label("時間範圍", systemImage: "timer")
                 } footer: {
-                    Text("填写恰饭片段的起止时间点（秒），例如从 30.5 秒到 45.2 秒。")
+                    Text("填寫恰飯片段的起止時間點（秒），例如從 30.5 秒到 45.2 秒。")
                 }
 
                 Section {
-                    Picker("类别", selection: $reportCategory) {
+                    Picker("類別", selection: $reportCategory) {
                         ForEach(SponsorCategory.allCases) { category in
                             Label(category.displayName, systemImage: categoryIcon(category)).tag(category)
                         }
                     }
                 } header: {
-                    Label("片段类别", systemImage: "tag")
+                    Label("片段類別", systemImage: "tag")
                 }
 
                 Section {
@@ -220,7 +220,7 @@ struct SponsorBlockSettingsView: View {
                             if isSubmitting {
                                 ProgressView()
                             } else {
-                                Text("提交到服务器")
+                                Text("提交到伺服器")
                                     .fontWeight(.semibold)
                             }
                             Spacer()
@@ -243,7 +243,7 @@ struct SponsorBlockSettingsView: View {
             }
             .scrollContentBackground(.hidden)
             .background(PaladalaTheme.canvas)
-            .navigationTitle("上报恰饭片段")
+            .navigationTitle("上報恰飯片段")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -262,7 +262,7 @@ struct SponsorBlockSettingsView: View {
 
     private func submitReport() {
         guard let start = Double(reportStartTime), let end = Double(reportEndTime), end > start else {
-            submitMessage = "请填写有效的时间范围"
+            submitMessage = "請填寫有效的時間範圍"
             return
         }
 
@@ -280,11 +280,11 @@ struct SponsorBlockSettingsView: View {
                     endTime: end,
                     videoDuration: 0
                 )
-                submitMessage = "提交成功！感谢您的贡献。"
+                submitMessage = "提交成功！感謝您的貢獻。"
                 reportStartTime = ""
                 reportEndTime = ""
             } catch {
-                submitMessage = "提交失败：\(error.localizedDescription)"
+                submitMessage = "提交失敗：\(error.localizedDescription)"
             }
         }
     }
@@ -306,14 +306,14 @@ struct SponsorBlockSettingsView: View {
 
     private func categoryHint(_ category: SponsorCategory) -> String {
         switch category {
-        case .sponsor: return "赞助商广告、贴片广告、口播广告"
-        case .intro: return "视频开场的动画或片头"
-        case .outro: return "视频结尾的鸣谢或片尾"
-        case .interaction: return "求赞、求三连、关注提醒"
-        case .selfpromo: return "UP 主推荐自己的其他内容"
-        case .musicOfftopic: return "音乐视频中的非音乐部分"
-        case .preview: return "下集预告或内容回顾"
-        case .filler: return "凑数或填充内容"
+        case .sponsor: return "贊助商廣告、貼片廣告、口播廣告"
+        case .intro: return "影片開場的動畫或片頭"
+        case .outro: return "影片結尾的鳴謝或片尾"
+        case .interaction: return "求贊、求三連、關注提醒"
+        case .selfpromo: return "UP 主推薦自己的其他內容"
+        case .musicOfftopic: return "音樂影片中的非音樂部分"
+        case .preview: return "下集預告或內容回顧"
+        case .filler: return "湊數或填充內容"
         }
     }
 
@@ -321,8 +321,8 @@ struct SponsorBlockSettingsView: View {
         let hours = Int(seconds) / 3600
         let minutes = Int(seconds) / 60 % 60
         let secs = Int(seconds) % 60
-        if hours > 0 { return "\(hours) 小时 \(minutes) 分钟" }
-        if minutes > 0 { return "\(minutes) 分钟 \(secs) 秒" }
+        if hours > 0 { return "\(hours) 小時 \(minutes) 分鐘" }
+        if minutes > 0 { return "\(minutes) 分鐘 \(secs) 秒" }
         return "\(secs) 秒"
     }
 }

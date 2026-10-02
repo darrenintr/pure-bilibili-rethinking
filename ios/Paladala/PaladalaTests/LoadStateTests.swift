@@ -31,7 +31,7 @@ final class LoadStateTests: XCTestCase {
         let state = LoadState<[Int]>()
         await state.load(
             { [1, 2, 3] },
-            errorText: "加载失败"
+            errorText: "載入失敗"
         )
         XCTAssertEqual(state.value, [1, 2, 3])
         XCTAssertFalse(state.isLoading)
@@ -42,10 +42,10 @@ final class LoadStateTests: XCTestCase {
         let state = LoadState<[Int]>(value: [99])
         await state.load(
             { throw TestError.boom },
-            errorText: "加载失败"
+            errorText: "載入失敗"
         )
         XCTAssertNil(state.value, "error path must clear the previous value")
-        XCTAssertEqual(state.errorMessage, "加载失败")
+        XCTAssertEqual(state.errorMessage, "載入失敗")
         XCTAssertFalse(state.isLoading)
     }
 
@@ -95,7 +95,7 @@ final class LoadStateTests: XCTestCase {
         await state.loadMore(
             { [3, 4] },
             append: { existing, next in existing + next },
-            errorText: "加载更多失败"
+            errorText: "載入更多失敗"
         )
         XCTAssertEqual(state.value, [1, 2, 3, 4])
         XCTAssertFalse(state.isLoadingMore)
@@ -112,10 +112,10 @@ final class LoadStateTests: XCTestCase {
         await state.loadMore(
             { throw TestError.boom },
             append: { existing, next in existing + next },
-            errorText: "加载更多失败"
+            errorText: "載入更多失敗"
         )
         XCTAssertEqual(state.value, [1, 2], "loadMore failure must NOT clear existing value")
-        XCTAssertEqual(state.errorMessage, "加载更多失败")
+        XCTAssertEqual(state.errorMessage, "載入更多失敗")
         XCTAssertFalse(state.isLoadingMore)
     }
 

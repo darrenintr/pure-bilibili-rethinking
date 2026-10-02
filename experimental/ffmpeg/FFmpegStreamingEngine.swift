@@ -25,9 +25,9 @@ import CoreMedia
 /// ```
 @MainActor
 final class FFmpegStreamingEngine: ObservableObject {
-    
+
     // MARK: - Types
-    
+
     /// Engine playback state.
     enum State: Equatable, Sendable {
         case idle
@@ -39,7 +39,7 @@ final class FFmpegStreamingEngine: ObservableObject {
         case failed(StreamingError)
         case ended
     }
-    
+
     /// Streaming errors.
     enum StreamingError: Error, LocalizedError, Sendable {
         case noPlayableSource
@@ -48,7 +48,7 @@ final class FFmpegStreamingEngine: ObservableObject {
         case engineCreationFailed(String)
         case playbackFailed(String)
         case networkTimeout
-        
+
         var errorDescription: String? {
             switch self {
             case .noPlayableSource:
@@ -66,7 +66,7 @@ final class FFmpegStreamingEngine: ObservableObject {
             }
         }
     }
-    
+
     /// Playback progress information.
     struct Progress: Sendable {
         let currentTime: Double
@@ -74,9 +74,9 @@ final class FFmpegStreamingEngine: ObservableObject {
         let bufferedTime: Double
         let isSeekable: Bool
     }
-    
+
     // MARK: - Published State
-    
+
     @Published private(set) var state: State = .idle
     @Published private(set) var progress: Progress = .init(
         currentTime: 0,
@@ -84,32 +84,32 @@ final class FFmpegStreamingEngine: ObservableObject {
         bufferedTime: 0,
         isSeekable: false
     )
-    
+
     // MARK: - Private Properties
-    
+
     private var engine: FFmpegPlaybackEngine?
     private var segmentFetcher: DASHSegmentFetcher?
     private var bridge: FFmpegPlaybackBridge?
-    
+
     private var playbackTask: Task<Void, Never>?
     private var progressUpdateTask: Task<Void, Never>?
-    
+
     private var currentPlayback: BiliPlayback?
     private var currentVideo: BiliVideo?
-    
+
     // MARK: - Initialization
-    
+
     init() {
         // Initialize components on first use
     }
-    
+
     deinit {
         progressUpdateTask?.cancel()
         playbackTask?.cancel()
     }
-    
+
     // MARK: - Public API
-    
+
     /// Loads a B站 playback for streaming.
     ///
     /// - Parameters:
@@ -123,36 +123,36 @@ final class FFmpegStreamingEngine: ObservableObject {
     ) async {
         // Cancel any existing playback
         await stop()
-        
+
         state = .loading
         currentPlayback = playback
         currentVideo = video
-        
+
         do {
             // Initialize bridge and fetcher
             bridge = FFmpegPlaybackBridge()
             segmentFetcher = DASHSegmentFetcher()
-            
+
             // Prepare the session
             guard let bridge = bridge else {
                 throw StreamingError.engineCreationFailed("Bridge initialization failed")
             }
-            
+
             let session = try await bridge.prepareSession(
                 playback: playback,
                 video: video,
                 preferredHost: preferredHost
             )
-            
+
             // Store the engine
             engine = session.engine
-            
+
             // Start progress updates
             startProgressUpdates()
-            
+
             // Update state
             state = .paused
-            
+
             // Update duration in progress
             if let duration = session.engine.durationSeconds {
                 progress = Progress(
@@ -162,63 +162,63 @@ final class FFmpegStreamingEngine: ObservableObject {
                     isSeekable: true
                 )
             }
-            
+
         } catch {
             state = .failed(.playbackFailed(error.localizedDescription))
         }
     }
-    
+
     /// Starts or resumes playback.
     func play() {
         guard let engine = engine else { return }
-        
+
         engine.play()
         state = .playing
     }
-    
+
     /// Pauses playback.
     func pause() {
         guard let engine = engine else { return }
-        
+
         engine.pause()
         state = .paused
     }
-    
+
     /// Seeks to the specified time.
     ///
     /// - Parameter time: Target time in seconds
     func seek(to time: Double) {
         guard let engine = engine else { return }
-        
+
         let wasPlaying = state == .playing
         state = .seeking
-        
+
         engine.seek(toSeconds: time)
-        
+
         // Resume previous state
         state = wasPlaying ? .playing : .paused
     }
-    
+
     /// Stops playback and releases resources.
     func stop() async {
         progressUpdateTask?.cancel()
         playbackTask?.cancel()
-        
+
         if let engine = engine {
             await engine.unload()
         }
-        
+
         // Clean up bridge and fetcher
         if let bridge = bridge {
             await bridge.teardownSession()
         }
-        
+
         engine = nil
         bridge = nil
         segmentFetcher = nil
         currentPlayback = nil
         currentVideo = nil
-        
+
         state = .idle
         progress = Progress(
             currentTime: 0,
@@ -227,12 +227,12 @@ final class FFmpegStreamingEngine: ObservableObject {
             isSeekable: false
         )
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func startProgressUpdates() {
         progressUpdateTask?.cancel()
-        
+
         progressUpdateTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self = self,
@@ -240,14 +240,14 @@ final class FFmpegStreamingEngine: ObservableObject {
                     try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
                     continue
                 }
-                
+
                 // Update progress
                 let currentTime = engine.currentTime
                 let duration = engine.durationSeconds ?? 0
-                
+
                 // Estimate buffered time (simplified)
                 let bufferedTime = min(currentTime + 10, duration)
-                
+
                 await MainActor.run {
                     self.progress = Progress(
                         currentTime: currentTime,
@@ -256,14 +256,14 @@ final class FFmpegStreamingEngine: ObservableObject {
                         isSeekable: duration > 0
                     )
                 }
-                
+
                 // Check for end of playback
                 if currentTime >= duration - 0.5 && duration > 0 {
                     await MainActor.run {
                         self.state = .ended
                     }
                 }
-                
+
                 try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
             }
         }
@@ -279,7 +279,7 @@ extension FFmpegPlaybackEngine {
         // For now, returning 0 as placeholder
         0
     }
-    
+
     /// Total duration in seconds (nil for live streams).
     var durationSeconds: Double? {
         // This would need to be implemented in FFmpegPlaybackEngine

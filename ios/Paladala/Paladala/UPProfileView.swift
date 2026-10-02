@@ -16,7 +16,7 @@ enum UPProfileTab: String, CaseIterable, Identifiable, Codable, Sendable {
     var title: String {
         switch self {
         case .posts: "投稿"
-        case .dynamics: "动态"
+        case .dynamics: "動態"
         case .favorites: "收藏"
         }
     }
@@ -79,7 +79,7 @@ final class UPProfileViewModel: ObservableObject {
 
     func load(repository: PaladalaRepository, selfMid: Int64 = 0) async {
         guard mid > 0 else {
-            errorMessage = "无效的 UP ID"
+            errorMessage = "無效的 UP ID"
             return
         }
         isLoading = true
@@ -125,7 +125,7 @@ final class UPProfileViewModel: ObservableObject {
             hasMore = page.hasMore
             nextPage += 1
         } catch {
-            errorMessage = "加载更多失败"
+            errorMessage = "載入更多失敗"
         }
     }
 
@@ -157,7 +157,7 @@ final class UPProfileViewModel: ObservableObject {
             dynamicHasMore = page.hasMore
             dynamicNextOffset = page.nextOffset
         } catch {
-            errorMessage = "加载动态失败"
+            errorMessage = "載入動態失敗"
         }
     }
 
@@ -171,7 +171,7 @@ final class UPProfileViewModel: ObservableObject {
         do {
             favoriteFolders = try await repository.userFavoriteFolders(upMid: mid)
         } catch {
-            errorMessage = "加载收藏失败"
+            errorMessage = "載入收藏失敗"
         }
     }
 
@@ -192,10 +192,10 @@ final class UPProfileViewModel: ObservableObject {
         relation = optimistic
         do {
             _ = try await repository.modifyRelation(target: mid, act: newAct)
-            relationToast = optimistic.isFollowing ? "已关注" : "已取消关注"
+            relationToast = optimistic.isFollowing ? "已關注" : "已取消關注"
         } catch {
             relation = previous
-            relationToast = "操作失败，请重试"
+            relationToast = "操作失敗，請重試"
         }
     }
 }
@@ -309,20 +309,20 @@ struct UPProfileView: View {
                     UIPasteboard.general.string = "\(mid)"
                     Haptics.success()
                 } label: {
-                    Label("复制 UID", systemImage: "doc.on.doc")
+                    Label("複製 UID", systemImage: "doc.on.doc")
                 }
                 Button {
                     if let url = URL(string: "https://space.bilibili.com/\(mid)") {
                         UIApplication.shared.open(url)
                     }
                 } label: {
-                    Label("浏览器打开", systemImage: "safari")
+                    Label("瀏覽器開啟", systemImage: "safari")
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .font(.body.weight(.medium))
             }
-            .accessibilityLabel("UP 主页更多操作")
+            .accessibilityLabel("UP 主頁更多操作")
         }
     }
 
@@ -353,7 +353,7 @@ struct UPProfileView: View {
                                 // the previous layout used.
                                 Image(systemName: "crown.fill")
                                     .foregroundStyle(PaladalaTheme.biliPink)
-                                    .accessibilityLabel("大会员")
+                                    .accessibilityLabel("大會員")
                             }
                         }
                         Text("UID: \(card.mid)")
@@ -491,8 +491,8 @@ struct UPProfileView: View {
         let isFollowing = model.relation.isFollowing
         let title: String = {
             if isBlocked { return "已拉黑" }
-            if !isLoggedIn { return "关注" }
-            return isFollowing ? "已关注" : "关注"
+            if !isLoggedIn { return "關注" }
+            return isFollowing ? "已關注" : "關注"
         }()
         let symbol: String = isBlocked
             ? "hand.raised.slash"
@@ -557,19 +557,19 @@ struct UPProfileView: View {
     private var statsRow: some View {
         HStack(spacing: 8) {
             statPill(
-                label: "粉丝",
+                label: "粉絲",
                 value: model.followerCount,
                 systemImage: "person.2",
                 interactive: false
             )
             statPill(
-                label: "关注",
+                label: "關注",
                 value: model.followingCount,
                 systemImage: "person.crop.circle.badge.checkmark",
                 interactive: false
             )
             statPill(
-                label: "动态",
+                label: "動態",
                 value: model.dynamicCount,
                 systemImage: "rectangle.stack",
                 interactive: true,
@@ -676,7 +676,7 @@ struct UPProfileView: View {
                 )
             }
         }
-        .accessibilityLabel("UP 主页分页")
+        .accessibilityLabel("UP 主頁分頁")
     }
 
     // MARK: - Posts section
@@ -701,9 +701,9 @@ struct UPProfileView: View {
                 }
             } else if model.videos.isEmpty {
                 ContentUnavailableView(
-                    "暂无投稿",
+                    "暫無投稿",
                     systemImage: "film.stack",
-                    description: Text("该 UP 暂未发布视频，或数据加载失败。")
+                    description: Text("該 UP 暫未釋出影片，或資料載入失敗。")
                 )
                 .frame(maxWidth: .infinity, minHeight: 150)
             } else {
@@ -731,7 +731,7 @@ struct UPProfileView: View {
         if model.isLoadingMore {
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Text("加载更多…")
+                Text("載入更多…")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -742,7 +742,7 @@ struct UPProfileView: View {
                 Haptics.selection()
                 Task { await model.loadMore(repository: repository) }
             } label: {
-                Label("加载更多视频", systemImage: "arrow.down.circle")
+                Label("載入更多影片", systemImage: "arrow.down.circle")
                     .font(.caption.weight(.semibold))
             }
             .buttonStyle(PaladalaGlassButtonStyle(materialDesign: materialDesign))
@@ -757,7 +757,7 @@ struct UPProfileView: View {
                 canAutoLoadMorePosts = true
             }
         } else if !model.hasMore && !model.videos.isEmpty {
-            Text("— 没有更多了 —")
+            Text("— 沒有更多了 —")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity)
@@ -791,7 +791,7 @@ struct UPProfileView: View {
     private var dynamicsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("动态")
+                Text("動態")
                     .font(PaladalaTheme.FontRole.sectionHeader)
                     .textCase(.uppercase)
                 Spacer()
@@ -805,9 +805,9 @@ struct UPProfileView: View {
                 }
             } else if model.dynamicItems.isEmpty {
                 ContentUnavailableView(
-                    "暂无动态",
+                    "暫無動態",
                     systemImage: "rectangle.stack.badge.minus",
-                    description: Text("该 UP 暂未发布动态，或动态加载失败。")
+                    description: Text("該 UP 暫未釋出動態，或動態載入失敗。")
                 )
                 .frame(maxWidth: .infinity, minHeight: 150)
             } else {
@@ -831,14 +831,14 @@ struct UPProfileView: View {
                 if model.isLoadingDynamics {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
-                        Text("加载更多…")
+                        Text("載入更多…")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                 } else if !model.dynamicHasMore && !model.dynamicItems.isEmpty {
-                    Text("— 没有更多了 —")
+                    Text("— 沒有更多了 —")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity)
@@ -888,9 +888,9 @@ struct UPProfileView: View {
                 }
             } else if model.favoriteFolders.isEmpty {
                 ContentUnavailableView(
-                    "暂无公开收藏",
+                    "暫無公開收藏",
                     systemImage: "folder.badge.questionmark",
-                    description: Text("该 UP 没有公开收藏夹。")
+                    description: Text("該 UP 沒有公開收藏夾。")
                 )
                 .frame(maxWidth: .infinity, minHeight: 150)
             } else {
@@ -927,7 +927,7 @@ struct UPProfileView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                Text("\(folder.mediaCount) 个视频")
+                Text("\(folder.mediaCount) 個影片")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 if !folder.ownerName.isEmpty {

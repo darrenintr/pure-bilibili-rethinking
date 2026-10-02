@@ -14,14 +14,14 @@ enum SponsorCategory: String, CaseIterable, Codable, Identifiable, Sendable {
 
     var displayName: String {
         switch self {
-        case .sponsor: return "赞助广告"
-        case .intro: return "开场动画"
-        case .outro: return "结尾动画"
-        case .interaction: return "一键三连"
-        case .selfpromo: return "自卖自夸"
-        case .musicOfftopic: return "音乐无关"
-        case .preview: return "预告/下集"
-        case .filler: return "凑数填充"
+        case .sponsor: return "贊助廣告"
+        case .intro: return "開場動畫"
+        case .outro: return "結尾動畫"
+        case .interaction: return "一鍵三連"
+        case .selfpromo: return "自賣自誇"
+        case .musicOfftopic: return "音樂無關"
+        case .preview: return "預告/下集"
+        case .filler: return "湊數填充"
         }
     }
 }

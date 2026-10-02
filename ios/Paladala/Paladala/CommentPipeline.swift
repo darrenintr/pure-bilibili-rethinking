@@ -1045,13 +1045,13 @@ struct CommentDTO: Decodable, Sendable {
             if let raw = try? container.decode(String.self, forKey: DynamicKey("message")) {
                 message = raw.strippingHTML
             } else if container.contains(DynamicKey("pictures")) {
-                message = "[图片评论]"
+                message = "[圖片評論]"
             } else if container.contains(DynamicKey("vote")) {
                 message = "[投票]"
             } else if container.contains(DynamicKey("emote")) {
                 message = "[表情]"
             } else if container.contains(DynamicKey("at_name_to_mid")) {
-                message = "[at 消息]"
+                message = "[at 訊息]"
             } else {
                 message = ""
             }

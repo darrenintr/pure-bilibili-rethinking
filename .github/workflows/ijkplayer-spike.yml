@@ -64,14 +64,14 @@ jobs:
           FF_ALL_ARCHS=arm64 bash init-ios.sh
           test -f ffmpeg-arm64/libavcodec/aarch64/h264dsp_init_aarch64.c
           python3 - <<'PATCH_H264DSP'
-from pathlib import Path
-p = Path('ffmpeg-arm64/libavcodec/aarch64/h264dsp_init_aarch64.c')
-s = p.read_text()
-if '#include <stddef.h>\n' not in s:
-    s = s.replace('#include <stdint.h>\n', '#include <stdint.h>\n#include <stddef.h>\n')
-s = s.replace('int stride, int height', 'ptrdiff_t stride, int height')
-p.write_text(s)
-PATCH_H264DSP
+          from pathlib import Path
+          p = Path('ffmpeg-arm64/libavcodec/aarch64/h264dsp_init_aarch64.c')
+          s = p.read_text()
+          if '#include <stddef.h>\n' not in s:
+              s = s.replace('#include <stdint.h>\n', '#include <stdint.h>\n#include <stddef.h>\n')
+          s = s.replace('int stride, int height', 'ptrdiff_t stride, int height')
+          p.write_text(s)
+          PATCH_H264DSP
           echo "FFmpeg source and arm64 h264dsp ABI patch verified"
       - name: Build marker
         run: |

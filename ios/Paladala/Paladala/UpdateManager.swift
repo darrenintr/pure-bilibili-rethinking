@@ -81,7 +81,7 @@ final class UpdateManager: NSObject, ObservableObject {
             bpLog("UpdateManager: Shortcut not installed, prompting user")
             ShortcutManager.shared.checkAndPromptIfNeeded()
             await MainActor.run {
-                updateDownloadState = .failed("请先安装快捷指令")
+                updateDownloadState = .failed("請先安裝快捷指令")
             }
             return
         }
@@ -121,7 +121,7 @@ final class UpdateManager: NSObject, ObservableObject {
                     updateDownloadState = .completed(downloadURL)
                     bpLog("UpdateManager: Shortcut invoked successfully")
                 } else {
-                    updateDownloadState = .failed("无法调用快捷指令")
+                    updateDownloadState = .failed("無法呼叫快捷指令")
                     bpLog("UpdateManager: failed to invoke Shortcut")
                 }
             }
@@ -229,7 +229,7 @@ final class UpdateManager: NSObject, ObservableObject {
             // 即可一鍵安裝".
             installState = .noStoreFound
         case .none:
-            installState = .failed("无法打開安裝頁")
+            installState = .failed("無法開啟安裝頁")
         }
     }
 
@@ -441,13 +441,13 @@ enum UpdateError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "无效的下载地址"
+            return "無效的下載地址"
         case .networkError:
-            return "网络请求失败"
+            return "網路請求失敗"
         case .noReleaseFound:
-            return "未找到可用的发布版本"
+            return "未找到可用的釋出版本"
         case .noIPAFound:
-            return "该版本没有 unsigned IPA 文件"
+            return "該版本沒有 unsigned IPA 檔案"
         }
     }
 }
