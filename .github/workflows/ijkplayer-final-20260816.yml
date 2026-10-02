@@ -1,0 +1,26 @@
+name: IJKPlayer Final Framework Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build IJKPlayer.framework
+    runs-on: macos-15
+    steps:
+      - name: Set up paths
+        run: |
+          set -euo pipefail
+          echo "IJKPLAYER_SRC=$RUNNER_TEMP/ijkplayer-src" >> "$GITHUB_ENV"
+          echo "IJKPLAYER_BUILD=$RUNNER_TEMP/ijkplayer-build" >> "$GITHUB_ENV"
+      - name: Clone IJKPlayer
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch master https://github.com/Bilibili/ijkplayer.git "$IJKPLAYER_SRC"
+          test -x "$IJKPLAYER_SRC/init-ios.sh"
+          echo "IJKPlayer clone verified"
+      - name: Show toolchain
+        run: xcodebuild -version
