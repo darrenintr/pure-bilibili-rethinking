@@ -1,9 +1,9 @@
 {
   "_meta": {
-    "generatedAt": "2026-10-02T00:43:15Z",
-    "githubRunId": "36946937499",
-    "githubRunNumber": "641",
-    "githubSha": "248be24a9b2bce9410f3f368233fee3663353a7e",
+    "generatedAt": "2026-10-02T00:47:15Z",
+    "githubRunId": "36947360530",
+    "githubRunNumber": "643",
+    "githubSha": "4673bb347fe1b156f01abd72fc3cf3cef86b4732",
     "sourceScript": "scripts/generate_apps_json.py"
   },
   "apps": [
@@ -23,6 +23,14 @@
       "subtitle": "純淨嘅第三方嗶哩嗶哩 iOS 客戶端",
       "tintColor": "#FB7299",
       "versions": [
+        {
+          "buildVersion": "340",
+          "date": "2026-10-02T00:47:15Z",
+          "downloadURL": "https://github.com/darrenintr/pure-bilibili-rethinking/releases/download/v0.5.40.340/Paladala-unsigned-v0.5.40.340.ipa",
+          "localizedDescription": "i18n: convert app strings from Simplified to Traditional Chinese\n\n\nConverted string literals only (code, comments and API identifiers untouched)\nusing OpenCC s2twp across 47 Swift files, the built-in plugin manifests and\nInfo.plist. Line endings preserved.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01BdeTJFjGWrLDh7gU3MgrQK",
+          "size": 4106345,
+          "version": "0.5.40"
+        },
         {
           "buildVersion": "339",
           "date": "2026-10-02T00:43:15Z",
@@ -325,6 +333,15 @@
   "description": "Paladala 嘅官方 AltStore / SideStore 源。每次 push 到 working 分支都會自動出新版本,呢個 apps.json 都會同步更新。",
   "name": "Paladala",
   "news": [
+    {
+      "appID": "com.dt.paladala",
+      "caption": "Build 340 (4673bb3)",
+      "date": "2026-10-02T00:47:15Z",
+      "identifier": "v0.5.40.340",
+      "tintColor": "#FB7299",
+      "title": "Paladala v0.5.40.340",
+      "url": "https://github.com/darrenintr/pure-bilibili-rethinking/releases/tag/v0.5.40.340"
+    },
     {
       "appID": "com.dt.paladala",
       "caption": "Build 339 (248be24)",
