@@ -8,11 +8,13 @@ import XCTest
 
 @MainActor
 final class PlaybackAndDesignTests: XCTestCase {
-    func testExistingInstallsMigrateToExpressiveOnce() {
+    func testEveryStoredDesignChoiceUsesExpressive() {
         XCTAssertEqual(DesignVariant.storedChoice(rawValue: "streetRedesign", migrationVersion: 0), .expressive)
         XCTAssertEqual(DesignVariant.storedChoice(rawValue: nil, migrationVersion: 0), .expressive)
-        XCTAssertEqual(DesignVariant.storedChoice(rawValue: "iosNative", migrationVersion: 1), .iosNative)
-        XCTAssertTrue(DesignVariant.userFacingCases.contains(.expressive))
+        XCTAssertEqual(DesignVariant.storedChoice(rawValue: "iosNative", migrationVersion: 1), .expressive)
+        XCTAssertEqual(DesignVariant.storedChoice(rawValue: "classic", migrationVersion: 1), .expressive)
+        PaladalaTheme.apply(.streetRedesign)
+        XCTAssertEqual(PaladalaTheme.activeVariant, .expressive)
     }
 
     func testAnUnknownTimelineCannotReportVideoCompletion() {

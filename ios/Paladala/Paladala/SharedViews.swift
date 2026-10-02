@@ -19,9 +19,6 @@ struct VideoCard: View {
     /// rows) pass `nil` and the cover renders as before.
     let heroNamespace: Namespace.ID?
 
-    @AppStorage("paladala.designVariant") private var designVariant: DesignVariant = .expressive
-    @AppStorage("paladala.materialDesign") private var materialDesign: MaterialDesign = .liquidGlass
-
     /// Convenience init for call sites that don't need the
     /// context menu or hero transition. Matches the original
     /// `init(video:action:)` signature so the existing call sites
@@ -42,7 +39,7 @@ struct VideoCard: View {
     }
 
     var body: some View {
-        contentView
+        expressiveBody
             .frame(maxWidth: .infinity)
             .buttonStyle(PaladalaPressBounceButtonStyle())
             .modifier(VideoContextMenuIfAvailable(video: video, repository: repository))
@@ -55,21 +52,6 @@ struct VideoCard: View {
             .onAppear {
                 Analytics.log("card_impression", ["bvid": video.id])
             }
-    }
-
-    /// Variant dispatcher — picks between the hard-edged Street
-    /// body and the iOS Native body.  Both branches share the
-    /// same outer modifiers (frame, button style, context menu,
-    /// impression analytics) so the change is purely visual.
-    @ViewBuilder
-    private var contentView: some View {
-        if designVariant == .expressive {
-            expressiveBody
-        } else if PaladalaTheme.usesNativeLayout {
-            iosNativeBody
-        } else {
-            streetBody
-        }
     }
 
     private var expressiveBody: some View {
@@ -89,249 +71,6 @@ struct VideoCard: View {
             }
         }
         .buttonStyle(.plain)
-    }
-
-    /// Street Minimal body — 街頭硬影視頻卡片
-    /// - 16:10 封面（保留舊邏輯）
-    /// - 1.5pt 全黑邊 + 4pt 硬陰影
-    /// - 24pt bold 標題
-    /// - mono metadata（UP 名 / 統計 / 日期）
-    private var streetBody: some View {
-        Button {
-            // Centralised "user tapped a card" analytics hook —
-            // single point of instrumentation covers home / follow
-            // / search / history / favorites / watch-later /
-            // dynamic feeds because every call site uses
-            // `VideoCard`. `bvid` is the only identifying param
-            // we ship; everything else (duration, view count,
-            // etc.) is recoverable by joining against the
-            // server-side bvid table.
-            Analytics.log("card_select", [
-                "bvid": video.id,
-                "duration": video.duration
-            ])
-            Haptics.tap()
-            action()
-        } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                ZStack(alignment: .bottomTrailing) {
-                    // Register the cover image as a matched
-                    // transition source so the system can zoom
-                    // out of it on push. We only attach the
-                    // modifier when a namespace is provided —
-                    // the transition is a no-op otherwise and
-                    // would be dead weight in the view tree.
-                    coverImage
-                        .modifier(HeroSourceModifier(videoID: video.id, namespace: heroNamespace))
-                    Text(video.duration.mmss)
-                        .font(PaladalaTheme.FontRole.labelMono)
-                        .foregroundStyle(PaladalaTheme.paper)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(PaladalaTheme.ink)
-                        .padding(12)
-                }
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(PaladalaTheme.ink)
-                        .frame(height: PaladalaTheme.borderWidth)
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(video.title)
-                        .font(PaladalaTheme.FontRole.headline)
-                        .foregroundStyle(PaladalaTheme.ink)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .topLeading)
-                    // Owner name + optional 大会员 chip. The chip
-                    // uses the compact icon-only flavour because
-                    // the home-feed cards have a fixed name
-                    // row width; the full chip would crowd out
-                    // the playback counts below. The owner's
-                    // badge, when present, comes from the
-                    // upstream `owner` block on the feed rows
-                    // that publish it (home / recommend feed).
-                    // Falls back to plain muted text when no
-                    // badge is decoded.
-                    HStack(spacing: 4) {
-                        Text(video.ownerName)
-                            .font(PaladalaTheme.FontRole.labelMono)
-                            .foregroundStyle(
-                                vipBadgeNicknameColor(for: video.ownerVIPBadge)
-                                    ?? PaladalaTheme.mutedInk
-                            )
-                            .lineLimit(1)
-                        if let badge = video.ownerVIPBadge, badge.isActive {
-                            VipBadgeCompact(badge: badge, pointSize: 10)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                    HStack(spacing: 12) {
-                        Label(video.viewCount.compactCount, systemImage: "play.fill")
-                        Label(video.danmakuCount.compactCount, systemImage: "text.bubble")
-                        // Reply / comment count.  The
-                        // `text.bubble.fill` SF Symbol is the
-                        // standard "comments" affordance on iOS
-                        // 17+; the older `text.bubble` (used for
-                        // danmaku above) would visually
-                        // duplicate, so use the fill variant
-                        // here to keep the two side-by-side
-                        // icons distinguishable.
-                        Label(video.replyCount.compactCount, systemImage: "text.bubble.fill")
-                    }
-                    .font(PaladalaTheme.FontRole.labelMono)
-                    .foregroundStyle(PaladalaTheme.mutedInk)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                    // Publish date — `relativeDateLabel` returns
-                    // "刚刚" / "N 天前" / "yyyy-MM-dd" depending
-                    // on age.  We hide the row entirely when the
-                    // upstream didn't surface `pubdate` (search
-                    // previews, dynamic-feed archive rows) rather
-                    // than rendering a "—" placeholder.
-                    if let date = video.publishDate {
-                        HStack(spacing: 6) {
-                            Image(systemName: "calendar")
-                                .font(PaladalaTheme.FontRole.labelMono)
-                            Text(date.relativeDateLabel)
-                                .font(PaladalaTheme.FontRole.labelMono)
-                        }
-                        .foregroundStyle(PaladalaTheme.mutedInk)
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                    }
-                }
-                .padding(16)
-            }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-            .paladalaCardSurface(materialDesign)
-            .contentShape(Rectangle())
-        }
-    }
-
-    /// iOS Native body — 純蘋果原生視頻卡片
-    /// - 16:9 封面 + 16pt 連續圓角（行業標準比例）
-    /// - 17pt SF Pro headline 標題
-    /// - UP 名 15pt subheadline + 20pt 圓形 avatar（首字母 placeholder）
-    /// - 統計行合併為一行：`▶ 5.6K · 💬 0 · 2 週前`，12pt caption
-    /// - 0 硬陰影，0 黑邊，0 自定義顏色
-    private var iosNativeBody: some View {
-        Button {
-            Analytics.log("card_select", [
-                "bvid": video.id,
-                "duration": video.duration
-            ])
-            Haptics.tap()
-            action()
-        } label: {
-            VStack(alignment: .leading, spacing: PaladalaTheme.Spacing.s) {
-                coverImage
-                    .modifier(HeroSourceModifier(videoID: video.id, namespace: heroNamespace))
-                    .aspectRatio(16/9, contentMode: .fill)
-                    .frame(maxWidth: .infinity)
-                    .clipShape(RoundedRectangle(
-                        cornerRadius: PaladalaTheme.IOSNative.cardRadius,
-                        style: .continuous
-                    ))
-                    .overlay(alignment: .bottomTrailing) {
-                        // 系統風格時長徽章：半透明黑底 + 白字，
-                        // 不用黑底白字硬邊（避免跟卡片視覺衝突）。
-                        Text(video.duration.mmss)
-                            .font(PaladalaTheme.IOSNative.caption2.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(
-                                .black.opacity(0.75),
-                                in: RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            )
-                            .padding(8)
-                    }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(video.title)
-                        .font(PaladalaTheme.IOSNative.headline)
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                    HStack(spacing: 6) {
-                        // UP 頭像 placeholder — 20pt 圓形灰底 + 首字母
-                        // 真正的頭像 URL 暫不在 BiliVideo 數據模型上，
-                        // 後續加 ownerFaceURL 字段時可替換為 AsyncImage。
-                        Circle()
-                            .fill(Color.secondary.opacity(0.2))
-                            .frame(width: 20, height: 20)
-                            .overlay(
-                                Text(String(video.ownerName.prefix(1)))
-                                    .font(PaladalaTheme.IOSNative.caption2.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                            )
-                        Text(video.ownerName)
-                            .font(PaladalaTheme.IOSNative.subheadline)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    HStack(spacing: 6) {
-                        Label(video.viewCount.compactCount, systemImage: "play.fill")
-                        Text("·").foregroundStyle(.tertiary)
-                        Label(video.danmakuCount.compactCount, systemImage: "text.bubble")
-                        Text("·").foregroundStyle(.tertiary)
-                        Label(video.replyCount.compactCount, systemImage: "text.bubble.fill")
-                        if let date = video.publishDate {
-                            Text("·").foregroundStyle(.tertiary)
-                            Text(date.relativeDateLabel)
-                        }
-                    }
-                    .font(PaladalaTheme.IOSNative.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                }
-                .padding(.horizontal, 4)
-            }
-            .contentShape(Rectangle())
-        }
-    }
-
-    /// The cover image, kept as a property so we can apply the
-    /// hero-source modifier without duplicating the modifier
-    /// chain in two places.
-    ///
-    /// Sizing story (this is the third rewrite — see commit
-    /// history): the box must report a *deterministic* height to
-    /// the parent `LazyVGrid` cell so the cell's text rows
-    /// (title / owner / counts, all pinned to fixed heights) get
-    /// stacked below the cover instead of being painted on top
-    /// of the next row's cover.
-    ///
-    /// - `Rectangle().fill(.clear)` is a `Shape` and proposes a
-    ///   non-zero intrinsic size to its parent. `Color.clear` is
-    ///   a `Color` wrapped as `View` and its intrinsic size
-    ///   collapses to zero on iPad horizontal + sidebar layouts,
-    ///   so `aspectRatio` has nothing to derive a height from.
-    /// - `.aspectRatio(16/10, .fit)` then locks the rectangle to
-    ///   a 16:10 box; the `.frame(maxWidth: .infinity)` above
-    ///   gives it the column's full width, so height becomes
-    ///   `width * 10/16` deterministically.
-    /// - `CoverImage` (a `ZStack` of placeholder + `Image`) is
-    ///   overlaid into that fixed box. We force it to fill via
-    ///   `maxWidth:.infinity, maxHeight:.infinity` because
-    ///   ZStacks don't fill by default. The internal
-    ///   `Image(uiImage:)` already does `.scaledToFill() + .clipped()`
-    ///   so every source aspect ratio (16:9, 4:3, 1:1) gets
-    ///   cropped to the 16:10 box.
-    /// - The image stays flush to the card border; Street Minimal
-    ///   deliberately avoids a nested image frame or corner mask.
-    private var coverImage: some View {
-        Rectangle()
-            .fill(.clear)
-            .aspectRatio(16 / 10, contentMode: .fit)
-            .frame(maxWidth: .infinity)
-            .overlay(
-                CoverImage(url: video.coverURL)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            )
-            .clipped()
     }
 }
 
@@ -382,9 +121,8 @@ struct LiveRoomCard: View {
         } label: {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .topLeading) {
-                    // See `VideoCard.coverImage` for the sizing story.
-                    // Same Rectangle() + .aspectRatio(16/10, .fit)
-                    // pattern — without the explicit Shape container,
+                    // The explicit Rectangle() + .aspectRatio(16/10, .fit)
+                    // container keeps a stable cover size. Without it,
                     // CoverImage's ZStack of Rectangle+Image can
                     // collapse to placeholder size on first paint
                     // (before the URL image lands) and the grid cell

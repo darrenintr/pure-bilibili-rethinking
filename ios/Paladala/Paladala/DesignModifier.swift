@@ -7,32 +7,14 @@ struct PaladalaGlassButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(PaladalaTheme.FontRole.labelMono)
-            .textCase(.uppercase)
-            .foregroundStyle(PaladalaTheme.ink)
+            .font(PaladalaTheme.FontRole.body)
+            .foregroundStyle(PaladalaTheme.biliPink)
             .padding(.horizontal, PaladalaTheme.Spacing.l)
             .padding(.vertical, PaladalaTheme.Spacing.m)
-            .background(PaladalaTheme.paper)
-            .overlay {
-                Rectangle()
-                    .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
-            }
-            .background {
-                if !configuration.isPressed {
-                    Rectangle()
-                        .fill(PaladalaTheme.ink)
-                        .offset(
-                            x: PaladalaTheme.hardShadowOffset,
-                            y: PaladalaTheme.hardShadowOffset
-                        )
-                }
-            }
-            .offset(
-                x: configuration.isPressed ? PaladalaTheme.pressedOffset : 0,
-                y: configuration.isPressed ? PaladalaTheme.pressedOffset : 0
-            )
+            .background(PaladalaTheme.cardBackground, in: RoundedRectangle.ds(DSRadius.control))
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1)
             .animation(
-                reduceMotion ? nil : .easeOut(duration: 0.08),
+                reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.85),
                 value: configuration.isPressed
             )
     }
@@ -51,12 +33,9 @@ struct PaladalaPressBounceButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .offset(
-                x: configuration.isPressed ? PaladalaTheme.pressedOffset : 0,
-                y: configuration.isPressed ? PaladalaTheme.pressedOffset : 0
-            )
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1)
             .animation(
-                reduceMotion ? nil : .easeOut(duration: 0.08),
+                reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.85),
                 value: configuration.isPressed
             )
     }
@@ -265,32 +244,15 @@ extension View {
         stroke: Color? = nil,
         strokeWidth: CGFloat = 0.5
     ) -> some View {
-        let isNative = PaladalaTheme.usesNativeLayout
-        let shape = RoundedRectangle(
-            cornerRadius: isNative ? PaladalaTheme.cornerRadius : cornerRadius,
-            style: PaladalaTheme.cornerStyle
-        )
-        let effectiveFill: Color = isNative
-            ? Color(uiColor: .secondarySystemGroupedBackground)
-            : (tint ?? PaladalaTheme.cardBackground)
+        let shape = RoundedRectangle.ds(cornerRadius)
         self
-            .background(effectiveFill, in: shape)
+            .background(tint ?? PaladalaTheme.cardBackground, in: shape)
             .overlay {
-                if !isNative {
+                if let stroke {
                     shape.strokeBorder(
-                        stroke ?? PaladalaTheme.ink,
-                        lineWidth: stroke == nil ? PaladalaTheme.borderWidth : strokeWidth
+                        stroke,
+                        lineWidth: strokeWidth
                     )
-                }
-            }
-            .background {
-                if !isNative {
-                    shape
-                        .fill(PaladalaTheme.ink)
-                        .offset(
-                            x: PaladalaTheme.hardShadowOffset,
-                            y: PaladalaTheme.hardShadowOffset
-                        )
                 }
             }
     }
@@ -300,11 +262,7 @@ extension View {
         _ design: MaterialDesign
     ) -> some View {
         self
-            .background(PaladalaTheme.paper)
-            .overlay {
-                Rectangle()
-                    .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
-            }
+            .background(PaladalaTheme.cardBackground, in: Capsule())
     }
 
     /// Force the navigation bar to a Street-style opaque `paper`
@@ -517,24 +475,8 @@ extension View {
         cornerRadius: CGFloat,
         tint: Color
     ) -> some View {
-        let shape = Rectangle()
-
         self
-            .background(PaladalaTheme.paper, in: shape)
-            .overlay {
-                shape.strokeBorder(
-                    PaladalaTheme.ink,
-                    lineWidth: PaladalaTheme.borderWidth
-                )
-            }
-            .background {
-                shape
-                    .fill(PaladalaTheme.ink)
-                    .offset(
-                        x: PaladalaTheme.hardShadowOffset,
-                        y: PaladalaTheme.hardShadowOffset
-                    )
-            }
+            .background(PaladalaTheme.cardBackground, in: RoundedRectangle.ds(cornerRadius))
     }
 
     func paladalaBackdrop() -> some View {
@@ -549,7 +491,7 @@ extension View {
     func paladalaSheetGlass() -> some View {
         self
             .presentationBackground(PaladalaTheme.paper)
-            .presentationCornerRadius(0)
+            .presentationCornerRadius(DSRadius.sheet)
     }
 
     /// Street Minimal uses a static skeleton. Besides matching the dry,
@@ -582,38 +524,8 @@ extension View {
         fill: Color = PaladalaTheme.paper,
         elevated: Bool = true
     ) -> some View {
-        let isNative = PaladalaTheme.usesNativeLayout
-        let shape = RoundedRectangle(
-            cornerRadius: PaladalaTheme.cornerRadius,
-            style: PaladalaTheme.cornerStyle
-        )
-        let effectiveFill: Color = isNative
-            ? Color(uiColor: .secondarySystemGroupedBackground)
-            : fill
-        return self
-            .background(effectiveFill)
-            .overlay {
-                if !isNative {
-                    shape
-                        .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
-                }
-            }
-            .background {
-                // Hard shadow only renders for non-iosNative variants.
-                // iOS Native already has `hardShadowOffset == 0` (so
-                // the offset is a no-op), but skipping the whole
-                // `fill(.ink)` layer also keeps the panel from
-                // interfering with `.regularMaterial` glass backgrounds
-                // stacked above it.
-                if elevated, !isNative {
-                    shape
-                        .fill(PaladalaTheme.ink)
-                        .offset(
-                            x: PaladalaTheme.hardShadowOffset,
-                            y: PaladalaTheme.hardShadowOffset
-                        )
-                }
-            }
+        self
+            .background(PaladalaTheme.cardBackground, in: RoundedRectangle.ds(DSRadius.control))
     }
 
     func paladalaSectionHeader() -> some View {

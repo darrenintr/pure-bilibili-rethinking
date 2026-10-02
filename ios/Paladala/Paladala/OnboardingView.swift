@@ -708,38 +708,21 @@ private struct OnboardingNativePageView: View {
 }
 
 private struct OnboardingNativePreferencesView: View {
-    @AppStorage("paladala.designVariant") private var designVariantRaw: String = DesignVariant.expressive.rawValue
     @AppStorage("paladala.danmakuEnabled") private var danmakuEnabled = true
     @AppStorage("paladala.backgroundAudio") private var backgroundAudio = false
     @AppStorage("paladala.iCloudSync") private var iCloudSync = false
 
-    private var designVariant: DesignVariant {
-        DesignVariant(rawValue: designVariantRaw) ?? .expressive
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("挑你喜歡的風格")
+                Text("設定播放體驗")
                     .font(.title2.weight(.bold))
                     .foregroundStyle(.primary)
-                Text("選擇後可在設定中隨時切換")
+                Text("這些功能稍後也能在設定中調整")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 24)
-
-            sectionHeader("設計風格")
-            VStack(spacing: 8) {
-                // Use the filtered user-facing list (excludes
-                // `.classic`, which only exists for legacy
-                // UserDefaults migration — see
-                // `DesignVariant.userFacingCases`).
-                ForEach(DesignVariant.userFacingCases) { variant in
-                    designCard(variant)
-                }
-            }
-            .padding(.horizontal, 20)
 
             sectionHeader("功能開關")
             VStack(spacing: 0) {
@@ -769,84 +752,6 @@ private struct OnboardingNativePreferencesView: View {
             .textCase(.uppercase)
             .tracking(0.4)
             .padding(.leading, 24)
-    }
-
-    private func designCard(_ variant: DesignVariant) -> some View {
-        let isSelected = (variant == designVariant)
-        return Button {
-            designVariantRaw = variant.rawValue
-            // AppStorage update is enough for the picker to
-            // re-render, but other views in the app read
-            // `PaladalaTheme.activeVariant` directly.  Calling
-            // `apply(_:)` keeps the in-memory singleton in sync
-            // so the next render of any view sees the new value.
-            PaladalaTheme.apply(variant)
-            Haptics.selection()
-        } label: {
-            HStack(spacing: 14) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(cardIconColor(variant))
-                        .frame(width: 44, height: 44)
-                    Image(systemName: cardIconSymbol(variant))
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(variant.title)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Text(variant.blurb)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-                Spacer(minLength: 8)
-                ZStack {
-                    Circle()
-                        .strokeBorder(
-                            isSelected ? Color.accentColor : Color(uiColor: .separator),
-                            lineWidth: 1.5
-                        )
-                        .frame(width: 22, height: 22)
-                    if isSelected {
-                        Circle()
-                            .fill(Color.accentColor)
-                            .frame(width: 14, height: 14)
-                    }
-                }
-            }
-            .padding(14)
-            .background(
-                Color(uiColor: .secondarySystemGroupedBackground),
-                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(
-                        isSelected ? Color.accentColor : .clear,
-                        lineWidth: 2
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func cardIconColor(_ variant: DesignVariant) -> Color {
-        switch variant {
-        case .streetRedesign: return .black
-        case .iosNative, .expressive: return Color.accentColor
-        case .classic: return Color(uiColor: .systemGray)
-        }
-    }
-
-    private func cardIconSymbol(_ variant: DesignVariant) -> String {
-        switch variant {
-        case .streetRedesign: return "rectangle"
-        case .iosNative: return "globe"
-        case .expressive: return "sparkles"
-        case .classic: return "circle.grid.cross"
-        }
     }
 
     private func toggleRow(

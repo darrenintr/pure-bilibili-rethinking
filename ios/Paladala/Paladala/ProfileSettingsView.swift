@@ -44,7 +44,6 @@ struct ProfileSettingsView: View {
     @AppStorage("paladala.themeMode") private var themeMode: ThemeMode = .system
     @AppStorage("paladala.materialDesign") private var materialDesign: MaterialDesign = .liquidGlass
     @AppStorage("paladala.expressiveSeed") private var expressiveSeed = "#FF6194"
-    @AppStorage("paladala.designVariant") private var designVariant: DesignVariant = .expressive
     @AppStorage("paladala.danmakuEnabled") private var danmakuEnabled = true
     @AppStorage("paladala.backgroundAudio") private var backgroundAudio = false
     /// When `true` (default), navigating away from a playing
@@ -169,38 +168,11 @@ struct ProfileSettingsView: View {
                         value: newValue.rawValue
                     )
                 }
-                Picker("介面設計", selection: $designVariant) {
-                    // Same legacy-classic filter as the onboarding
-                    // picker — only the two shipped design languages
-                    // are offered.
-                    ForEach(DesignVariant.userFacingCases) { variant in
-                        Text(variant.title).tag(variant)
+                Picker("主題色", selection: $expressiveSeed) {
+                    ForEach(DSTheme.seeds) { seed in
+                        Text(seed.name).tag(seed.rgb.hex)
                     }
                 }
-                .onChange(of: designVariant) { _, newValue in
-                    // The picker writes to `UserDefaults`
-                    // automatically; we additionally reapply
-                    // it to the static `PaladalaTheme` enum
-                    // so all computed tokens flip in the
-                    // current render pass.  iCloud-mirrored
-                    // so the choice follows the user across
-                    // their other devices.
-                    PaladalaTheme.apply(newValue)
-                    ICloudSync.shared.mirror(
-                        key: "paladala.designVariant",
-                        value: newValue.rawValue
-                    )
-                }
-                if designVariant == .expressive {
-                    Picker("主題色", selection: $expressiveSeed) {
-                        ForEach(DSTheme.seeds) { seed in
-                            Text(seed.name).tag(seed.rgb.hex)
-                        }
-                    }
-                }
-                Text(designVariant.blurb)
-                    .font(PaladalaTheme.FontRole.bodySmall)
-                    .foregroundStyle(PaladalaTheme.mutedInk)
             }
 
             Section("播放設定") {
@@ -268,7 +240,7 @@ struct ProfileSettingsView: View {
                          destination: URL(string: UIApplication.openSettingsURLString)!)
                         .font(.caption2)
                 } else {
-                    Text("開啟後，主題、介面設計、彈幕與後臺音訊會同步到登入了同一 Apple ID 的其他裝置。")
+                    Text("開啟後，主題、彈幕與後臺音訊會同步到登入了同一 Apple ID 的其他裝置。")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }

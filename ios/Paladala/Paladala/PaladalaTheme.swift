@@ -1,8 +1,7 @@
 import SwiftUI
 import DesignSystem
 
-/// Shipping design choices. Existing installations migrate to Expressive once;
-/// subsequent choices remain persisted under `paladala.designVariant`.
+/// Legacy persisted values are accepted for decoding, while the app ships one design.
 enum DesignVariant: String, CaseIterable, Identifiable, Sendable {
     case classic
     case streetRedesign
@@ -12,11 +11,7 @@ enum DesignVariant: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 
     static func storedChoice(rawValue: String?, migrationVersion: Int) -> DesignVariant {
-        guard migrationVersion >= 1, let rawValue,
-              let variant = DesignVariant(rawValue: rawValue), variant != .classic else {
-            return .expressive
-        }
-        return variant
+        .expressive
     }
 
     /// User-facing label shown in the Settings toggle.
@@ -44,15 +39,9 @@ enum DesignVariant: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// The design languages the product ships to
-    /// end-users.  Excludes `.classic`, which is kept in the
-    /// enum only for legacy `UserDefaults` migration (older
-    /// builds persisted the variant under that rawValue).
-    /// Any new user-facing picker (onboarding, settings) should
-    /// iterate this list, not `allCases`, so `.classic` is
-    /// never re-introduced as a user choice.
+    /// Legacy cases remain decodable, but only Expressive is available.
     static var userFacingCases: [DesignVariant] {
-        [.expressive, .iosNative, .streetRedesign]
+        [.expressive]
     }
 }
 
@@ -70,7 +59,7 @@ enum PaladalaTheme {
     /// Apply a new variant. Called from the Settings toggle and
     /// from `PaladalaApp.init` on launch.
     static func apply(_ variant: DesignVariant) {
-        activeVariant = variant
+        activeVariant = .expressive
     }
 
     static var usesNativeLayout: Bool { activeVariant == .iosNative || activeVariant == .expressive }
