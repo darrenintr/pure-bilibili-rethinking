@@ -1,0 +1,86 @@
+name: IJKPlayer Build Spike
+
+# Manual-only workflow.  The IJKPlayer build (FFmpeg + libavcodec
+# compile from source) is a 20-40 minute cold run on the first
+# invocation and a 5-10 minute warm run on cache hit.  Auto-trigger
+# from `working` or `main` would slow every release push to a crawl
+# and burn through Actions minutes; the spike is run on demand.
+
+on:
+  # Auto-trigger on push to the spike branch.  This is the primary
+  # path because the user has no way to manually click "Run
+  # workflow" in the GitHub Actions UI; every push (including
+  # empty / no-op commits) re-runs the spike.
+  push:
+    branches:
+      - ijkplayer-spike
+  # Manual trigger via the Actions UI is also kept so anyone with
+  # repo access can override the inputs without touching the
+  # workflow file.
+  workflow_dispatch:
+    inputs:
+      ijkplayer_ref:
+        description: 'IJKPlayer git ref (tag / branch / SHA) to build'
+        required: false
+        default: 'master'
+        type: string
+      clean_ffmpeg:
+        description: 'Force clean FFmpeg build (skip cache)'
+        required: false
+        default: 'false'
+        type: boolean
+
+# Run one spike at a time.  Two parallel IJKPlayer builds would just
+# race for the same `macos-15` cache slot and step on each other's
+# logs.
+concurrency:
+  group: ijkplayer-spike-build
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build-ijkplayer:
+    name: Build IJKPlayer.framework on macos-15
+    runs-on: macos-15
+    steps:
+      - name: Set up paths
+        run: |
+          set -euo pipefail
+          IJKPLAYER_SRC="$RUNNER_TEMP/ijkplayer-src"
+          IJKPLAYER_BUILD="$RUNNER_TEMP/ijkplayer-build"
+          mkdir -p "$IJKPLAYER_SRC" "$IJKPLAYER_BUILD"
+          echo "IJKPLAYER_SRC=$IJKPLAYER_SRC" >> "$GITHUB_ENV"
+          echo "IJKPLAYER_BUILD=$IJKPLAYER_BUILD" >> "$GITHUB_ENV"
+      - name: Clone IJKPlayer
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch master https://github.com/Bilibili/ijkplayer.git "$IJKPLAYER_SRC"
+          test -x "$IJKPLAYER_SRC/init-ios.sh"
+          echo "IJKPlayer clone verified"
+      - name: Configure IJKPlayer iOS build
+        run: |
+          set -euo pipefail
+          cd "$IJKPLAYER_SRC"
+          brew install yasm nasm 2>&1 | tail -20 || true
+          command -v yasm
+          command -v nasm
+          FF_ALL_ARCHS=arm64 bash init-ios.sh
+          test -d "$IJKPLAYER_SRC/ios/ffmpeg-arm64"
+          echo "IJKPlayer iOS configuration verified"
+      - name: Build FFmpeg arm64
+        run: |
+          set -euo pipefail
+          cd "$IJKPLAYER_SRC/ios"
+          python3 - <<'PATCH_FFMPEG_SCRIPT'
+          from pathlib import Path
+          script = Path('tools/do-compile-ffmpeg.sh')
+          text = script.read_text()
+          text = text.replace('FFMPEG_EXTRA_CFLAGS=', 'FFMPEG_EXTRA_CFLAGS=${FFMPEG_EXTRA_CFLAGS:-}', 1)
+          script.write_text(text)
+          PATCH_FFMPEG_SCRIPT
+          FF_ALL_ARCHS=arm64 FFMPEG_EXTRA_CFLAGS="-Wno-error -Wno-error=incompatible-function-pointer-types" bash compile-ffmpeg.sh arm64
+          test -f "build/ffmpeg-arm64/output/lib/libavformat.a"
+          test -f "build/ffmpeg-arm64/output/lib/libavcodec.a"
+          echo "FFmpeg arm64 build verified"

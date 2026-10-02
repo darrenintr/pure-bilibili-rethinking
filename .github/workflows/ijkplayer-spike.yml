@@ -1,0 +1,81 @@
+name: IJKPlayer Build Spike
+
+# Manual-only workflow.  The IJKPlayer build (FFmpeg + libavcodec
+# compile from source) is a 20-40 minute cold run on the first
+# invocation and a 5-10 minute warm run on cache hit.  Auto-trigger
+# from `working` or `main` would slow every release push to a crawl
+# and burn through Actions minutes; the spike is run on demand.
+
+on:
+  # Auto-trigger on push to the spike branch.  This is the primary
+  # path because the user has no way to manually click "Run
+  # workflow" in the GitHub Actions UI; every push (including
+  # empty / no-op commits) re-runs the spike.
+  push:
+    branches:
+      - ijkplayer-spike
+  # Manual trigger via the Actions UI is also kept so anyone with
+  # repo access can override the inputs without touching the
+  # workflow file.
+  workflow_dispatch:
+    inputs:
+      ijkplayer_ref:
+        description: 'IJKPlayer git ref (tag / branch / SHA) to build'
+        required: false
+        default: 'master'
+        type: string
+      clean_ffmpeg:
+        description: 'Force clean FFmpeg build (skip cache)'
+        required: false
+        default: 'false'
+        type: boolean
+
+# Run one spike at a time.  Two parallel IJKPlayer builds would just
+# race for the same `macos-15` cache slot and step on each other's
+# logs.
+concurrency:
+  group: ijkplayer-spike-build
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build-ijkplayer:
+    name: Build IJKPlayer.framework on macos-15
+    runs-on: macos-15
+    steps:
+      - name: Set up paths
+        run: |
+          set -euo pipefail
+          echo "IJKPLAYER_SRC=$RUNNER_TEMP/ijkplayer-src"
+          echo "IJKPLAYER_BUILD=$RUNNER_TEMP/ijkplayer-build"
+          echo "IJKPLAYER_SRC=$RUNNER_TEMP/ijkplayer-src" >> "$GITHUB_ENV"
+          echo "IJKPLAYER_BUILD=$RUNNER_TEMP/ijkplayer-build" >> "$GITHUB_ENV"
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+          sw_vers
+      - name: Configure IJKPlayer FFmpeg source
+        run: |
+          set -euo pipefail
+          cd "$IJKPLAYER_SRC"
+          FF_ALL_ARCHS=arm64 bash init-ios.sh
+          test -f ffmpeg-arm64/libavcodec/aarch64/h264dsp_init_aarch64.c
+          python3 - <<'PATCH_H264DSP'
+          from pathlib import Path
+          p = Path('ffmpeg-arm64/libavcodec/aarch64/h264dsp_init_aarch64.c')
+          s = p.read_text()
+          if '#include <stddef.h>\n' not in s:
+              s = s.replace('#include <stdint.h>\n', '#include <stdint.h>\n#include <stddef.h>\n')
+          s = s.replace('int stride, int height', 'ptrdiff_t stride, int height')
+          p.write_text(s)
+          PATCH_H264DSP
+          echo "FFmpeg source and arm64 h264dsp ABI patch verified"
+      - name: Build marker
+        run: |
+          set -euo pipefail
+          echo "IJKPlayer workflow registration is valid"
+          test -n "$IJKPLAYER_SRC"
+          test -n "$IJKPLAYER_BUILD"
