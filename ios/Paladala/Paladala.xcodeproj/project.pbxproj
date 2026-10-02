@@ -52,12 +52,6 @@
 		10000000000000000000012A /* Localizable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000022A /* Localizable.swift */; };
 		MU00000000000000000000D0 /* LyricTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = MU00000000000000000000C0 /* LyricTypes.swift */; };
 		MU00000000000000000000D1 /* BiliLyricParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = MU00000000000000000000C1 /* BiliLyricParser.swift */; };
-		MU00000000000000000000D2 /* MusicViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = MU00000000000000000000C2 /* MusicViewModel.swift */; };
-		MU00000000000000000000D3 /* MusicHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = MU00000000000000000000C3 /* MusicHomeView.swift */; };
-		MU00000000000000000000D4 /* MusicPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = MU00000000000000000000C4 /* MusicPlayerView.swift */; };
-		MU00000000000000000000D5 /* MusicCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = MU00000000000000000000C5 /* MusicCard.swift */; };
-		MU00000000000000000000D6 /* LyricScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = MU00000000000000000000C6 /* LyricScrollView.swift */; };
-		MU00000000000000000000D7 /* MusicProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = MU00000000000000000000C7 /* MusicProgressBar.swift */; };
 		200000000000000000000301 /* AVPlayerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000401 /* AVPlayerController.swift */; };
 		300000000000000000000602 /* LocalHLSProxyServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300000000000000000000502 /* LocalHLSProxyServer.swift */; };
 		300000000000000000000603 /* WatchSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300000000000000000000503 /* WatchSession.swift */; };
@@ -173,12 +167,6 @@
 		10000000000000000000022A /* Localizable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localizable.swift; sourceTree = "<group>"; };
 		MU00000000000000000000C0 /* LyricTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricTypes.swift; sourceTree = "<group>"; };
 		MU00000000000000000000C1 /* BiliLyricParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiliLyricParser.swift; sourceTree = "<group>"; };
-		MU00000000000000000000C2 /* MusicViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicViewModel.swift; sourceTree = "<group>"; };
-		MU00000000000000000000C3 /* MusicHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicHomeView.swift; sourceTree = "<group>"; };
-		MU00000000000000000000C4 /* MusicPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicPlayerView.swift; sourceTree = "<group>"; };
-		MU00000000000000000000C5 /* MusicCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicCard.swift; sourceTree = "<group>"; };
-		MU00000000000000000000C6 /* LyricScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricScrollView.swift; sourceTree = "<group>"; };
-		MU00000000000000000000C7 /* MusicProgressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicProgressBar.swift; sourceTree = "<group>"; };
 		200000000000000000000401 /* AVPlayerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVPlayerController.swift; sourceTree = "<group>"; };
 		300000000000000000000502 /* LocalHLSProxyServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalHLSProxyServer.swift; sourceTree = "<group>"; };
 		300000000000000000000503 /* WatchSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSession.swift; sourceTree = "<group>"; };
@@ -432,8 +420,6 @@
 			children = (
 				MU00000000000000000000B0 /* Models */,
 				MU00000000000000000000B1 /* Parsers */,
-				MU00000000000000000000B2 /* ViewModels */,
-				MU00000000000000000000B3 /* Views */,
 			);
 			path = Music;
 			sourceTree = "<group>";
@@ -452,34 +438,6 @@
 				MU00000000000000000000C1 /* BiliLyricParser.swift */,
 			);
 			path = Parsers;
-			sourceTree = "<group>";
-		};
-		MU00000000000000000000B2 /* ViewModels */ = {
-			isa = PBXGroup;
-			children = (
-				MU00000000000000000000C2 /* MusicViewModel.swift */,
-			);
-			path = ViewModels;
-			sourceTree = "<group>";
-		};
-		MU00000000000000000000B3 /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				MU00000000000000000000C3 /* MusicHomeView.swift */,
-				MU00000000000000000000C4 /* MusicPlayerView.swift */,
-				MU00000000000000000000B4 /* Components */,
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
-		MU00000000000000000000B4 /* Components */ = {
-			isa = PBXGroup;
-			children = (
-				MU00000000000000000000C5 /* MusicCard.swift */,
-				MU00000000000000000000C6 /* LyricScrollView.swift */,
-				MU00000000000000000000C7 /* MusicProgressBar.swift */,
-			);
-			path = Components;
 			sourceTree = "<group>";
 		};
 		100000000000000000000463 /* Shared */ = {
@@ -751,12 +709,6 @@
 				10000000000000000000012A /* Localizable.swift in Sources */,
 				MU00000000000000000000D0 /* LyricTypes.swift in Sources */,
 				MU00000000000000000000D1 /* BiliLyricParser.swift in Sources */,
-				MU00000000000000000000D2 /* MusicViewModel.swift in Sources */,
-				MU00000000000000000000D3 /* MusicHomeView.swift in Sources */,
-				MU00000000000000000000D4 /* MusicPlayerView.swift in Sources */,
-				MU00000000000000000000D5 /* MusicCard.swift in Sources */,
-				MU00000000000000000000D6 /* LyricScrollView.swift in Sources */,
-				MU00000000000000000000D7 /* MusicProgressBar.swift in Sources */,
 				200000000000000000000301 /* AVPlayerController.swift in Sources */,
 				300000000000000000000602 /* LocalHLSProxyServer.swift in Sources */,
 				300000000000000000000603 /* WatchSession.swift in Sources */,

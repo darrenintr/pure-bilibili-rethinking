@@ -193,10 +193,6 @@ struct RootView: View {
         case "live":
             router.open(.live)
         case "music":
-            // 2026-08: music tab removed as part of the iOS
-            // Native design variant (4-tab layout). Deep link
-            // now lands on the home feed where music lives as
-            // a category chip instead of a dedicated tab.
             router.open(.home)
         case "settings":
             router.open(.profile)
@@ -508,12 +504,6 @@ private struct PhoneRootView: View {
                     )
                 }
             }
-            .navigationDestination(for: MusicRoute.self) { route in
-                switch route {
-                case .player(let video):
-                    MusicPlayerView(video: video, repository: repository)
-                }
-            }
             .navigationDestination(for: BangumiRoute.self) { route in
                 switch route {
                 case .timeline:
@@ -584,12 +574,6 @@ private struct PadRootView: View {
                                 heroNamespace: heroNamespace,
                                 localRecord: record
                             )
-                        }
-                    }
-                    .navigationDestination(for: MusicRoute.self) { route in
-                        switch route {
-                        case .player(let video):
-                            MusicPlayerView(video: video, repository: repository)
                         }
                     }
                     .navigationDestination(for: BangumiRoute.self) { route in

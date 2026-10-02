@@ -1393,23 +1393,6 @@ struct BiliDanmakuItem: Hashable, Codable, Identifiable, Sendable {
     let text: String
 }
 
-// MARK: - Music navigation routes
-
-/// Navigation routes for the Music tab. Pushed onto the router's
-/// `path` so the existing `.navigationDestination(for:)` machinery
-/// resolves them into the right view.
-///
-/// The Music tab itself was removed when the 追番 tab was
-/// added; `MusicRoute.player(_:)` is still routed to the
-/// fullscreen `MusicPlayerView` by the existing
-/// `navigationDestination(for:)` handler but no longer
-/// has a dedicated tab host.
-enum MusicRoute: Hashable, Sendable {
-    /// Open the fullscreen music player for `video`. The view
-    /// resolves the playback URL + lyric track on appear.
-    case player(BiliVideo)
-}
-
 /// Navigation routes for the 追番 surface.
 enum BangumiRoute: Hashable, Sendable {
     /// Open the weekly timeline. Same view as the
