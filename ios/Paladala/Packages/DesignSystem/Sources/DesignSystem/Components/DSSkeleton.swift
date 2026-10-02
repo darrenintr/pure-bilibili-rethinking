@@ -4,6 +4,7 @@ import SwiftUI
 public struct DSSkeleton: View {
     private let radius: CGFloat
     @State private var phase: CGFloat = -1
+    @DSPalette private var c
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(radius: CGFloat = DSRadius.chip) {
@@ -12,12 +13,12 @@ public struct DSSkeleton: View {
 
     public var body: some View {
         RoundedRectangle.ds(radius)
-            .fill(DSColor.surfaceMuted)
+            .fill(c.surfaceHighest)
             .overlay {
                 if !reduceMotion {
                     GeometryReader { proxy in
                         LinearGradient(
-                            colors: [.clear, Color.white.opacity(0.25), .clear],
+                            colors: [.clear, c.surfaceBright.opacity(0.55), .clear],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
