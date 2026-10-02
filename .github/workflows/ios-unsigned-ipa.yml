@@ -28,63 +28,6 @@ permissions:
   contents: write
 
 jobs:
-  build-ijkplayer-framework:
-    name: Build IJKPlayer.framework
-    runs-on: macos-15
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Build IJKPlayer arm64 FFmpeg
-        run: |
-          set -euo pipefail
-          SRC="$RUNNER_TEMP/ijkplayer-src"
-          BUILD="$RUNNER_TEMP/ijkplayer-build"
-          git clone --depth 1 --branch master https://github.com/Bilibili/ijkplayer.git "$SRC"
-          cd "$SRC"
-          python3 - <<'PATCH_INIT'
-from pathlib import Path
-p = Path('init-ios.sh')
-s = p.read_text()
-s = s.replace('FF_ALL_ARCHS=$FF_ALL_ARCHS_IOS8_SDK', 'FF_ALL_ARCHS=arm64')
-p.write_text(s)
-PATCH_INIT
-          python3 - <<'PATCH_H264'
-from pathlib import Path
-p = Path('ffmpeg-arm64/libavcodec/aarch64/h264dsp_init_aarch64.c')
-s = p.read_text()
-if '#include <stddef.h>\n' not in s:
-    s = s.replace('#include <stdint.h>\n', '#include <stdint.h>\n#include <stddef.h>\n')
-s = s.replace('int stride, int height', 'ptrdiff_t stride, int height')
-p.write_text(s)
-PATCH_H264
-          python3 - <<'PATCH_CFLAGS'
-from pathlib import Path
-p = Path('ios/tools/do-compile-ffmpeg.sh')
-s = p.read_text().replace('FFMPEG_EXTRA_CFLAGS=', 'FFMPEG_EXTRA_CFLAGS=${FFMPEG_EXTRA_CFLAGS:-}', 1)
-p.write_text(s)
-PATCH_CFLAGS
-          cd ios
-          FFMPEG_EXTRA_CFLAGS='-Wno-error -Wno-error=incompatible-function-pointer-types' bash compile-ffmpeg.sh arm64
-          test -f build/ffmpeg-arm64/output/lib/libavformat.a
-          test -f build/ffmpeg-arm64/output/lib/libavcodec.a
-          echo "FFmpeg arm64 archives verified"
-      - name: Build IJKMediaFramework
-        run: |
-          set -euo pipefail
-          cd "$RUNNER_TEMP/ijkplayer-src/ios"
-          xcodebuild -project IJKMediaPlayer/IJKMediaPlayer.xcodeproj -scheme IJKMediaPlayer -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/ijkplayer-derived" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' build
-          FRAMEWORK="$(find "$RUNNER_TEMP/ijkplayer-derived" -name IJKMediaFramework.framework -type d | head -1)"
-          test -n "$FRAMEWORK"
-          echo "FRAMEWORK=$FRAMEWORK" >> "$GITHUB_ENV"
-          file "$FRAMEWORK/IJKMediaFramework"
-          nm "$FRAMEWORK/IJKMediaFramework" | grep -E 'avformat_open_input|avcodec_open2' | head -5
-      - name: Upload IJKMediaFramework artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: IJKMediaFramework-${{ github.sha }}
-          path: ${{ env.FRAMEWORK }}
-          if-no-files-found: error
-          retention-days: 14
   build-unsigned-ipa:
     name: Build unsigned IPA
     runs-on: macos-15
@@ -330,100 +273,29 @@ PATCH_CFLAGS
       # ------------------------------------------------------------------
 
       # ------------------------------------------------------------------
-      # Build FFmpeg as a static library for arm64 iOS.  This is the
-      # demuxer backend for the FFmpegPlaybackEngine that replaces
-      # AVPlayer in iOS 26 Beta (which traps inside MetalPerformanceShadersGraph
-      # during decode).  Produces .a files consumed by the xcodebuild
-      # step below via OTHER_LDFLAGS="-lavformat -lavcodec ...".
-      #
-      # Cached across runs by `actions/cache` keyed on the build script
-      # content + FFmpeg version, so subsequent CI runs skip the
-      # ~20 minute compile and use the prebuilt archives directly.
-      # ------------------------------------------------------------------
-      - name: Cache FFmpeg build artifacts
-        id: ffmpeg-cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ runner.temp }}/ffmpeg-build/arm64
-          key: ffmpeg-7.1.1-arm64-v1
-          restore-keys: |
-            ffmpeg-7.1.1-arm64-
-
-      - name: Build FFmpeg (skipped on cache hit)
-        run: |
-          set -uo pipefail
-          # Skip the slow build when `actions/cache` restored the
-          # archives; the post-restore smoke check verifies they're
-          # actually present.
-          if [ -f "${{ runner.temp }}/ffmpeg-build/arm64/lib/libavformat.a" ] \
-             && [ -f "${{ runner.temp }}/ffmpeg-build/arm64/lib/libavcodec.a" ]; then
-            echo "FFmpeg archives restored from cache — skipping build"
-            exit 0
-          fi
-          export OUTPUT_DIR="${{ runner.temp }}/ffmpeg-build"
-          export FFMPEG_VERSION="7.1.1"
-          export PLATFORM_MIN_VERSION="18.0"
-          bash scripts/build-ffmpeg.sh
-        env:
-          # actions/cache saves under $RUNNER_TEMP which maps to a
-          # fresh path each run; the script's default OUTPUT_DIR
-          # resolves to $(pwd)/build/ffmpeg-build, but we want it
-          # under $RUNNER_TEMP so the cache key actually matches.
-          OUTPUT_DIR: ${{ runner.temp }}/ffmpeg-build
-
-      - name: Smoke-check FFmpeg artifacts
-        run: |
-          set -euo pipefail
-          FFMPEG_DIR="${{ runner.temp }}/ffmpeg-build/arm64"
-          for f in lib/libavformat.a lib/libavcodec.a lib/libavutil.a lib/libswresample.a; do
-            test -f "${FFMPEG_DIR}/${f}" || { echo "::error::Missing ${f}"; exit 1; }
-          done
-          # Surface header path / lib path as envvars so the
-          # xcodebuild step can pick them up.
-          echo "FFMPEG_INCLUDE=${FFMPEG_DIR}/include" >> "$GITHUB_ENV"
-          echo "FFMPEG_LIB=${FFMPEG_DIR}/lib" >> "$GITHUB_ENV"
-          echo "FFmpeg archives present at ${FFMPEG_DIR}/lib"
-
-      # ------------------------------------------------------------------
       # Phase 2: Paladala Portal reporter — write the gitignored
-      # `Opspad.{Debug,Release}.xcconfig` files from the
-      # `OPSPAD_HMAC_SECRET` repo secret so the iOS reporter has a
-      # signing key at build time.  Without this step, both xcconfigs
-      # stay empty (they're gitignored) and the LogReporter actor is a
-      # permanent no-op (`OPSPAD_HMAC_SECRET == ""` fails the start()
-      # guard).
-      #
-      # Required repo secret: `OPSPAD_HMAC_SECRET` (64-char hex from
-      # `openssl rand -hex 32`).  Add at Settings → Secrets → Actions.
-      # Same value must also be set as `HMAC_SECRET` on the Worker via
-      # `wrangler secret put HMAC_SECRET`.
-      #
-      # The secret is passed via the step's `env:` block (not inline
-      # `${{ ... }}`) so a value containing `$`, backticks, or newlines
-      # cannot be parsed as live shell syntax.  Printf is used instead
-      # of heredoc to avoid the same injection surface.
+      # `Opspad.{Debug,Release}.xcconfig` files. A public unsigned IPA
+      # must not contain the server's HMAC signing key, so these builds
+      # deliberately keep `OPSPAD_HMAC_SECRET` empty. The reporter stays
+      # inactive until a maintainer supplies the key through a private
+      # build channel; the endpoint and enablement key remain available
+      # for local configuration and schema validation.
       # ------------------------------------------------------------------
-      - name: Write Opspad xcconfig from secret
-        env:
-          OPSPAD_HMAC_SECRET: ${{ secrets.OPSPAD_HMAC_SECRET }}
+      - name: Write Opspad xcconfig without signing secret
         run: |
           set -euo pipefail
-          if [ -z "$OPSPAD_HMAC_SECRET" ]; then
-            echo "::error::OPSPAD_HMAC_SECRET repo secret is not set. Add it in Settings → Secrets and Variables → Actions, or the Paladala Portal reporter will be a silent no-op in the shipped IPA."
-            exit 1
-          fi
           mkdir -p ios/Paladala/Config
           {
-            printf 'OPSPAD_HMAC_SECRET = %s\n'  "$OPSPAD_HMAC_SECRET"
+            printf 'OPSPAD_HMAC_SECRET =\n'
             printf 'OPSPAD_ENDPOINT = https://paladala-portal.darrenintr.workers.dev\n'
             printf 'OPSPAD_ENABLED_KEY = diag.ops.enabled\n'
           } > ios/Paladala/Config/Opspad.Release.xcconfig
           {
-            printf 'OPSPAD_HMAC_SECRET = %s\n'  "$OPSPAD_HMAC_SECRET"
+            printf 'OPSPAD_HMAC_SECRET =\n'
             printf 'OPSPAD_ENDPOINT = http://localhost:8787\n'
             printf 'OPSPAD_ENABLED_KEY = diag.ops.enabled\n'
           } > ios/Paladala/Config/Opspad.Debug.xcconfig
-          echo "Wrote Opspad.{Debug,Release}.xcconfig from OPSPAD_HMAC_SECRET secret (length=${#OPSPAD_HMAC_SECRET})"
+          echo "Wrote Opspad.{Debug,Release}.xcconfig with an empty OPSPAD_HMAC_SECRET"
 
       - name: Build device app without signing
         run: |
@@ -436,9 +308,6 @@ PATCH_CFLAGS
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath "$DERIVED_DATA" \
-            HEADER_SEARCH_PATHS="${FFMPEG_INCLUDE} \$(inherited)" \
-            LIBRARY_SEARCH_PATHS="${FFMPEG_LIB} \$(inherited)" \
-            OTHER_LDFLAGS="-lavformat -lavcodec -lavutil -lswresample -liconv -lz \$(inherited)" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -719,21 +588,41 @@ PATCH_CFLAGS
           } > "$NOTES_FILE"
           echo "Wrote $NOTES_FILE:"
           sed 's/^/  /' "$NOTES_FILE"
+          # Build the notes commit in a clean temporary clone. The
+          # workspace has generated Info.plist changes from the build,
+          # so rebasing it in place could accidentally carry those
+          # changes into the bot commit. A fresh clone also lets us
+          # retry safely if another workflow updates `working` first.
+          NOTES_CLONE="$(mktemp -d)"
+          git clone --depth 1 --branch working \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "$NOTES_CLONE"
+          cp "$NOTES_FILE" "$NOTES_CLONE/$NOTES_FILE"
+          cd "$NOTES_CLONE"
           git config user.name  "ci-release-notes-bot"
           git config user.email "ci-release-notes-bot@users.noreply.github.com"
-          # `-f` (force-add) is a safety net: the `release-notes/`
-          # whitelist in .gitignore is the primary mechanism, but if
-          # a future change to the ignore rules accidentally re-blocks
-          # these files the CI would fail loudly with the explicit
-          # "ignored by .gitignore" hint rather than silently
-          # skipping the commit. The intent is clear — the file is
-          # meant to be committed.
           git add -f "$NOTES_FILE"
           if git diff --cached --quiet; then
             echo "release-notes file unchanged, skipping commit"
           else
             git commit -m "ci: release notes for v${MARKET_VERSION}.${BUNDLE_VERSION}"
-            git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:working
+            PUSHED=false
+            for attempt in 1 2 3; do
+              if git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:working; then
+                PUSHED=true
+                break
+              fi
+              echo "working advanced during release-notes push; rebasing attempt $attempt"
+              git fetch origin working
+              git reset --hard origin/working
+              cp "$GITHUB_WORKSPACE/$NOTES_FILE" "$NOTES_FILE"
+              git add -f "$NOTES_FILE"
+              git commit -m "ci: release notes for v${MARKET_VERSION}.${BUNDLE_VERSION}"
+            done
+            if [ "$PUSHED" != true ]; then
+              echo "::error::Could not push release notes after three attempts"
+              exit 1
+            fi
             echo "Pushed release notes to working"
           fi
 

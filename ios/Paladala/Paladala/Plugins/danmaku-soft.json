@@ -1,6 +1,6 @@
 {
   "id": "com.paladala.builtin.danmaku-soft",
-  "name": "弹幕减密",
+  "name": "彈幕減密",
   "version": 1,
   "enabled": false,
   "scope": ["danmaku"],

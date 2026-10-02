@@ -23,7 +23,7 @@ struct PluginsSettingsView: View {
         List {
             Section {
                 if manager.plugins.isEmpty {
-                    Text("尚未安装任何插件。粘贴 JSON 即可加入。")
+                    Text("尚未安裝任何外掛。貼上 JSON 即可加入。")
                         .font(PaladalaTheme.FontRole.bodySmall)
                         .foregroundStyle(.secondary)
                 } else {
@@ -47,7 +47,7 @@ struct PluginsSettingsView: View {
                     }
                 }
             } header: {
-                Text("已安装")
+                Text("已安裝")
             } footer: {
                 if let pasteError {
                     Text(pasteError)
@@ -61,12 +61,12 @@ struct PluginsSettingsView: View {
                     pasteError = nil
                     showingPasteSheet = true
                 } label: {
-                    Label("粘贴 JSON 导入", systemImage: "square.and.pencil")
+                    Label("貼上 JSON 匯入", systemImage: "square.and.pencil")
                 }
             }
 
             if !manager.loadErrors.isEmpty {
-                Section("解析失败") {
+                Section("解析失敗") {
                     ForEach(manager.loadErrors, id: \.self) { line in
                         Text(line)
                             .font(PaladalaTheme.FontRole.bodySmall)
@@ -75,7 +75,7 @@ struct PluginsSettingsView: View {
                 }
             }
         }
-        .navigationTitle("插件中心")
+        .navigationTitle("外掛中心")
         .onAppear { manager.reload() }
         .sheet(isPresented: $showingPasteSheet) {
             pasteSheet
@@ -86,7 +86,7 @@ struct PluginsSettingsView: View {
     private var pasteSheet: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 12) {
-                Text("将 JSON 粘贴进下方文本框，然后点 添加。")
+                Text("將 JSON 貼上進下方文字框，然後點 新增。")
                     .font(PaladalaTheme.FontRole.bodySmall)
                     .foregroundStyle(.secondary)
                 TextEditor(text: $pasteText)
@@ -101,14 +101,14 @@ struct PluginsSettingsView: View {
                 Spacer(minLength: 0)
             }
             .padding()
-            .navigationTitle("导入 JSON")
+            .navigationTitle("匯入 JSON")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(L10n.common.cancel) { showingPasteSheet = false }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("添加") {
+                    Button("新增") {
                         do {
                             try manager.add(plainText: pasteText)
                             showingPasteSheet = false
@@ -151,14 +151,14 @@ private struct PluginRowView: View {
 
     private var sourceLabel: String {
         switch plugin.origin {
-        case .bundled: return "内置"
-        case .disk: return "用户导入"
+        case .bundled: return "內建"
+        case .disk: return "使用者匯入"
         case .none: return "—"
         }
     }
 
     private func scopeLabel(_ scopes: [PluginScope]) -> String {
-        if scopes.isEmpty { return "无作用范围" }
+        if scopes.isEmpty { return "無作用範圍" }
         let names = scopes.map { scopeLabel($0) }
         return names.joined(separator: " · ")
     }
@@ -166,9 +166,9 @@ private struct PluginRowView: View {
     private func scopeLabel(_ scope: PluginScope) -> String {
         switch scope {
         case .sponsorblock: return "SponsorBlock"
-        case .cdn: return "CDN 节点"
-        case .danmaku: return "弹幕"
-        case .brightness: return "屏幕调光"
+        case .cdn: return "CDN 節點"
+        case .danmaku: return "彈幕"
+        case .brightness: return "螢幕調光"
         }
     }
 }

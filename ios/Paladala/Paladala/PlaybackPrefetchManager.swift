@@ -670,18 +670,16 @@ actor PlaybackPrefetchManager {
         "\(bvid)_\(qn)_\(cid)"
     }
 
-    /// First upstream URL for a track — the primary
-    /// host, with the first backup as a fallback if the
-    /// primary's CDN is dead.  We do *not* probe (the
-    /// existing proxy's `preparationCandidates` runs the
-    /// probe; for a one-shot download we just pick the
-    /// first valid URL).
+    /// First upstream URL for a track.  The base URL is the
+    /// primary candidate; backup URLs remain available to the
+    /// proxy's failover path if this best-effort prefetch fails.
+    /// We do *not* probe here (the existing proxy's
+    /// `preparationCandidates` runs the probe); prefetch should
+    /// start with the same primary candidate the active playback
+    /// selected.
     static func primaryUpstreamURL(
         track: BiliDashSource.Track
     ) -> URL {
-        if !track.backupURLs.isEmpty {
-            return track.backupURLs[0]
-        }
         return track.baseURL
     }
 

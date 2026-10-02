@@ -28,9 +28,9 @@ struct DynamicFeedView: View {
                     .listRowSeparator(.hidden)
             } else if model.posts.isEmpty {
                 ContentUnavailableView(
-                    "暂无动态",
+                    "暫無動態",
                     systemImage: "rectangle.stack.badge.minus",
-                    description: Text("关注 UP 主后，他们的视频、专栏、番剧和开播提醒会出现在这里。")
+                    description: Text("關注 UP 主後，他們的影片、專欄、番劇和開播提醒會出現在這裡。")
                 )
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
@@ -40,7 +40,7 @@ struct DynamicFeedView: View {
                         Haptics.tap()
                         Task { await model.load(repository: repository) }
                     } label: {
-                        Label("重试", systemImage: "arrow.clockwise")
+                        Label("重試", systemImage: "arrow.clockwise")
                     }
                     .buttonStyle(PaladalaGlassButtonStyle(materialDesign: materialDesign))
                     .padding(.bottom, 24)
@@ -105,7 +105,7 @@ struct DynamicFeedView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Color.clear)
-        .navigationTitle("动态")
+        .navigationTitle("動態")
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load(repository: repository) }
         .refreshable {

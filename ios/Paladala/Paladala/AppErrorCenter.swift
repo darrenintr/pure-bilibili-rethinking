@@ -34,29 +34,29 @@ struct AppErrorDescriptor: Equatable, Sendable {
             case .sessionExpired:
                 return AppErrorDescriptor(
                     kind: .authentication,
-                    title: "登录已过期",
-                    message: fallbackMessage ?? "请重新登录后继续。",
+                    title: "登入已過期",
+                    message: fallbackMessage ?? "請重新登入後繼續。",
                     isRetryable: false
                 )
             case .http:
                 return AppErrorDescriptor(
                     kind: .network,
-                    title: "网络请求失败",
-                    message: fallbackMessage ?? "请检查网络连接后重试。",
+                    title: "網路請求失敗",
+                    message: fallbackMessage ?? "請檢查網路連線後重試。",
                     isRetryable: true
                 )
             case .api(let message):
                 return AppErrorDescriptor(
                     kind: .server,
-                    title: "服务暂时不可用",
+                    title: "服務暫時不可用",
                     message: fallbackMessage ?? message,
                     isRetryable: true
                 )
             case .noPlayableFormat:
                 return AppErrorDescriptor(
                     kind: .playback,
-                    title: "视频暂时无法播放",
-                    message: fallbackMessage ?? "当前视频没有可用的播放源。",
+                    title: "影片暫時無法播放",
+                    message: fallbackMessage ?? "當前影片沒有可用的播放源。",
                     isRetryable: true
                 )
             case .vipRequired, .vipExpired:
@@ -71,15 +71,15 @@ struct AppErrorDescriptor: Equatable, Sendable {
                 // the error is still on the model.
                 return AppErrorDescriptor(
                     kind: .playback,
-                    title: "需要大会员",
-                    message: fallbackMessage ?? "该清晰度/音质需要大会员，开通后即可解锁。",
+                    title: "需要大會員",
+                    message: fallbackMessage ?? "該清晰度/音質需要大會員，開通後即可解鎖。",
                     isRetryable: false
                 )
             case .invalidURL, .missingData, .missingIdentity:
                 return AppErrorDescriptor(
                     kind: .data,
-                    title: "内容处理失败",
-                    message: fallbackMessage ?? "收到的内容不完整，请稍后重试。",
+                    title: "內容處理失敗",
+                    message: fallbackMessage ?? "收到的內容不完整，請稍後重試。",
                     isRetryable: true
                 )
             }
@@ -98,7 +98,7 @@ struct AppErrorDescriptor: Equatable, Sendable {
             let rateLimited = urlError.code == .resourceUnavailable
             return AppErrorDescriptor(
                 kind: rateLimited ? .rateLimited : .network,
-                title: rateLimited ? "请求过于频繁" : "网络连接异常",
+                title: rateLimited ? "請求過於頻繁" : "網路連線異常",
                 message: fallbackMessage ?? networkMessage(for: urlError),
                 isRetryable: true
             )
@@ -107,8 +107,8 @@ struct AppErrorDescriptor: Equatable, Sendable {
         if error is DecodingError {
             return AppErrorDescriptor(
                 kind: .data,
-                title: "内容解析失败",
-                message: fallbackMessage ?? "收到的内容格式异常，请稍后重试。",
+                title: "內容解析失敗",
+                message: fallbackMessage ?? "收到的內容格式異常，請稍後重試。",
                 isRetryable: true
             )
         }
@@ -117,8 +117,8 @@ struct AppErrorDescriptor: Equatable, Sendable {
         if nsError.domain == NSCocoaErrorDomain {
             return AppErrorDescriptor(
                 kind: .storage,
-                title: "本地数据操作失败",
-                message: fallbackMessage ?? "无法读取或保存本地数据，请稍后重试。",
+                title: "本地資料操作失敗",
+                message: fallbackMessage ?? "無法讀取或儲存本地資料，請稍後重試。",
                 isRetryable: true
             )
         }
@@ -126,7 +126,7 @@ struct AppErrorDescriptor: Equatable, Sendable {
         return AppErrorDescriptor(
             kind: .unknown,
             title: "操作未完成",
-            message: fallbackMessage ?? "发生了意外错误，请稍后重试。",
+            message: fallbackMessage ?? "發生了意外錯誤，請稍後重試。",
             isRetryable: true
         )
     }
@@ -141,15 +141,15 @@ struct AppErrorDescriptor: Equatable, Sendable {
     private static func networkMessage(for error: URLError) -> String {
         switch error.code {
         case .notConnectedToInternet:
-            return "当前没有网络连接，请联网后重试。"
+            return "當前沒有網路連線，請聯網後重試。"
         case .timedOut:
-            return "请求超时，请稍后重试。"
+            return "請求超時，請稍後重試。"
         case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed:
-            return "暂时无法连接服务器，请稍后重试。"
+            return "暫時無法連線伺服器，請稍後重試。"
         case .networkConnectionLost:
-            return "网络连接已中断，请重试。"
+            return "網路連線已中斷，請重試。"
         default:
-            return "请检查网络连接后重试。"
+            return "請檢查網路連線後重試。"
         }
     }
 }
@@ -291,7 +291,7 @@ private struct AppErrorAlertModifier: ViewModifier {
                     primaryButton: .default(Text(recoveryLabel)) {
                         center.recover()
                     },
-                    secondaryButton: .cancel(Text("关闭")) {
+                    secondaryButton: .cancel(Text("關閉")) {
                         center.dismiss()
                     }
                 )

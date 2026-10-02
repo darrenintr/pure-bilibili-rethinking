@@ -74,22 +74,22 @@ jobs:
           set -euo pipefail
           cd "$IJKPLAYER_SRC/ios"
           python3 - <<'PATCH_FFMPEG_SCRIPT'
-from pathlib import Path
-script = Path('tools/do-compile-ffmpeg.sh')
-text = script.read_text()
-text = text.replace('FFMPEG_EXTRA_CFLAGS=', 'FFMPEG_EXTRA_CFLAGS=${FFMPEG_EXTRA_CFLAGS:-}', 1)
-script.write_text(text)
-PATCH_FFMPEG_SCRIPT
+          from pathlib import Path
+          script = Path('tools/do-compile-ffmpeg.sh')
+          text = script.read_text()
+          text = text.replace('FFMPEG_EXTRA_CFLAGS=', 'FFMPEG_EXTRA_CFLAGS=${FFMPEG_EXTRA_CFLAGS:-}', 1)
+          script.write_text(text)
+          PATCH_FFMPEG_SCRIPT
           python3 - <<'PATCH_H264DSP'
-from pathlib import Path
-p = Path('ffmpeg-arm64/libavcodec/aarch64/h264dsp_init_aarch64.c')
-s = p.read_text()
-s = s.replace('#include <stdint.h>\n', '#include <stdint.h>\n#include <stddef.h>\n')
-# The assembly ABI uses a 64-bit stride on AArch64, matching the
-# ptrdiff_t function-table signature used by h264dsp.h.
-s = s.replace('int stride, int height', 'ptrdiff_t stride, int height')
-p.write_text(s)
-PATCH_H264DSP
+          from pathlib import Path
+          p = Path('ffmpeg-arm64/libavcodec/aarch64/h264dsp_init_aarch64.c')
+          s = p.read_text()
+          s = s.replace('#include <stdint.h>\n', '#include <stdint.h>\n#include <stddef.h>\n')
+          # The assembly ABI uses a 64-bit stride on AArch64, matching the
+          # ptrdiff_t function-table signature used by h264dsp.h.
+          s = s.replace('int stride, int height', 'ptrdiff_t stride, int height')
+          p.write_text(s)
+          PATCH_H264DSP
           FF_ALL_ARCHS=arm64 FFMPEG_EXTRA_CFLAGS="-Wno-error -Wno-error=incompatible-function-pointer-types" bash compile-ffmpeg.sh arm64
           test -f "build/ffmpeg-arm64/output/lib/libavformat.a"
           test -f "build/ffmpeg-arm64/output/lib/libavcodec.a"

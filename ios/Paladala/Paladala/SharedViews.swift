@@ -790,7 +790,7 @@ struct ErrorBanner: View {
                         }
                 }
                 .buttonStyle(PaladalaPressBounceButtonStyle())
-                .accessibilityLabel("重试")
+                .accessibilityLabel("重試")
             }
         }
         .padding(12)
@@ -885,7 +885,7 @@ private struct VideoContextMenuModifier: ViewModifier {
                     Haptics.selection()
                     router.openUP(mid: video.ownerMid)
                 } label: {
-                    Label("查看 UP 主主页", systemImage: "person.crop.circle")
+                    Label("檢視 UP 主主頁", systemImage: "person.crop.circle")
                 }
                 Divider()
             }
@@ -902,7 +902,7 @@ private struct VideoContextMenuModifier: ViewModifier {
                             }
                         }
                     } label: {
-                        Label("稍后再看", systemImage: "clock.badge.checkmark")
+                        Label("稍後再看", systemImage: "clock.badge.checkmark")
                     }
                 } else {
                     Button(role: .destructive) {
@@ -920,7 +920,7 @@ private struct VideoContextMenuModifier: ViewModifier {
                             }
                         }
                     } label: {
-                        Label("从稍后再看中移除", systemImage: "clock.badge.xmark")
+                        Label("從稍後再看中移除", systemImage: "clock.badge.xmark")
                     }
                 }
                 Menu {
@@ -935,7 +935,7 @@ private struct VideoContextMenuModifier: ViewModifier {
                             }
                         }
                     } label: {
-                        Label("投 1 枚硬币", systemImage: "bitcoinsign.circle")
+                        Label("投 1 枚硬幣", systemImage: "bitcoinsign.circle")
                     }
                     Button {
                         Haptics.tap()
@@ -948,23 +948,23 @@ private struct VideoContextMenuModifier: ViewModifier {
                             }
                         }
                     } label: {
-                        Label("投 2 枚硬币", systemImage: "bitcoinsign.circle.fill")
+                        Label("投 2 枚硬幣", systemImage: "bitcoinsign.circle.fill")
                     }
                 } label: {
-                    Label("投币支持 UP 主", systemImage: "bitcoinsign.circle")
+                    Label("投幣支援 UP 主", systemImage: "bitcoinsign.circle")
                 }
             }
             Button {
                 Haptics.tap()
                 UIPasteboard.general.url = url
             } label: {
-                Label("复制链接", systemImage: "doc.on.doc")
+                Label("複製連結", systemImage: "doc.on.doc")
             }
             Button {
                 Haptics.tap()
                 UIApplication.shared.open(url)
             } label: {
-                Label("浏览器打开", systemImage: "safari")
+                Label("瀏覽器開啟", systemImage: "safari")
             }
             ShareLink(item: url) {
                 Label("分享", systemImage: "square.and.arrow.up")
@@ -983,7 +983,7 @@ private struct VideoContextMenuModifier: ViewModifier {
                         object: video
                     )
                 } label: {
-                    Label("从历史记录中移除", systemImage: "trash")
+                    Label("從歷史記錄中移除", systemImage: "trash")
                 }
             }
         } preview: {
@@ -1080,7 +1080,7 @@ struct BangumiLoadingView: View {
             ProgressView()
                 .progressViewStyle(.circular)
                 .tint(PaladalaTheme.ink)
-            Text("加载中…")
+            Text("載入中…")
                 .font(PaladalaTheme.FontRole.bodySmall)
                 .foregroundStyle(PaladalaTheme.mutedInk)
                 .padding(.top, PaladalaTheme.Spacing.s)
@@ -1120,7 +1120,7 @@ struct BangumiErrorView: View {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 32, weight: .light))
                 .foregroundStyle(PaladalaTheme.biliPink)
-            Text("加载失败")
+            Text("載入失敗")
                 .font(PaladalaTheme.FontRole.sectionHeader)
                 .foregroundStyle(PaladalaTheme.ink)
             Text(message)
@@ -1143,7 +1143,7 @@ struct BangumiErrorView: View {
         Button {
             retry()
         } label: {
-            Text("重试")
+            Text("重試")
                 .font(PaladalaTheme.FontRole.labelMono)
                 .foregroundStyle(PaladalaTheme.ink)
                 .padding(.horizontal, PaladalaTheme.Spacing.l)

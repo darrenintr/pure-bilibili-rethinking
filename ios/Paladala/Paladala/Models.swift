@@ -26,15 +26,15 @@ enum HomeCategory: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .recommend: "推荐"
-        case .follow: "关注"
-        case .popular: "热门"
+        case .recommend: "推薦"
+        case .follow: "關注"
+        case .popular: "熱門"
         case .live: "直播"
         case .anime: "追番"
-        case .game: "游戏"
-        case .knowledge: "知识"
+        case .game: "遊戲"
+        case .knowledge: "知識"
         case .tech: "科技"
-        case .search: "搜索"
+        case .search: "搜尋"
         }
     }
 
@@ -59,9 +59,9 @@ enum PopularSubCategory: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .comprehensive: "综合热门"
+        case .comprehensive: "綜合熱門"
         case .ranking: "排行榜"
-        case .weekly: "每周必看"
+        case .weekly: "每週必看"
         case .precious: "入站必刷"
         }
     }
@@ -361,13 +361,13 @@ extension BangumiDay {
     /// `BangumiDay` by hand.
     static func weekdayLabel(for weekday: Int) -> String {
         switch weekday {
-        case 1: "周一"
-        case 2: "周二"
-        case 3: "周三"
-        case 4: "周四"
-        case 5: "周五"
-        case 6: "周六"
-        case 7: "周日"
+        case 1: "週一"
+        case 2: "週二"
+        case 3: "週三"
+        case 4: "週四"
+        case 5: "週五"
+        case 6: "週六"
+        case 7: "週日"
         default: "周\(weekday)"
         }
     }
@@ -1315,7 +1315,7 @@ enum CommentSort: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var title: String {
         switch self {
-        case .hot: "最热"
+        case .hot: "最熱"
         case .newest: "最新"
         }
     }
@@ -1391,23 +1391,6 @@ struct BiliDanmakuItem: Hashable, Codable, Identifiable, Sendable {
     let fontSize: Int
     let color: Int
     let text: String
-}
-
-// MARK: - Music navigation routes
-
-/// Navigation routes for the Music tab. Pushed onto the router's
-/// `path` so the existing `.navigationDestination(for:)` machinery
-/// resolves them into the right view.
-///
-/// The Music tab itself was removed when the 追番 tab was
-/// added; `MusicRoute.player(_:)` is still routed to the
-/// fullscreen `MusicPlayerView` by the existing
-/// `navigationDestination(for:)` handler but no longer
-/// has a dedicated tab host.
-enum MusicRoute: Hashable, Sendable {
-    /// Open the fullscreen music player for `video`. The view
-    /// resolves the playback URL + lyric track on appear.
-    case player(BiliVideo)
 }
 
 /// Navigation routes for the 追番 surface.

@@ -11,6 +11,32 @@ final class LocalHLSProxyServerTests: XCTestCase {
         try await super.tearDown()
     }
 
+    func test_resolvedPrefetchQuality_usesRequestedQualityWhenPresent() {
+        XCTAssertEqual(
+            LocalHLSProxyServer.resolvedPrefetchQuality(
+                requested: 120,
+                acceptQuality: [80, 64]
+            ),
+            120
+        )
+    }
+
+    func test_resolvedPrefetchQuality_fallsBackToAcceptQuality() {
+        XCTAssertEqual(
+            LocalHLSProxyServer.resolvedPrefetchQuality(
+                requested: nil,
+                acceptQuality: [80, 64]
+            ),
+            80
+        )
+        XCTAssertNil(
+            LocalHLSProxyServer.resolvedPrefetchQuality(
+                requested: nil,
+                acceptQuality: nil
+            )
+        )
+    }
+
     func test_waitForListener_respectsTimeoutCeiling() async {
         // When the listener is never started, waitForListener must throw
         // within timeout + a small grace window (50 ms), not hang for the

@@ -297,7 +297,7 @@ struct BilibiliAuthAPI {
         let payload = try decoder.decode(WebNavResponse.self, from: data)
         return WebQrcodeNavInfo(
             mid: payload.data.mid,
-            name: payload.data.uname ?? "Bilibili 用户",
+            name: payload.data.uname ?? "Bilibili 使用者",
             faceURL: payload.data.faceURL,
             vipBadge: payload.data.vip?.badge() ?? .none
         )
@@ -680,9 +680,9 @@ struct BilibiliAuthError: LocalizedError {
     var errorDescription: String? {
         switch stage {
         case .generate:
-            return "B站 二维码生成失败 (\(code)): \(message)"
+            return "B站 二維碼生成失敗 (\(code)): \(message)"
         case .poll:
-            return "B站 二维码轮询失败 (\(code)): \(message)"
+            return "B站 二維碼輪詢失敗 (\(code)): \(message)"
         }
     }
 }

@@ -131,27 +131,6 @@ final class AppRouter: ObservableObject {
     /// to `false` when it dismisses itself.
     @Published var isLoginSheetPresented = false
 
-    /// Open the music player for `video`. Switches to the 音樂
-    /// tab and pushes `MusicRoute.player(video)` onto the path
-    /// so the existing `.navigationDestination(for:)` machinery
-    /// resolves it into a `MusicPlayerView`.
-    ///
-    /// The music tab itself was removed when the 追番 tab
-    /// was added (commit upcoming).  `openMusic(_:)` stays
-    /// for callers that still route to `MusicPlayerView`
-    /// through the navigation stack (e.g. the existing
-    /// `MusicRoute.player(video)` push survives), but the
-    /// UI no longer has a music home tab to switch into —
-    /// the destination renders standalone in whatever
-    /// tab the caller was on.
-    func openMusic(_ video: BiliVideo) {
-        diagLog(.music, "AppRouter.openMusic", details: [
-            "bvid": video.bvid,
-            "title": video.title
-        ])
-        path.append(MusicRoute.player(video))
-    }
-
     /// Open the 追番 weekly timeline. Switches to the
     /// 追番 tab and pushes a `BangumiRoute.timeline` onto
     /// the path so the destination renders inside the

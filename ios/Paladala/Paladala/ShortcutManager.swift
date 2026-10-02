@@ -26,7 +26,7 @@ final class ShortcutManager: ObservableObject {
 
     /// The canonical name of the Shortcut the user must install.
     /// This must match the name in the .shortcut file exactly.
-    static let shortcutName = "安装Paladala"
+    static let shortcutName = "安裝Paladala"
 
     /// UserDefaults key tracking whether the user has completed
     /// the initial Shortcut installation flow.
@@ -105,7 +105,7 @@ final class ShortcutManager: ObservableObject {
     func openShortcutsApp() {
         // Strategy 1: if we bundle a .shortcut file and host it on GitHub,
         // open that URL directly so the user can tap "Add Shortcut"
-        if let shortcutURL = URL(string: "https://github.com/darrenintr/pure-bilibili-rethinking/raw/main/shortcuts/安装Paladala.shortcut") {
+        if let shortcutURL = URL(string: "https://github.com/darrenintr/pure-bilibili-rethinking/raw/main/shortcuts/安裝Paladala.shortcut") {
             UIApplication.shared.open(shortcutURL)
             return
         }
@@ -138,7 +138,7 @@ struct ShortcutInstallPromptView: View {
             }
             .scrollContentBackground(.hidden)
             .background(PaladalaTheme.canvas)
-            .navigationTitle("一键更新设置")
+            .navigationTitle("一鍵更新設定")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -161,11 +161,11 @@ struct ShortcutInstallPromptView: View {
                 .foregroundStyle(PaladalaTheme.biliPink)
                 .padding(.top, PaladalaTheme.Spacing.l)
 
-            Text("安装更新快捷指令")
+            Text("安裝更新快捷指令")
                 .font(.system(size: 24, weight: .black, design: .monospaced))
                 .foregroundStyle(PaladalaTheme.ink)
 
-            Text("一次设置，永久使用")
+            Text("一次設定，永久使用")
                 .font(PaladalaTheme.FontRole.labelMono)
                 .foregroundStyle(PaladalaTheme.mutedInk)
         }
@@ -176,7 +176,7 @@ struct ShortcutInstallPromptView: View {
         VStack(spacing: 0) {
             // Section header
             HStack {
-                Text("操作步骤")
+                Text("操作步驟")
                     .font(.system(size: 11, weight: .black, design: .monospaced))
                     .foregroundStyle(PaladalaTheme.mutedInk)
                     .textCase(.uppercase)
@@ -189,8 +189,8 @@ struct ShortcutInstallPromptView: View {
             VStack(alignment: .leading, spacing: PaladalaTheme.Spacing.l) {
                 instructionStep(
                     number: "1",
-                    title: "下载快捷指令",
-                    description: "点击下方按钮，Safari 会打开快捷指令安装页面"
+                    title: "下載快捷指令",
+                    description: "點選下方按鈕，Safari 會開啟快捷指令安裝頁面"
                 )
 
                 Divider()
@@ -198,8 +198,8 @@ struct ShortcutInstallPromptView: View {
 
                 instructionStep(
                     number: "2",
-                    title: "添加到快捷指令库",
-                    description: "在打开的页面中，向下滚动并点击「添加快捷指令」"
+                    title: "新增到快捷指令庫",
+                    description: "在開啟的頁面中，向下滾動並點選「新增快捷指令」"
                 )
 
                 Divider()
@@ -207,8 +207,8 @@ struct ShortcutInstallPromptView: View {
 
                 instructionStep(
                     number: "3",
-                    title: "完成设置",
-                    description: "安装完成后，返回 Paladala 点击「我已安装」"
+                    title: "完成設定",
+                    description: "安裝完成後，返回 Paladala 點選「我已安裝」"
                 )
             }
             .padding(PaladalaTheme.Spacing.l)
@@ -224,7 +224,7 @@ struct ShortcutInstallPromptView: View {
             }
 
             // Footer note
-            Text("安装后，每次检查更新时会自动调用快捷指令完成下载和安装，无需手动操作。")
+            Text("安裝後，每次檢查更新時會自動呼叫快捷指令完成下載和安裝，無需手動操作。")
                 .font(.system(size: 10, weight: .medium, design: .monospaced))
                 .foregroundStyle(PaladalaTheme.mutedInk)
                 .padding(.horizontal, PaladalaTheme.Spacing.l)
@@ -265,7 +265,7 @@ struct ShortcutInstallPromptView: View {
                 HStack(spacing: PaladalaTheme.Spacing.s) {
                     Image(systemName: "arrow.down.circle.fill")
                         .font(.system(size: 16, weight: .bold))
-                    Text("下载快捷指令")
+                    Text("下載快捷指令")
                         .font(.system(size: 15, weight: .bold, design: .monospaced))
                 }
                 .foregroundStyle(PaladalaTheme.ink)
@@ -292,7 +292,7 @@ struct ShortcutInstallPromptView: View {
                 HStack(spacing: PaladalaTheme.Spacing.s) {
                     Image(systemName: "checkmark.circle")
                         .font(.system(size: 16, weight: .bold))
-                    Text("我已安装")
+                    Text("我已安裝")
                         .font(.system(size: 15, weight: .bold, design: .monospaced))
                 }
                 .foregroundStyle(PaladalaTheme.ink)
@@ -310,7 +310,7 @@ struct ShortcutInstallPromptView: View {
             Button {
                 dismiss()
             } label: {
-                Text("暂时跳过")
+                Text("暫時跳過")
                     .font(.system(size: 13, weight: .semibold, design: .monospaced))
                     .foregroundStyle(PaladalaTheme.mutedInk)
             }

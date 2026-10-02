@@ -50,21 +50,21 @@ struct CDNSettingsView: View {
                         .foregroundStyle(activePluginPin != nil ? PaladalaTheme.biliPink : .secondary)
                     VStack(alignment: .leading, spacing: 2) {
                         if let pin = activePluginPin {
-                            Text("插件已强制切换节点")
+                            Text("外掛已強制切換節點")
                                 .font(PaladalaTheme.FontRole.labelMono)
                             Text(pin)
                                 .font(.caption.monospaced())
                                 .foregroundStyle(.secondary)
                         } else if enabled, !manager.selectedHost.isEmpty {
-                            Text("手动节点生效中")
+                            Text("手動節點生效中")
                                 .font(PaladalaTheme.FontRole.labelMono)
                             Text(manager.selectedHost)
                                 .font(.caption.monospaced())
                                 .foregroundStyle(.secondary)
                         } else {
-                            Text("使用 B 站默认节点")
+                            Text("使用 B 站預設節點")
                                 .font(PaladalaTheme.FontRole.labelMono)
-                            Text("无插件 / 未启用手动切换")
+                            Text("無外掛 / 未啟用手動切換")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -72,31 +72,31 @@ struct CDNSettingsView: View {
                     Spacer()
                 }
             } header: {
-                Text("当前生效")
+                Text("當前生效")
             } footer: {
-                Text("优先级：插件强制 > 手动选择 > B 站默认。插件 pin 在「插件中心」管理。")
+                Text("優先順序：外掛強制 > 手動選擇 > B 站預設。外掛 pin 在「外掛中心」管理。")
             }
             Section {
-                Toggle("启用手动 CDN", isOn: $enabled)
-                Text("按照 CCB 的思路，仅替换播放地址中的媒体节点，保留 B 站签名参数。切换后重新打开视频或点击重试即可生效。")
+                Toggle("啟用手動 CDN", isOn: $enabled)
+                Text("按照 CCB 的思路，僅替換播放地址中的媒體節點，保留 B 站簽名引數。切換後重新開啟影片或點選重試即可生效。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Section("当前节点") {
+            Section("當前節點") {
                 HStack {
                     Text(manager.selectedHost).font(.subheadline.monospaced())
                     Spacer()
-                    if enabled { Text("已启用").foregroundStyle(.green).font(.caption) }
+                    if enabled { Text("已啟用").foregroundStyle(.green).font(.caption) }
                 }
-                Picker("地区", selection: $selectedRegion) {
+                Picker("地區", selection: $selectedRegion) {
                     ForEach(regions, id: \.self) { Text($0).tag($0) }
                 }
             }
             Section {
                 Toggle(isOn: $autoPickEnabled) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("自动测速切换")
-                        Text("每次测速后自动把节点切到延迟最低的端点。")
+                        Text("自動測速切換")
+                        Text("每次測速後自動把節點切到延遲最低的端點。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -114,10 +114,10 @@ struct CDNSettingsView: View {
                         Image(systemName: "bolt.fill")
                             .foregroundStyle(.yellow)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("已切换到 \(best)")
+                            Text("已切換到 \(best)")
                                 .font(.subheadline.monospaced())
                             if let ms = manager.results.first(where: { $0.node.host == best })?.latencyMs {
-                                Text("TLS 握手延迟 \(ms) ms")
+                                Text("TLS 握手延遲 \(ms) ms")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
@@ -125,7 +125,7 @@ struct CDNSettingsView: View {
                         Spacer()
                     }
                 }
-            } header: { Text("自动选优") } footer: {
+            } header: { Text("自動選優") } footer: {
                 // The probe uses a real TCP + TLS handshake
                 // (Network.framework + explicit SNI) — see
                 // `CDNAkamProbe.swift`. It is *not* a Range /
@@ -138,13 +138,13 @@ struct CDNSettingsView: View {
                 // can't override SNI), so the host-keyed
                 // auto-pick is the strongest signal we can
                 // hand to the player today.
-                Text("测速使用 Network.framework 真实 TCP + TLS 握手（含 SNI），与 miyouzi/akamTester 思路一致；延迟最低的端点会被自动设为下一段播放的默认节点。")
+                Text("測速使用 Network.framework 真實 TCP + TLS 握手（含 SNI），與 miyouzi/akamTester 思路一致；延遲最低的端點會被自動設為下一段播放的預設節點。")
             }
             Section {
                 Button {
                     Task { await manager.test(nodes: Array(visibleNodes.prefix(40))) }
                 } label: {
-                    Label(manager.isTesting ? "测速中…" : "测试当前列表", systemImage: "speedometer")
+                    Label(manager.isTesting ? "測速中…" : "測試當前列表", systemImage: "speedometer")
                 }
                 .disabled(manager.isTesting || visibleNodes.isEmpty)
                 // Node rows. The list always renders the
@@ -170,8 +170,8 @@ struct CDNSettingsView: View {
                     }
                     .buttonStyle(.plain)
                 }
-            } header: { Text("测速与选择") } footer: {
-                Text("每行显示对应节点的最新 TLS 握手延迟。绿色 < 150ms，橙色 < 400ms，红色 ≥ 400ms 或不可达。")
+            } header: { Text("測速與選擇") } footer: {
+                Text("每行顯示對應節點的最新 TLS 握手延遲。綠色 < 150ms，橙色 < 400ms，紅色 ≥ 400ms 或不可達。")
             }
         }
         .navigationTitle("CDN 播放源")
@@ -217,12 +217,12 @@ private struct NodeRow: View {
                     .font(.caption2.monospaced())
                     .foregroundStyle(ms < 150 ? .green : ms < 400 ? .orange : .red)
             } else {
-                Text("不可达")
+                Text("不可達")
                     .font(.caption2)
                     .foregroundStyle(.red)
             }
         } else {
-            Text("未测速")
+            Text("未測速")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }

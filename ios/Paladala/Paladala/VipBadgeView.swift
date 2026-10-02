@@ -115,14 +115,14 @@ struct VipBadgeView: View {
     }
 
     private var accessibilityDescription: String {
-        var parts: [String] = [badge.text.isEmpty ? "大会员" : badge.text]
+        var parts: [String] = [badge.text.isEmpty ? "大會員" : badge.text]
         if let due = badge.dueDate, !badge.isExpired {
             let f = DateFormatter()
             f.dateStyle = .medium
             f.timeStyle = .none
             parts.append("到期 \(f.string(from: due))")
         } else if badge.isExpired {
-            parts.append("已过期")
+            parts.append("已過期")
         }
         return parts.joined(separator: "，")
     }
@@ -144,7 +144,7 @@ struct VipBadgeCompact: View {
                 .font(.system(size: pointSize, weight: .heavy))
                 .foregroundStyle(badge.backgroundColor)
                 .opacity(badge.isExpired ? 0.55 : 1.0)
-                .accessibilityLabel(Text(badge.text.isEmpty ? "大会员" : badge.text))
+                .accessibilityLabel(Text(badge.text.isEmpty ? "大會員" : badge.text))
         }
     }
 }

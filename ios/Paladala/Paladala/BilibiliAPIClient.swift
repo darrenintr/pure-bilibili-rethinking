@@ -1090,7 +1090,7 @@ final class BilibiliAPIClient: @unchecked Sendable {
             guard let seasonId = ep.seasonId else {
                 return nil
             }
-            let title = ep.title ?? "未知番剧"
+            let title = ep.title ?? "未知番劇"
             // Upstream always sends a cover URL but guard
             // against the unlikely missing-field case.
             let cover = (ep.cover ?? ep.squareCover ?? ep.epCover)
@@ -1105,7 +1105,7 @@ final class BilibiliAPIClient: @unchecked Sendable {
             } else if !pubTime.isEmpty {
                 updateDescription = pubTime
             } else {
-                updateDescription = "即将开播"
+                updateDescription = "即將開播"
             }
             // `published` is `0` for not-yet-aired rows and
             // `1` for everything else.  Some rows may not
@@ -1113,7 +1113,7 @@ final class BilibiliAPIClient: @unchecked Sendable {
             // "published" (the safe default).
             let badge: String?
             if let published = ep.published, published == 0 {
-                badge = "未开播"
+                badge = "未開播"
             } else {
                 badge = nil
             }
@@ -1142,13 +1142,13 @@ final class BilibiliAPIClient: @unchecked Sendable {
 
     private static func weekdayLabel(for weekday: Int) -> String {
         switch weekday {
-        case 1: "周一"
-        case 2: "周二"
-        case 3: "周三"
-        case 4: "周四"
-        case 5: "周五"
-        case 6: "周六"
-        case 7: "周日"
+        case 1: "週一"
+        case 2: "週二"
+        case 3: "週三"
+        case 4: "週四"
+        case 5: "週五"
+        case 6: "週六"
+        case 7: "週日"
         default: "周\(weekday)"
         }
     }
@@ -1836,7 +1836,7 @@ final class BilibiliAPIClient: @unchecked Sendable {
         let info = payload.value?.info
         let medias = payload.value?.medias.map { $0.video } ?? []
         return FavoriteFolderVideosPage(
-            title: info?.title ?? "收藏夹",
+            title: info?.title ?? "收藏夾",
             videos: medias,
             hasMore: payload.value?.hasMore ?? false
         )
@@ -4640,7 +4640,7 @@ private struct LiveRoomDTO: Decodable, Sendable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicKey.self)
         roomid = container.decodeInt(keys: ["roomid"]) ?? 0
-        title = container.decodeString(keys: ["title"]) ?? "直播间"
+        title = container.decodeString(keys: ["title"]) ?? "直播間"
         uname = container.decodeString(keys: ["uname"]) ?? "Unknown"
         areaName = container.decodeString(keys: ["area_name", "area_v2_name", "parent_name"]) ?? ""
         coverURL = container.decodeString(keys: ["cover", "user_cover", "system_cover", "show_cover"])?.httpsURL
@@ -4699,7 +4699,7 @@ private struct DynamicCardDTO: Decodable, Sendable {
         authorMid = author?.decodeInt64(keys: ["mid"])
         authorAvatarURL = author?.decodeString(keys: ["face"])?.httpsURL
         let pubTs = author?.decodeInt64(keys: ["pub_ts"]) ?? 0
-        timeLabel = pubTs > 0 ? Self.relativeTimeLabel(from: pubTs) : "刚刚"
+        timeLabel = pubTs > 0 ? Self.relativeTimeLabel(from: pubTs) : "剛剛"
 
         let moduleDynamic = try? modules?.nestedContainer(keyedBy: DynamicKey.self, forKey: DynamicKey("module_dynamic"))
         let desc = try? moduleDynamic?.nestedContainer(keyedBy: DynamicKey.self, forKey: DynamicKey("desc"))
@@ -4723,7 +4723,7 @@ private struct DynamicCardDTO: Decodable, Sendable {
                 bvid: bvid,
                 aid: aid,
                 cid: cid,
-                title: archiveTitle.isEmpty ? "视频动态" : archiveTitle,
+                title: archiveTitle.isEmpty ? "影片動態" : archiveTitle,
                 ownerName: authorName,
                 coverURL: coverURL,
                 duration: duration,
@@ -4742,11 +4742,11 @@ private struct DynamicCardDTO: Decodable, Sendable {
         let delta = max(0, Int(Date().timeIntervalSince1970) - Int(timestamp))
         switch delta {
         case ..<60:
-            return "刚刚"
+            return "剛剛"
         case ..<3600:
-            return "\(max(1, delta / 60)) 分钟前"
+            return "\(max(1, delta / 60)) 分鐘前"
         case ..<86_400:
-            return "\(max(1, delta / 3600)) 小时前"
+            return "\(max(1, delta / 3600)) 小時前"
         default:
             return "\(max(1, delta / 86_400)) 天前"
         }
@@ -4898,7 +4898,7 @@ private struct FavoriteFolderDTO: Decodable, Sendable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicKey.self)
         id = Int64(container.decodeInt(keys: ["id", "fid"]) ?? 0)
-        title = container.decodeString(keys: ["title"]) ?? "收藏夹"
+        title = container.decodeString(keys: ["title"]) ?? "收藏夾"
         coverURL = (container.decodeString(keys: ["cover"]) ?? "").httpsURL
         mediaCount = container.decodeInt(keys: ["media_count"]) ?? 0
         let upper = try? container.nestedContainer(keyedBy: DynamicKey.self, forKey: DynamicKey("upper"))
