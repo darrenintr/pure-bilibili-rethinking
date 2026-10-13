@@ -684,8 +684,7 @@ final class BilibiliAPIClient: @unchecked Sendable {
 
     /// Fetch the video's current player danmaku in six-minute protobuf
     /// segments. This matches the segmented WBI route used by the live web
-    /// player; the old `comment.bilibili.com/{cid}.xml` list only exposed a
-    /// limited rolling pool and did not cover long videos consistently.
+    /// player, replacing the older XML list route.
     func danmaku(cid: Int, aid: Int = 0, duration: Int = 0) async throws -> [BiliDanmakuItem] {
         guard cid > 0 else { return [] }
         let segmentCount = duration > 0 ? ((duration - 1) / 360) + 1 : 1
