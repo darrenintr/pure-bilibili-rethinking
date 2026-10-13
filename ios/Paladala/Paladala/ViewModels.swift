@@ -583,7 +583,7 @@ final class VideoDetailViewModel: ObservableObject {
     /// Timed subtitle track for the active video, loaded from
     /// `/x/player/v2` when the upstream publishes one.
     @Published var subtitleTrack: BiliLyricTrack?
-    /// Historical danmaku loaded from `comment.bilibili.com/{cid}.xml`.
+    /// Timed danmaku loaded from the web player's segmented protobuf feed.
     /// Kept sorted by time so the overlay can cheaply scan the small window
     /// around the current playhead.
     @Published var danmakuItems: [BiliDanmakuItem] = []

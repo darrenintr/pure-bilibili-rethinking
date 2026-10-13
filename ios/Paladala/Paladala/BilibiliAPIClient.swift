@@ -1,5 +1,4 @@
 import CryptoKit
-import Compression
 import Foundation
 
 // MARK: - App API signing credentials
@@ -683,31 +682,45 @@ final class BilibiliAPIClient: @unchecked Sendable {
         try await videoSubtitleText(info: info)
     }
 
-    /// Fetch real video danmaku from Bilibili's XML endpoint.
-    ///
-    /// The endpoint is intentionally separate from `baseURL`: Bilibili
-    /// serves historical danmaku from `comment.bilibili.com/{cid}.xml`.
-    /// It normally advertises `Content-Encoding: deflate`; URLSession often
-    /// handles that transparently, and the parser also has a zlib fallback
-    /// for responses that arrive as compressed bytes.
-    func danmaku(cid: Int) async throws -> [BiliDanmakuItem] {
+    /// Fetch the video's current player danmaku in six-minute protobuf
+    /// segments. This matches the segmented WBI route used by the live web
+    /// player; the old `comment.bilibili.com/{cid}.xml` list only exposed a
+    /// limited rolling pool and did not cover long videos consistently.
+    func danmaku(cid: Int, aid: Int = 0, duration: Int = 0) async throws -> [BiliDanmakuItem] {
         guard cid > 0 else { return [] }
-        guard let url = URL(string: "https://comment.bilibili.com/\(cid).xml") else {
-            throw BilibiliAPIError.invalidURL
-        }
-        var request = URLRequest(url: url)
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.setValue("deflate", forHTTPHeaderField: "Accept-Encoding")
-        request.setValue("https://www.bilibili.com", forHTTPHeaderField: "Referer")
-        request.setValue(DeviceInfo.shared.userAgent, forHTTPHeaderField: "User-Agent")
+        let segmentCount = duration > 0 ? ((duration - 1) / 360) + 1 : 1
+        var items: [BiliDanmakuItem] = []
 
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
-            bpLog("Danmaku fetch failed with HTTP \(status): \(url.absoluteString)")
-            throw BilibiliAPIError.http
+        for segmentIndex in 1...segmentCount {
+            var queryItems = [
+                URLQueryItem(name: "type", value: "1"),
+                URLQueryItem(name: "oid", value: "\(cid)"),
+                URLQueryItem(name: "segment_index", value: "\(segmentIndex)"),
+                URLQueryItem(name: "web_location", value: "1315875")
+            ]
+            if aid > 0 {
+                queryItems.append(URLQueryItem(name: "pid", value: "\(aid)"))
+            }
+
+            do {
+                let data = try await rawGet(
+                    baseURL: baseURL,
+                    path: "/x/v2/dm/wbi/web/seg.so",
+                    queryItems: queryItems,
+                    signWithWBI: true
+                )
+                items.append(contentsOf: try BiliDanmakuProtobufDecoder.parse(data))
+            } catch {
+                // Preserve the already-loaded prefix if a later segment is
+                // unavailable (for example, a transient rate limit). The
+                // first segment is required because it contains the start
+                // of playback, so its failure remains visible to the caller.
+                guard segmentIndex > 1, !items.isEmpty else { throw error }
+                bpLog("Danmaku segment \(segmentIndex) failed; keeping \(items.count) earlier entries")
+                break
+            }
         }
-        return BiliDanmakuXMLParser.parse(data: data.biliDanmakuInflatedIfNeeded())
+        return items.sorted { $0.time < $1.time }
     }
 
     func searchVideos(keyword: String, page: Int = 1) async throws -> [BiliVideo] {
@@ -982,38 +995,33 @@ final class BilibiliAPIClient: @unchecked Sendable {
     private func rawGet(
         baseURL: URL,
         path: String,
-        queryItems: [URLQueryItem]
+        queryItems: [URLQueryItem],
+        signWithWBI: Bool = false
     ) async throws -> Data {
-        var items = queryItems
-        let isAppAPI = baseURL.host?.contains("app.bilibili.com") == true
-        if !isAppAPI {
-            if !items.contains(where: { $0.name == "_t" }) {
-                items.append(URLQueryItem(name: "_t", value: "\(Int(Date().timeIntervalSince1970 * 1000))"))
-            }
-            if !items.contains(where: { $0.name == "_r" }) {
-                items.append(URLQueryItem(name: "_r", value: UUID().uuidString))
-            }
-        }
-        var components = URLComponents(
-            url: baseURL.appending(path: path),
-            resolvingAgainstBaseURL: false
-        )!
-        components.queryItems = items
-        guard let url = components.url else {
-            throw BilibiliAPIError.invalidURL
-        }
-        var request = URLRequest(url: url)
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.setValue("https://www.bilibili.com", forHTTPHeaderField: "Referer")
-        request.setValue(DeviceInfo.shared.userAgent, forHTTPHeaderField: "User-Agent")
-        if let cookie = await currentCookieHeader() {
-            request.setValue(cookie, forHTTPHeaderField: "Cookie")
-        }
+        var request = try await buildSignedRequest(
+            baseURL: baseURL,
+            path: path,
+            queryItems: queryItems,
+            signWithWBI: signWithWBI,
+            referer: "https://www.bilibili.com"
+        )
         let initial = try await session.data(for: request)
         let resolved: (Data, URLResponse)
-        if let initialStatus = (initial.1 as? HTTPURLResponse)?.statusCode,
-           initialStatus == 412 || initialStatus == 429 {
+        let initialStatus = (initial.1 as? HTTPURLResponse)?.statusCode
+        let initialCode: Int? = initialStatus == 200 ? Self.envelopeCode(of: initial.0) : nil
+        if let initialStatus, initialStatus == 412 || initialStatus == 429 {
             try await Task.sleep(for: .milliseconds(1_200))
+            resolved = try await session.data(for: request)
+        } else if signWithWBI, let initialCode,
+                  initialCode == -403 || initialCode == -352 || initialCode == -101 {
+            await wbiSigner.invalidate()
+            request = try await buildSignedRequest(
+                baseURL: baseURL,
+                path: path,
+                queryItems: queryItems,
+                signWithWBI: true,
+                referer: "https://www.bilibili.com"
+            )
             resolved = try await session.data(for: request)
         } else {
             resolved = initial
@@ -1022,6 +1030,10 @@ final class BilibiliAPIClient: @unchecked Sendable {
         guard let http = response as? HTTPURLResponse,
               (200..<300).contains(http.statusCode) else {
             throw BilibiliAPIError.http
+        }
+        if let code = Self.envelopeCode(of: data), code != 0,
+           let envelope = try? JSONDecoder().decode(APIResponse<EmptyPayload>.self, from: data) {
+            try envelope.requireOK()
         }
         return data
     }
@@ -1854,35 +1866,16 @@ final class BilibiliAPIClient: @unchecked Sendable {
         return (following: data.following, follower: data.follower)
     }
 
-    /// Fetch the total number of dynamic posts for a user.
-    ///
-    /// B 站 retired the `/x/space/nav/num` endpoint at some
-    /// point in 2026 — it now answers 404 for arbitrary `mid`s.
-    /// We surface that as a silent zero rather than propagating
-    /// an error, so the profile card renders with a "—"
-    /// placeholder instead of an "加载失败" toast.  The
-    /// `SpaceNavNumPayload` decoder still works for any
-    /// upstream that DOES answer (the helper is left in place
-    /// for that path).
+    /// Fetch the total number of dynamic posts for a user from the
+    /// current profile-page count endpoint.
     func userDynamicCount(mid: Int64) async throws -> Int {
-        do {
-            let payload: APIResponse<SpaceNavNumPayload> = try await get(
-                baseURL: baseURL,
-                path: "/x/space/nav/num",
-                queryItems: [URLQueryItem(name: "mid", value: "\(mid)")]
-            )
-            try payload.requireOK()
-            return payload.value?.dynamicCount ?? 0
-        } catch BilibiliAPIError.http {
-            // /x/space/nav/num is retired upstream — don't
-            // break the profile card for that.  Other
-            // BilibiliAPIError cases (api, missingData,
-            // sessionExpired) still propagate so the user
-            // actually sees a login prompt when their cookie
-            // is dead.
-            bpLog("/x/space/nav/num retired upstream; falling back to 0")
-            return 0
-        }
+        let payload: APIResponse<SpaceNavNumPayload> = try await get(
+            baseURL: baseURL,
+            path: "/x/space/navnum",
+            queryItems: [URLQueryItem(name: "mid", value: "\(mid)")]
+        )
+        try payload.requireOK()
+        return payload.value?.dynamicCount ?? 0
     }
 
     /// Fetch a user's public profile card (avatar, name, signature,
@@ -1901,26 +1894,20 @@ final class BilibiliAPIClient: @unchecked Sendable {
         return card
     }
 
-    /// Look up whether the signed-in user is following `mid`. The
-    /// upstream endpoint `/x/relation` requires both `mid` (the
-    /// target) AND a `fid` (the signed-in user's own mid); when
-    /// either is missing the endpoint refuses with -101 and the
-    /// caller falls back to `.notRelated`. Anonymous / signed-out
-    /// callers always see `.notRelated` so the follow button
-    /// shows "关注" instead of "已关注" without a confusing
-    /// flicker.
+    /// Look up whether the signed-in user is following `mid` through
+    /// the same WBI relation route used by the current profile page.
+    /// The response contains both directions; `be_relation` describes
+    /// the current viewer's relationship to the target account.
     func userRelation(target mid: Int64, selfMid: Int64) async throws -> BiliRelation {
         guard mid > 0, selfMid > 0, selfMid != mid else { return .notRelated }
-        let payload: APIResponse<RelationAttributePayload> = try await get(
+        let payload: APIResponse<SpaceRelationPayload> = try await get(
             baseURL: baseURL,
-            path: "/x/relation",
-            queryItems: [
-                URLQueryItem(name: "fid", value: "\(mid)"),
-                URLQueryItem(name: "mid", value: "\(selfMid)")
-            ]
+            path: "/x/space/wbi/acc/relation",
+            queryItems: [URLQueryItem(name: "mid", value: "\(mid)")],
+            signWithWBI: true
         )
         try payload.requireOK()
-        return BiliRelation(attribute: payload.value?.attribute ?? 0)
+        return BiliRelation(attribute: payload.value?.beRelation?.attribute ?? 0)
     }
 
     /// Follow (`act=1`), unfollow (`act=2`), or silently follow
@@ -4949,6 +4936,16 @@ private struct RelationAttributePayload: Decodable, Sendable {
     let attribute: Int
 }
 
+/// Response of `/x/space/wbi/acc/relation`. `be_relation` is the
+/// viewer's relationship to the profile being viewed.
+private struct SpaceRelationPayload: Decodable, Sendable {
+    let beRelation: RelationAttributePayload?
+
+    enum CodingKeys: String, CodingKey {
+        case beRelation = "be_relation"
+    }
+}
+
 /// Payload of `/x/relation/modify`. The endpoint returns
 /// `{ code: 0, message: "0", data: { ... } }` on success; on
 /// failure `code` is the bilibili error code (e.g. -101 for
@@ -4962,8 +4959,9 @@ private struct ModifyRelationPayload: Decodable, Sendable {
 private struct SpaceNavNumPayload: Decodable, Sendable {
     let dynamicCount: Int
 
-    enum CodingKeys: String, CodingKey {
-        case dynamicCount = "dynamic_count"
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DynamicKey.self)
+        dynamicCount = container.decodeInt(keys: ["opus", "upos", "dynamic_count"]) ?? 0
     }
 }
 
@@ -5398,120 +5396,135 @@ private struct LyricAuthorDTO: Decodable, Sendable {
     let name: String?
 }
 
-// MARK: - Danmaku XML parser
+// MARK: - Danmaku protobuf decoder
 
-private final class BiliDanmakuXMLParser: NSObject, XMLParserDelegate {
-    private var items: [BiliDanmakuItem] = []
-    private var currentAttributes: String?
-    private var currentText = ""
-    private var ordinal = 0
-
-    static func parse(data: Data) -> [BiliDanmakuItem] {
-        let delegate = BiliDanmakuXMLParser()
-        let parser = XMLParser(data: data)
-        parser.delegate = delegate
-        guard parser.parse() else {
-            bpLog("Danmaku XML parse failed: \(parser.parserError?.localizedDescription ?? "unknown error")")
-            return []
-        }
-        return delegate.items.sorted { $0.time < $1.time }
+/// Minimal wire-format reader for `DmSegMobileReply` and its
+/// `DanmakuElem` children. Keeping this local avoids adding a large
+/// generated protobuf runtime for the handful of fields the overlay uses.
+private enum BiliDanmakuProtobufDecoder {
+    private enum DecodeError: Error {
+        case malformed
     }
 
-    func parser(
-        _ parser: XMLParser,
-        didStartElement elementName: String,
-        namespaceURI: String?,
-        qualifiedName qName: String?,
-        attributes attributeDict: [String: String] = [:]
-    ) {
-        guard elementName == "d" else { return }
-        currentAttributes = attributeDict["p"]
-        currentText = ""
+    static func parse(_ data: Data) throws -> [BiliDanmakuItem] {
+        var reader = Reader(bytes: Array(data))
+        var items: [BiliDanmakuItem] = []
+        while !reader.isAtEnd {
+            let key = try reader.readVarint()
+            let field = Int(key >> 3)
+            let wireType = Int(key & 0x7)
+            guard field > 0 else { throw DecodeError.malformed }
+
+            if field == 1, wireType == 2 {
+                let bytes = try reader.readLengthDelimited()
+                if let item = try parseElement(bytes, ordinal: items.count) {
+                    items.append(item)
+                }
+            } else {
+                try reader.skip(wireType: wireType)
+            }
+        }
+        return items.sorted { $0.time < $1.time }
     }
 
-    func parser(_ parser: XMLParser, foundCharacters string: String) {
-        guard currentAttributes != nil else { return }
-        currentText += string
-    }
+    private static func parseElement(_ bytes: [UInt8], ordinal: Int) throws -> BiliDanmakuItem? {
+        var reader = Reader(bytes: bytes)
+        var id: UInt64 = 0
+        var progress: UInt64 = 0
+        var mode = 0
+        var fontSize = 0
+        var color: UInt64 = 0
+        var text = ""
 
-    func parser(
-        _ parser: XMLParser,
-        didEndElement elementName: String,
-        namespaceURI: String?,
-        qualifiedName qName: String?
-    ) {
-        guard elementName == "d", let attributes = currentAttributes else { return }
-        defer {
-            currentAttributes = nil
-            currentText = ""
+        while !reader.isAtEnd {
+            let key = try reader.readVarint()
+            let field = Int(key >> 3)
+            let wireType = Int(key & 0x7)
+            guard field > 0 else { throw DecodeError.malformed }
+
+            switch (field, wireType) {
+            case (1, 0): id = try reader.readVarint()
+            case (2, 0): progress = try reader.readVarint()
+            case (3, 0): mode = Int(truncatingIfNeeded: try reader.readVarint())
+            case (4, 0): fontSize = Int(truncatingIfNeeded: try reader.readVarint())
+            case (5, 0): color = try reader.readVarint()
+            case (7, 2):
+                let content = try reader.readLengthDelimited()
+                if let decoded = String(bytes: content, encoding: .utf8) {
+                    text = decoded
+                }
+            default:
+                try reader.skip(wireType: wireType)
+            }
         }
 
-        let fields = attributes.split(separator: ",", omittingEmptySubsequences: false)
-        guard fields.count >= 4,
-              let time = Double(fields[0]),
-              let mode = Int(fields[1]),
-              let fontSize = Int(fields[2]),
-              let color = Int(fields[3]) else {
-            return
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
         }
-        let text = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
-        items.append(BiliDanmakuItem(
-            id: ordinal,
-            time: time,
+        let parsedID = Int(truncatingIfNeeded: id)
+        return BiliDanmakuItem(
+            id: parsedID > 0 ? parsedID : ordinal,
+            time: Double(progress) / 1_000,
             mode: mode,
             fontSize: fontSize,
-            color: color,
+            color: Int(truncatingIfNeeded: color),
             text: text
-        ))
-        ordinal += 1
+        )
     }
-}
 
-private extension Data {
-    func biliDanmakuInflatedIfNeeded() -> Data {
-        if looksLikeXML { return self }
+    private struct Reader {
+        let bytes: [UInt8]
+        var offset = 0
 
-        var capacity = Swift.max(count * 8, 64 * 1024)
-        for _ in 0..<4 {
-            var output = Data(count: capacity)
-            let decodedCount = output.withUnsafeMutableBytes { outputBuffer in
-                withUnsafeBytes { inputBuffer in
-                    guard let outputBase = outputBuffer.bindMemory(to: UInt8.self).baseAddress,
-                          let inputBase = inputBuffer.bindMemory(to: UInt8.self).baseAddress else {
-                        return 0
-                    }
-                    return compression_decode_buffer(
-                        outputBase,
-                        capacity,
-                        inputBase,
-                        count,
-                        nil,
-                        COMPRESSION_ZLIB
-                    )
-                }
+        var isAtEnd: Bool { offset == bytes.count }
+
+        mutating func readVarint() throws -> UInt64 {
+            var value: UInt64 = 0
+            for index in 0..<10 {
+                guard offset < bytes.count else { throw DecodeError.malformed }
+                let byte = bytes[offset]
+                offset += 1
+                let payload = UInt64(byte & 0x7f)
+                if index == 9, payload > 1 { throw DecodeError.malformed }
+                value |= payload << UInt64(index * 7)
+                if byte & 0x80 == 0 { return value }
             }
-            if decodedCount > 0 {
-                output.removeSubrange(decodedCount..<output.count)
-                return output
-            }
-            capacity *= 2
+            throw DecodeError.malformed
         }
 
-        return self
-    }
+        mutating func readLengthDelimited() throws -> [UInt8] {
+            let length = try readVarint()
+            guard length <= UInt64(bytes.count - offset) else {
+                throw DecodeError.malformed
+            }
+            let end = offset + Int(length)
+            let result = Array(bytes[offset..<end])
+            offset = end
+            return result
+        }
 
-    private var looksLikeXML: Bool {
-        guard let first = firstNonWhitespaceByte else { return false }
-        return first == 60
-    }
+        mutating func skip(wireType: Int) throws {
+            switch wireType {
+            case 0:
+                _ = try readVarint()
+            case 1:
+                try skipBytes(8)
+            case 2:
+                let length = try readVarint()
+                guard length <= UInt64(bytes.count - offset) else {
+                    throw DecodeError.malformed
+                }
+                offset += Int(length)
+            case 5:
+                try skipBytes(4)
+            default:
+                throw DecodeError.malformed
+            }
+        }
 
-    private var firstNonWhitespaceByte: UInt8? {
-        first { byte in
-            byte != 32 &&
-            byte != 10 &&
-            byte != 13 &&
-            byte != 9
+        mutating func skipBytes(_ count: Int) throws {
+            guard count <= bytes.count - offset else { throw DecodeError.malformed }
+            offset += count
         }
     }
 }

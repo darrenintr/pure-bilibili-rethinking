@@ -378,28 +378,30 @@ extension BangumiDay {
     }
 }
 
-/// Relation between the signed-in user and another UP. Mirrors
-/// Bilibili's `/x/relation` `attribute` field — `1` is followed,
-/// `2` is the special "悄悄关注" (silent follow) state, `6` is
-/// blocked. Anything else (including the unsigned-in case, where
-/// the endpoint refuses to answer) collapses to `.notRelated`
-/// so the ViewModel can decide whether to show a "Follow" CTA
-/// or skip the button entirely.
+/// Relation between the signed-in user and another UP. The current
+/// WBI profile relation route reports `2` for followed, `6` for mutual
+/// follow, and `128` for blocked. The legacy `1` followed value is also
+/// accepted for cached/older response shapes.
 enum BiliRelation: Int, Codable, Hashable, Sendable {
     case notRelated = 0
-    case followed = 1
-    case silentFollow = 2
-    case blocked = 6
+    case followed = 2
+    case mutualFollow = 6
+    case blocked = 128
 
     init(attribute: Int) {
-        self = BiliRelation(rawValue: attribute) ?? .notRelated
+        switch attribute {
+        case 1, 2: self = .followed
+        case 6: self = .mutualFollow
+        case 128: self = .blocked
+        default: self = .notRelated
+        }
     }
 
     /// `true` when the user is already following this UP in any
     /// capacity. The follow button shows the inverse action
     /// ("已关注" / "取消关注") and a different icon based on this.
     var isFollowing: Bool {
-        self == .followed || self == .silentFollow
+        self == .followed || self == .mutualFollow
     }
 }
 
@@ -1386,9 +1388,8 @@ struct BiliLyricInfo: Hashable, Codable, Sendable {
 
 // MARK: - Video Danmaku
 
-/// One timed danmaku entry from `https://comment.bilibili.com/{cid}.xml`.
-/// The first field in `p` is the start time in seconds; the second is
-/// Bilibili's display mode (`1` scrolling, `4` bottom, `5` top, etc.).
+/// One timed danmaku entry decoded from Bilibili's segmented protobuf
+/// player API. `time` is seconds from the start of the video.
 struct BiliDanmakuItem: Hashable, Codable, Identifiable, Sendable {
     let id: Int
     let time: Double

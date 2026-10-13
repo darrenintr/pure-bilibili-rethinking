@@ -275,17 +275,20 @@ final class PaladalaRepository: ObservableObject, @unchecked Sendable {
         return BiliLyricParser.parse(text: text, language: info.lanDoc.isEmpty ? info.lan : info.lanDoc)
     }
 
-    /// Fetch historical danmaku for the video's `cid`. Failures are handled
+    /// Fetch segmented player danmaku for the video. Failures are handled
     /// by the caller as non-fatal timed-text absence; playback should not
     /// fail just because comments cannot be loaded.
     func videoDanmaku(for video: BiliVideo) async throws -> [BiliDanmakuItem] {
-        var cid = video.cid
-        if cid <= 0 {
-            let detail = try await apiClient.videoDetail(bvid: video.bvid, aid: video.aid)
-            cid = detail.cid
+        var resolvedVideo = video
+        if resolvedVideo.cid <= 0 {
+            resolvedVideo = try await apiClient.videoDetail(bvid: video.bvid, aid: video.aid)
         }
-        guard cid > 0 else { return [] }
-        return try await apiClient.danmaku(cid: cid)
+        guard resolvedVideo.cid > 0 else { return [] }
+        return try await apiClient.danmaku(
+            cid: resolvedVideo.cid,
+            aid: resolvedVideo.aid,
+            duration: resolvedVideo.duration
+        )
     }
 
     /// Resolve the playable stream URLs for a live room. The result
@@ -539,8 +542,8 @@ final class PaladalaRepository: ObservableObject, @unchecked Sendable {
     /// Returns a tuple of strings formatted for the profile stat pills.
     func userStats(mid: Int64) async throws -> (following: String, follower: String, dynamic: String) {
         // Fetch independently so one flaky public endpoint does
-        // not blank the whole stats row. In practice
-        // `/x/space/nav/num` is more brittle than relation
+        // not blank the whole stats row. In practice the post
+        // count can be more brittle than relation
         // stats, so preserving 粉丝 / 关注 is better than
         // failing the combined tuple.
         async let relationResult = try? await apiClient.userRelationStat(mid: mid)
@@ -594,11 +597,9 @@ final class PaladalaRepository: ObservableObject, @unchecked Sendable {
     }
 
     /// Check whether the signed-in user follows `mid`. The
-    /// `selfMid` parameter exists because Bilibili's `/x/relation`
-    /// endpoint requires the signed-in user's own mid; signed-
-    /// out callers always see `.notRelated` so the follow
-    /// button shows "关注" instead of an inconsistent
-    /// "已关注" state.
+    /// `selfMid` guard prevents a self-profile lookup; signed-
+    /// out callers always see `.notRelated` so the follow button
+    /// shows "关注" instead of an inconsistent "已关注" state.
     func userRelation(target mid: Int64, selfMid: Int64) async throws -> BiliRelation {
         try await apiClient.userRelation(target: mid, selfMid: selfMid)
     }
