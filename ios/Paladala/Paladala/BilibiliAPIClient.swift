@@ -3389,6 +3389,9 @@ struct VideoDTO: Decodable, Sendable {
     let viewCount: Int
     let danmakuCount: Int
     let likeCount: Int
+    let favoriteCount: Int?
+    let coinCount: Int?
+    let shareCount: Int?
     /// Reply / comment count from the upstream `stat` block.
     /// Bilibili feeds (`/x/web-interface/index/feed`, recommend
     /// cards) and search results all return `stat` as a nested
@@ -3424,6 +3427,9 @@ struct VideoDTO: Decodable, Sendable {
             danmakuCount: danmakuCount,
             likeCount: likeCount,
             replyCount: replyCount,
+            favoriteCount: favoriteCount,
+            coinCount: coinCount,
+            shareCount: shareCount,
             publishDate: publishDate,
             description: description,
             ownerMid: ownerMid
@@ -3468,6 +3474,9 @@ struct VideoDTO: Decodable, Sendable {
         viewCount = stat?.decodeInt(keys: ["view", "view_count"]) ?? container.decodeInt(keys: ["play"]) ?? 0
         danmakuCount = stat?.decodeInt(keys: ["danmaku"]) ?? container.decodeInt(keys: ["danmaku"]) ?? 0
         likeCount = stat?.decodeInt(keys: ["like"]) ?? 0
+        favoriteCount = stat?.decodeInt(keys: ["favorite", "collect"])
+        coinCount = stat?.decodeInt(keys: ["coin"])
+        shareCount = stat?.decodeInt(keys: ["share"])
         // `stat.reply` is the comment count.  Bilibili writes it
         // on every `/x/web-interface/view` and most feed shapes
         // but a few (search result previews) only surface
@@ -4730,6 +4739,10 @@ private struct DynamicCardDTO: Decodable, Sendable {
                 viewCount: stat?.decodeInt(keys: ["play", "view"]) ?? 0,
                 danmakuCount: stat?.decodeInt(keys: ["danmaku"]) ?? 0,
                 likeCount: stat?.decodeInt(keys: ["like"]) ?? 0,
+                replyCount: stat?.decodeInt(keys: ["reply", "video_review"]) ?? 0,
+                favoriteCount: stat?.decodeInt(keys: ["favorite", "collect"]),
+                coinCount: stat?.decodeInt(keys: ["coin"]),
+                shareCount: stat?.decodeInt(keys: ["share"]),
                 description: descText,
                 ownerMid: 0
             )
@@ -4831,6 +4844,10 @@ private struct HistoryItemDTO: Decodable, Sendable {
             viewCount: stat?.view ?? 0,
             danmakuCount: stat?.danmaku ?? 0,
             likeCount: stat?.like ?? 0,
+            replyCount: stat?.reply ?? 0,
+            favoriteCount: stat?.favorite,
+            coinCount: stat?.coin,
+            shareCount: stat?.share,
             description: "",
             ownerMid: 0
         )
@@ -5044,6 +5061,10 @@ private struct FavoriteMediaDTO: Decodable, Sendable {
             viewCount: stat?.view ?? 0,
             danmakuCount: stat?.danmaku ?? 0,
             likeCount: stat?.like ?? 0,
+            replyCount: stat?.reply ?? 0,
+            favoriteCount: stat?.favorite,
+            coinCount: stat?.coin,
+            shareCount: stat?.share,
             description: "",
             ownerMid: 0
         )
@@ -5065,7 +5086,11 @@ private struct FavoriteMediaDTO: Decodable, Sendable {
             VideoStatsDTO(
                 view: nested.decodeInt(keys: ["play"]) ?? 0,
                 danmaku: nested.decodeInt(keys: ["danmaku"]) ?? 0,
-                like: nested.decodeInt(keys: ["collect"]) ?? 0
+                like: nested.decodeInt(keys: ["like"]) ?? 0,
+                favorite: nested.decodeInt(keys: ["collect", "favorite"]),
+                coin: nested.decodeInt(keys: ["coin"]),
+                share: nested.decodeInt(keys: ["share"]),
+                reply: nested.decodeInt(keys: ["reply", "video_review"]) ?? 0
             )
         }
         let ugc = try? container.nestedContainer(keyedBy: DynamicKey.self, forKey: DynamicKey("ugc"))
@@ -5099,6 +5124,10 @@ private struct WatchLaterItemDTO: Decodable, Sendable {
             viewCount: stat?.view ?? 0,
             danmakuCount: stat?.danmaku ?? 0,
             likeCount: stat?.like ?? 0,
+            replyCount: stat?.reply ?? 0,
+            favoriteCount: stat?.favorite,
+            coinCount: stat?.coin,
+            shareCount: stat?.share,
             description: "",
             ownerMid: 0
         )
@@ -5122,18 +5151,38 @@ private struct VideoStatsDTO: Decodable, Sendable {
     let view: Int
     let danmaku: Int
     let like: Int
+    let favorite: Int?
+    let coin: Int?
+    let share: Int?
+    let reply: Int
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicKey.self)
         view = container.decodeInt(keys: ["view", "play"]) ?? 0
         danmaku = container.decodeInt(keys: ["danmaku"]) ?? 0
-        like = container.decodeInt(keys: ["like", "favorite", "collect"]) ?? 0
+        like = container.decodeInt(keys: ["like"]) ?? 0
+        favorite = container.decodeInt(keys: ["favorite", "collect"])
+        coin = container.decodeInt(keys: ["coin"])
+        share = container.decodeInt(keys: ["share"])
+        reply = container.decodeInt(keys: ["reply", "video_review"]) ?? 0
     }
 
-    init(view: Int, danmaku: Int, like: Int) {
+    init(
+        view: Int,
+        danmaku: Int,
+        like: Int,
+        favorite: Int? = nil,
+        coin: Int? = nil,
+        share: Int? = nil,
+        reply: Int = 0
+    ) {
         self.view = view
         self.danmaku = danmaku
         self.like = like
+        self.favorite = favorite
+        self.coin = coin
+        self.share = share
+        self.reply = reply
     }
 }
 

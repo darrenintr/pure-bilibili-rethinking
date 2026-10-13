@@ -88,6 +88,11 @@ struct BiliVideo: Identifiable, Hashable, Codable, Sendable {
     /// from sources that don't surface `stat.reply` (search
     /// results, dynamic-feed archive rows) still render.
     var replyCount: Int = 0
+    /// Action counters from Bilibili's `stat` block. Optional so
+    /// feeds that omit a counter don't display a misleading zero.
+    var favoriteCount: Int? = nil
+    var coinCount: Int? = nil
+    var shareCount: Int? = nil
     /// Publish date / time. Bilibili's `pubdate` field is a
     /// Unix timestamp in seconds; we decode it as `Date?` and
     /// render it on the card as a relative age

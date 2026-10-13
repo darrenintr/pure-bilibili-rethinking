@@ -116,6 +116,8 @@ docs/*
 !docs/wiki/
 !docs/wiki/*.md
 !docs/superpowers/
+!docs/research/
+!docs/research/2026-10-13-bilibili-web-behavior.md
 !docs/superpowers/specs/*.md
 !docs/superpowers/plans/*.md
 !docs/portal/

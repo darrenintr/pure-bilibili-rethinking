@@ -869,21 +869,44 @@ struct VideoDetailView: View {
                 .textCase(.uppercase)
                 .tracking(-0.6)
                 .fixedSize(horizontal: false, vertical: true)
-            // B站-style 4-pill stats bar: 播放 / 彈幕 / 評論 / 時長.
+            // Consumption metrics: 播放 / 彈幕 / 評論 / 時長.
             // 評論 is the *comment* count (`replyCount`), distinct
             // from 彈幕 (danmaku).  Previously the second pill was
             // danmaku with a filled chat-bubble icon, which the
             // user read as "comments" and expected the COMMENTS
             // section below to show that many rows.  Adding the
             // dedicated 評論 pill makes the mapping unambiguous.
-            // The hand.thumbsup pill was dropped to make room —
-            // likes already appear in the player chrome, and
-            // a 4-pill bar is what B站 uses.
+            // Likes and other engagement counters are shown in a
+            // separate row below.
             HStack(spacing: 8) {
                 MetricPill(systemImage: "play.fill", text: model.detail.viewCount.compactCount)
                 MetricPill(systemImage: "text.bubble", text: model.detail.danmakuCount.compactCount)
                 MetricPill(systemImage: "text.bubble.fill", text: model.detail.replyCount.compactCount)
                 MetricPill(systemImage: "clock.fill", text: model.detail.duration.mmss)
+            }
+            if model.detail.likeCount > 0
+                || model.detail.coinCount != nil
+                || model.detail.favoriteCount != nil
+                || model.detail.shareCount != nil {
+                // Keep action totals separate from views, danmaku,
+                // and comments. Optional counters are omitted when
+                // the response shape did not supply them.
+                HStack(spacing: 8) {
+                    MetricPill(systemImage: "hand.thumbsup", text: model.detail.likeCount.compactCount)
+                        .accessibilityLabel("點讚 \(model.detail.likeCount.compactCount)")
+                    if let coinCount = model.detail.coinCount {
+                        MetricPill(systemImage: "bitcoinsign.circle", text: coinCount.compactCount)
+                            .accessibilityLabel("投幣 \(coinCount.compactCount)")
+                    }
+                    if let favoriteCount = model.detail.favoriteCount {
+                        MetricPill(systemImage: "bookmark", text: favoriteCount.compactCount)
+                            .accessibilityLabel("收藏 \(favoriteCount.compactCount)")
+                    }
+                    if let shareCount = model.detail.shareCount {
+                        MetricPill(systemImage: "square.and.arrow.up", text: shareCount.compactCount)
+                            .accessibilityLabel("分享 \(shareCount.compactCount)")
+                    }
+                }
             }
             if let error = model.errorMessage {
                 VStack(alignment: .leading, spacing: 8) {
