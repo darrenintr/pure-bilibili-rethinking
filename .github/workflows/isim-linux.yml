@@ -51,6 +51,26 @@ jobs:
           cp ios/Paladala/Config/Opspad.Debug.xcconfig ios/Paladala/Config/Opspad.Release.xcconfig
           mkdir -p build/isim/reports
 
+      - name: Exclude unsupported Live Activity extension from Linux-only build
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Modify only this runner's checkout; do not change the iOS device project in Git.
+          python3 - <<'PY'
+          from pathlib import Path
+          project = Path("ios/Paladala/Paladala.xcodeproj/project.pbxproj")
+          contents = project.read_text()
+          for entry in (
+              "10000000000000000000047F /* Embed PlugIns */,",
+              "100000000000000000000480 /* PBXTargetDependency */,",
+          ):
+              if contents.count(entry) != 1:
+                  raise SystemExit(f"Unexpected Xcode project structure for {entry}: {contents.count(entry)}")
+              contents = contents.replace(entry, "", 1)
+          project.write_text(contents)
+          print("iSim Linux build: app only; Live Activity widget is excluded")
+          PY
+
       - name: Build Paladala with iSim SDK (x86_64 simulator)
         id: build
         shell: bash
