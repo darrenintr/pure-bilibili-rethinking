@@ -48,7 +48,7 @@ extension FileManager {
 
 // iSim 0.24 does not expose AVPlayerItem's error-log API. The app uses
 // it for supplementary diagnostics; playback error/status handling remains.
-private struct IsimAVPlayerItemErrorLogEvent {
+struct IsimAVPlayerItemErrorLogEvent {
     let errorStatusCode: Int = 0
     let errorDomain: String = ""
     let errorComment: String? = nil
@@ -56,9 +56,9 @@ private struct IsimAVPlayerItemErrorLogEvent {
     let serverAddress: String? = nil
     let playbackSessionID: String? = nil
 }
-private struct IsimAVPlayerItemErrorLog {
+struct IsimAVPlayerItemErrorLog {
     let events: [IsimAVPlayerItemErrorLogEvent] = []
 }
 extension AVPlayerItem {
-    fileprivate func errorLog() -> IsimAVPlayerItemErrorLog? { nil }
+    func errorLog() -> IsimAVPlayerItemErrorLog? { nil }
 }
