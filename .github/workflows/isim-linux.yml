@@ -1,0 +1,182 @@
+name: iSim Linux simulator build (experimental)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [working]
+    paths:
+      - 'ios/**'
+      - '.github/workflows/isim-linux.yml'
+      - 'scripts/isim/**'
+
+permissions:
+  contents: read
+
+jobs:
+  isim:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      PATH: /home/runner/.local/bin:/usr/lib/llvm-21/bin:/usr/local/bin:/usr/bin:/bin
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux prerequisites and LLVM 21
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-venv curl ca-certificates gnupg             fontconfig fonts-noto-cjk adwaita-icon-theme xvfb xauth file unzip
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/llvm-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main" | sudo tee /etc/apt/sources.list.d/llvm-21.list
+          sudo apt-get update
+          sudo apt-get install -y clang-21 lld-21 llvm-21
+          clang-21 --version
+          llvm-objdump-21 --version | head -n 2
+          docker version
+
+      - name: Install upstream iSim
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/kolabs-dev/isim/main/install.sh -o /tmp/isim-install.sh
+          bash /tmp/isim-install.sh --no-desktop
+          isim version
+          # iSim v0.24.0's release tarball omits a Python helper referenced by
+          # isim-build.py. Restore only that missing file from the SAME tag.
+          isim_bin="$HOME/.local/lib/isim/current/bin"
+          if [ ! -f "$isim_bin/isim-privacy.py" ]; then
+            version="$(basename "$(readlink -f "$HOME/.local/lib/isim/current")")"
+            curl -fsSL "https://raw.githubusercontent.com/kolabs-dev/isim/v${version}/isim/tools/isim-privacy.py" \
+              -o "$isim_bin/isim-privacy.py"
+            python3 -m py_compile "$isim_bin/isim-privacy.py"
+          fi
+
+      - name: Prepare non-secret local configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ios/Paladala/Config
+          printf 'OPSPAD_API_KEY =\nOPSPAD_HMAC_SECRET =\n' > ios/Paladala/Config/Opspad.Debug.xcconfig
+          cp ios/Paladala/Config/Opspad.Debug.xcconfig ios/Paladala/Config/Opspad.Release.xcconfig
+          mkdir -p build/isim/reports
+
+      - name: Exclude unsupported Live Activity extension from Linux-only build
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Modify only this runner's checkout; do not change the iOS device project in Git.
+          python3 - <<'PY'
+          from pathlib import Path
+          project = Path("ios/Paladala/Paladala.xcodeproj/project.pbxproj")
+          contents = project.read_text()
+          for entry in (
+              "10000000000000000000047F /* Embed PlugIns */,",
+              "100000000000000000000480 /* PBXTargetDependency */,",
+          ):
+              if contents.count(entry) != 1:
+                  raise SystemExit(f"Unexpected Xcode project structure for {entry}: {contents.count(entry)}")
+              contents = contents.replace(entry, "", 1)
+          project.write_text(contents)
+          # The iSim SwiftUI overlays use actor-isolated APIs while the local
+          # DesignSystem package defaults to Swift 6 strict concurrency.
+          # Use Swift 5 language mode only in this CI checkout.
+          package = Path("ios/Paladala/Packages/DesignSystem/Package.swift")
+          manifest = package.read_text()
+          if not manifest.startswith("// swift-tools-version: 6.0"):
+              raise SystemExit("Unexpected DesignSystem Package.swift tools version")
+          # Keep PackageDescription 6: .iOS(.v18) is unavailable to 5.9 manifests.
+          # Only select Swift 5 language semantics for the local package.
+          tail = "    ]\n)\n"
+          if manifest.count(tail) != 1:
+              raise SystemExit("Unexpected DesignSystem Package.swift structure")
+          manifest = manifest.replace(tail, "    ],\n    swiftLanguageModes: [.v5]\n)\n", 1)
+          package.write_text(manifest)
+          print("iSim Linux build: app only; widget excluded; DesignSystem uses Swift 5 mode")
+          PY
+
+      - name: Apply iSim SDK compatibility adapters (CI checkout only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/isim/prepare.py
+
+      - name: Build Paladala with iSim SDK (x86_64 simulator)
+        id: build
+        shell: bash
+        run: |
+          set -uo pipefail
+          set +e
+          isim build -project ios/Paladala/Paladala.xcodeproj \
+            -scheme Paladala -configuration Debug -o build/isim/products \
+            SWIFT_VERSION=5.0 SWIFT_ENABLE_BARE_SLASH_REGEX=YES \
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS=ISIM \
+            2>&1 | tee build/isim/reports/build.log
+          code=${PIPESTATUS[0]}
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::iSim could not compile this Xcode project. See build.log for missing frameworks, Swift APIs or build-system limitations."
+            exit "$code"
+          fi
+
+      - name: Verify actual simulator Mach-O, not an iPhone IPA
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$(find build/isim/products -type d -name Paladala.app -print -quit)"
+          test -n "$app" || { echo "::error::No Paladala.app output"; exit 1; }
+          test -f "$app/Paladala" || { echo "::error::Missing executable"; exit 1; }
+          file "$app/Paladala" | tee build/isim/reports/architecture.txt
+          llvm-objdump-21 --macho --private-headers "$app/Paladala" \
+            | tee build/isim/reports/macho.txt
+          grep -q 'x86_64' build/isim/reports/architecture.txt || {
+            echo "::error::Not an x86_64 simulator executable"; exit 1;
+          }
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path("build/isim/reports/macho.txt").read_text()
+          import re
+          if not re.search(r"cmd LC_BUILD_VERSION\s+cmdsize \d+\s+platform (?:7|IOSSIMULATOR)", s, re.I):
+              raise SystemExit("Missing LC_BUILD_VERSION platform 7 (iOS Simulator)")
+          PY
+          printf '%s\n' "$app" > build/isim/reports/app-path.txt
+          isim info "$app" 2>&1 | tee build/isim/reports/isim-info.txt
+
+      - name: Smoke-test launching in iSim (headless)
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$(cat build/isim/reports/app-path.txt)"
+          # Running through iSim is essential: copying .app into Applications is not proof it works.
+          timeout 120s xvfb-run -a isim run "$app" --headless \
+            --script "wait 4; shot build/isim/reports/launch.png; quit" \
+            2>&1 | tee build/isim/reports/runtime.log
+          test -s build/isim/reports/launch.png || {
+            echo "::error::No simulator screenshot was produced"; exit 1;
+          }
+          # The runtime currently exits 0 even when its guest segfaults after
+          # a scripted quit; an image alone does not establish app stability.
+          if grep -Eiq 'guest crashed|Segmentation fault|crash report written' build/isim/reports/runtime.log; then
+            echo "::error::The app or iSim runtime crashed; see runtime.log"
+            exit 1
+          fi
+
+      - name: Upload iSim diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paladala-isim-diagnostics
+          if-no-files-found: warn
+          path: build/isim/reports/
+          retention-days: 14
+
+      - name: Upload compiled iSim application (even if runtime smoke test fails)
+        if: always() && steps.verify.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Paladala-isim-x86_64-app
+          path: build/isim/products/**/Paladala.app/
+          if-no-files-found: error
+          retention-days: 14
