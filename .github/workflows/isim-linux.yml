@@ -1,0 +1,123 @@
+name: iSim Linux simulator build (experimental)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [working]
+    paths:
+      - 'ios/**'
+      - '.github/workflows/isim-linux.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  isim:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      PATH: /home/runner/.local/bin:/usr/lib/llvm-21/bin:/usr/local/bin:/usr/bin:/bin
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux prerequisites and LLVM 21
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-venv curl ca-certificates gnupg             fontconfig adwaita-icon-theme xvfb xauth file unzip
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/llvm-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main" | sudo tee /etc/apt/sources.list.d/llvm-21.list
+          sudo apt-get update
+          sudo apt-get install -y clang-21 lld-21 llvm-21
+          clang-21 --version
+          llvm-objdump-21 --version | head -n 2
+          docker version
+
+      - name: Install upstream iSim
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/kolabs-dev/isim/main/install.sh -o /tmp/isim-install.sh
+          bash /tmp/isim-install.sh --no-desktop
+          isim version
+
+      - name: Prepare non-secret local configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ios/Paladala/Config
+          printf 'OPSPAD_API_KEY =\nOPSPAD_HMAC_SECRET =\n' > ios/Paladala/Config/Opspad.Debug.xcconfig
+          cp ios/Paladala/Config/Opspad.Debug.xcconfig ios/Paladala/Config/Opspad.Release.xcconfig
+          mkdir -p build/isim/reports
+
+      - name: Build Paladala with iSim SDK (x86_64 simulator)
+        id: build
+        shell: bash
+        run: |
+          set -uo pipefail
+          set +e
+          isim build -project ios/Paladala/Paladala.xcodeproj \
+            -scheme Paladala -configuration Debug -o build/isim/products \
+            2>&1 | tee build/isim/reports/build.log
+          code=${PIPESTATUS[0]}
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" -ne 0 ]; then
+            echo "::error::iSim could not compile this Xcode project. See build.log for missing frameworks, Swift APIs or build-system limitations."
+            exit "$code"
+          fi
+
+      - name: Verify actual simulator Mach-O, not an iPhone IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$(find build/isim/products -type d -name Paladala.app -print -quit)"
+          test -n "$app" || { echo "::error::No Paladala.app output"; exit 1; }
+          test -f "$app/Paladala" || { echo "::error::Missing executable"; exit 1; }
+          file "$app/Paladala" | tee build/isim/reports/architecture.txt
+          llvm-objdump-21 --macho --private-headers "$app/Paladala" \
+            | tee build/isim/reports/macho.txt
+          grep -q 'x86_64' build/isim/reports/architecture.txt || {
+            echo "::error::Not an x86_64 simulator executable"; exit 1;
+          }
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path("build/isim/reports/macho.txt").read_text()
+          import re
+          if not re.search(r"cmd LC_BUILD_VERSION\s+cmdsize \d+\s+platform (?:7|IOSSIMULATOR)", s, re.I):
+              raise SystemExit("Missing LC_BUILD_VERSION platform 7 (iOS Simulator)")
+          PY
+          printf '%s\n' "$app" > build/isim/reports/app-path.txt
+          isim info "$app" 2>&1 | tee build/isim/reports/isim-info.txt
+
+      - name: Smoke-test launching in iSim (headless)
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$(cat build/isim/reports/app-path.txt)"
+          # Running through iSim is essential: copying .app into Applications is not proof it works.
+          timeout 120s xvfb-run -a isim run "$app" --headless \
+            --script "wait 4; shot build/isim/reports/launch.png; quit" \
+            2>&1 | tee build/isim/reports/runtime.log
+          test -s build/isim/reports/launch.png || {
+            echo "::error::No simulator screenshot was produced"; exit 1;
+          }
+
+      - name: Upload iSim diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paladala-isim-diagnostics
+          if-no-files-found: warn
+          path: build/isim/reports/
+          retention-days: 14
+
+      - name: Upload verified iSim application
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Paladala-isim-x86_64-app
+          path: build/isim/products/**/Paladala.app/
+          if-no-files-found: error
+          retention-days: 14
