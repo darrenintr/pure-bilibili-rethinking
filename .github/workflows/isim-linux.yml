@@ -26,7 +26,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y python3 python3-venv curl ca-certificates gnupg             fontconfig adwaita-icon-theme xvfb xauth file unzip
+          sudo apt-get install -y python3 python3-venv curl ca-certificates gnupg             fontconfig fonts-noto-cjk adwaita-icon-theme xvfb xauth file unzip
           curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/llvm-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main" | sudo tee /etc/apt/sources.list.d/llvm-21.list
           sudo apt-get update
@@ -121,6 +121,7 @@ jobs:
           fi
 
       - name: Verify actual simulator Mach-O, not an iPhone IPA
+        id: verify
         shell: bash
         run: |
           set -euo pipefail
@@ -155,6 +156,12 @@ jobs:
           test -s build/isim/reports/launch.png || {
             echo "::error::No simulator screenshot was produced"; exit 1;
           }
+          # The runtime currently exits 0 even when its guest segfaults after
+          # a scripted quit; an image alone does not establish app stability.
+          if grep -Eiq 'guest crashed|Segmentation fault|crash report written' build/isim/reports/runtime.log; then
+            echo "::error::The app or iSim runtime crashed; see runtime.log"
+            exit 1
+          fi
 
       - name: Upload iSim diagnostics
         if: always()
@@ -165,8 +172,8 @@ jobs:
           path: build/isim/reports/
           retention-days: 14
 
-      - name: Upload verified iSim application
-        if: success()
+      - name: Upload compiled iSim application (even if runtime smoke test fails)
+        if: always() && steps.verify.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: Paladala-isim-x86_64-app
