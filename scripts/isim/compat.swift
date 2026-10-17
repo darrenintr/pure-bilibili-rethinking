@@ -5,6 +5,11 @@
 import Foundation
 import AVFoundation
 
+// iSim bundles are development builds, never App Store distributions.
+extension Bundle {
+    var appStoreReceiptURL: URL? { nil }
+}
+
 extension UserDefaults {
     func data(forKey key: String) -> Data? {
         object(forKey: key) as? Data
