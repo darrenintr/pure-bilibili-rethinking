@@ -7,6 +7,7 @@ on:
     paths:
       - 'ios/**'
       - '.github/workflows/isim-linux.yml'
+      - 'scripts/isim/**'
 
 permissions:
   contents: read
@@ -85,6 +86,12 @@ jobs:
           print("iSim Linux build: app only; widget excluded; DesignSystem uses Swift 5 mode")
           PY
 
+      - name: Apply iSim SDK compatibility adapters (CI checkout only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/isim/prepare.py
+
       - name: Build Paladala with iSim SDK (x86_64 simulator)
         id: build
         shell: bash
@@ -93,7 +100,8 @@ jobs:
           set +e
           isim build -project ios/Paladala/Paladala.xcodeproj \
             -scheme Paladala -configuration Debug -o build/isim/products \
-            SWIFT_VERSION=5.0 \
+            SWIFT_VERSION=5.0 SWIFT_ENABLE_BARE_SLASH_REGEX=YES \
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS=ISIM \
             2>&1 | tee build/isim/reports/build.log
           code=${PIPESTATUS[0]}
           set -e
