@@ -68,7 +68,15 @@ jobs:
                   raise SystemExit(f"Unexpected Xcode project structure for {entry}: {contents.count(entry)}")
               contents = contents.replace(entry, "", 1)
           project.write_text(contents)
-          print("iSim Linux build: app only; Live Activity widget is excluded")
+          # The iSim SwiftUI overlays use actor-isolated APIs while the local
+          # DesignSystem package defaults to Swift 6 strict concurrency.
+          # Use Swift 5 language mode only in this CI checkout.
+          package = Path("ios/Paladala/Packages/DesignSystem/Package.swift")
+          manifest = package.read_text()
+          if not manifest.startswith("// swift-tools-version: 6.0"):
+              raise SystemExit("Unexpected DesignSystem Package.swift tools version")
+          package.write_text(manifest.replace("// swift-tools-version: 6.0", "// swift-tools-version: 5.9", 1))
+          print("iSim Linux build: app only; widget excluded; DesignSystem uses Swift 5 mode")
           PY
 
       - name: Build Paladala with iSim SDK (x86_64 simulator)
@@ -79,6 +87,7 @@ jobs:
           set +e
           isim build -project ios/Paladala/Paladala.xcodeproj \
             -scheme Paladala -configuration Debug -o build/isim/products \
+            SWIFT_VERSION=5.0 \
             2>&1 | tee build/isim/reports/build.log
           code=${PIPESTATUS[0]}
           set -e
