@@ -75,7 +75,13 @@ jobs:
           manifest = package.read_text()
           if not manifest.startswith("// swift-tools-version: 6.0"):
               raise SystemExit("Unexpected DesignSystem Package.swift tools version")
-          package.write_text(manifest.replace("// swift-tools-version: 6.0", "// swift-tools-version: 5.9", 1))
+          # Keep PackageDescription 6: .iOS(.v18) is unavailable to 5.9 manifests.
+          # Only select Swift 5 language semantics for the local package.
+          tail = "    ]\n)\n"
+          if manifest.count(tail) != 1:
+              raise SystemExit("Unexpected DesignSystem Package.swift structure")
+          manifest = manifest.replace(tail, "    ],\n    swiftLanguageModes: [.v5]\n)\n", 1)
+          package.write_text(manifest)
           print("iSim Linux build: app only; widget excluded; DesignSystem uses Swift 5 mode")
           PY
 
