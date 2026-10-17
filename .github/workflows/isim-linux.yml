@@ -42,6 +42,15 @@ jobs:
           curl -fsSL https://raw.githubusercontent.com/kolabs-dev/isim/main/install.sh -o /tmp/isim-install.sh
           bash /tmp/isim-install.sh --no-desktop
           isim version
+          # iSim v0.24.0's release tarball omits a Python helper referenced by
+          # isim-build.py. Restore only that missing file from the SAME tag.
+          isim_bin="$HOME/.local/lib/isim/current/bin"
+          if [ ! -f "$isim_bin/isim-privacy.py" ]; then
+            version="$(basename "$(readlink -f "$HOME/.local/lib/isim/current")")"
+            curl -fsSL "https://raw.githubusercontent.com/kolabs-dev/isim/v${version}/isim/tools/isim-privacy.py" \
+              -o "$isim_bin/isim-privacy.py"
+            python3 -m py_compile "$isim_bin/isim-privacy.py"
+          fi
 
       - name: Prepare non-secret local configuration
         shell: bash
