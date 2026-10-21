@@ -67,14 +67,18 @@ jobs:
       # single bad API call, and the next successful run corrects
       # the drift.
       #
-      # Like the build-number bump, this mutates Info.plist in
-      # the *runner's* working copy only — no commit, no push.
+      # The committed version lives in one place: MARKETING_VERSION /
+      # CURRENT_PROJECT_VERSION in project.pbxproj, which both
+      # Info.plists read via $(MARKETING_VERSION) and
+      # $(CURRENT_PROJECT_VERSION). CI never edits those files; it
+      # exports MARKET_VERSION / BUNDLE_VERSION and passes them to
+      # xcodebuild as build-setting overrides (app + widget alike).
       # The latest tag on the server is the persistent state.
       # ------------------------------------------------------------------
       - name: Bump marketing version
         run: |
           set -euo pipefail
-          PLIST="$PROJECT_DIR/$PROJECT_NAME/Info.plist"
+          PBXPROJ="$PROJECT_DIR/$PROJECT_NAME.xcodeproj/project.pbxproj"
           REPO="${{ github.repository }}"
           LATEST_TAG="$(curl -fsSL \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
@@ -82,14 +86,9 @@ jobs:
             "https://api.github.com/repos/$REPO/releases?per_page=1" 2>/dev/null \
             | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
             | head -n1 || true)"
-          # The grep below mirrors the one in "Resolve release tag"
-          # so a "0.5.1 TESTING" suffix in Info.plist is stripped
-          # the same way in both steps — keeps the two reads in
-          # lock-step.
-          CURRENT_MV="$(/usr/bin/plutil -extract CFBundleShortVersionString raw "$PLIST" \
-            | grep -Eo '[0-9]+(\.[0-9]+)+' | head -n1)"
+          CURRENT_MV="$(sed -n 's/.*MARKETING_VERSION = \([0-9][0-9.]*\);.*/\1/p' "$PBXPROJ" | head -n1)"
           if [ -z "$CURRENT_MV" ]; then
-            echo "::error::Could not parse CFBundleShortVersionString from $PLIST"
+            echo "::error::Could not parse MARKETING_VERSION from $PBXPROJ"
             exit 1
           fi
           MAJOR="$(printf '%s' "$CURRENT_MV" | cut -d. -f1)"
@@ -110,22 +109,20 @@ jobs:
             MARKET_VERSION="$FALLBACK_MV"
             echo "Legacy tag shape $LATEST_TAG — using fallback $MARKET_VERSION"
           fi
-          /usr/bin/plutil -replace CFBundleShortVersionString -string "$MARKET_VERSION" "$PLIST"
           echo "MARKET_VERSION=$MARKET_VERSION" >> "$GITHUB_ENV"
-          echo "Bumped CFBundleShortVersionString: $CURRENT_MV -> $MARKET_VERSION"
+          echo "Marketing version: $CURRENT_MV (committed) -> $MARKET_VERSION"
 
       # ------------------------------------------------------------------
       # Auto-increment the iOS build number so the prerelease list
       # always shows the newest at the top. We pull the highest
       # existing release sequence from the GitHub API and add 1,
-      # then write that back to Info.plist *in the
-      # runner's working copy only* (no commit, no push, so we
-      # never race with the user pushing).  The next workflow
+      # then export it as BUNDLE_VERSION for xcodebuild (no
+      # commit, no push, so we never race with the user pushing).  The next workflow
       # run re-derives from gh, so the sequence is monotonic
       # across runs and never resets.
       #
       # If the API call fails (offline / permissions), we fall
-      # back to the value currently in Info.plist + 1 so a single
+      # back to the committed CURRENT_PROJECT_VERSION + 1 so a single
       # bad run doesn't break the pipeline.
       # ------------------------------------------------------------------
       - name: Bump build number
@@ -136,14 +133,15 @@ jobs:
             echo "::error::Info.plist not found at $PLIST"
             exit 1
           fi
-          CURRENT="$(/usr/bin/plutil -extract CFBundleVersion raw "$PLIST")"
+          PBXPROJ="$PROJECT_DIR/$PROJECT_NAME.xcodeproj/project.pbxproj"
+          CURRENT="$(sed -n 's/.*CURRENT_PROJECT_VERSION = \([0-9][0-9.]*\);.*/\1/p' "$PBXPROJ" | sort -n | tail -n1)"
           if [ -z "$CURRENT" ]; then
-            echo "::error::CFBundleVersion is empty in $PLIST"
+            echo "::error::Could not parse CURRENT_PROJECT_VERSION from $PBXPROJ"
             exit 1
           fi
           BASE_INT="${CURRENT%%.*}"
           if ! [[ "$BASE_INT" =~ ^[0-9]+$ ]]; then
-            echo "::error::CFBundleVersion '$CURRENT' is not numeric"
+            echo "::error::CURRENT_PROJECT_VERSION '$CURRENT' is not numeric"
             exit 1
           fi
           # Discover the highest existing prerelease N via
@@ -220,8 +218,7 @@ jobs:
           BASE="$BASE_INT"
           if [ "$HIGHEST" -gt "$BASE" ]; then BASE="$HIGHEST"; fi
           NEW=$((BASE + 1))
-          /usr/bin/plutil -replace CFBundleVersion -string "$NEW" "$PLIST"
-          echo "Bumped CFBundleVersion: $CURRENT -> $NEW (highest existing prerelease = $HIGHEST)"
+          echo "Build number: $CURRENT (committed) -> $NEW (highest existing prerelease = $HIGHEST)"
           echo "BUNDLE_VERSION=$NEW" >> "$GITHUB_ENV"
 
           # ------------------------------------------------------------------
@@ -311,6 +308,8 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION="$MARKET_VERSION" \
+            CURRENT_PROJECT_VERSION="$BUNDLE_VERSION" \
             build > "$LOGFILE" 2>&1
           XC_EXIT=$?
           echo "xcodebuild exited with code $XC_EXIT"
@@ -388,7 +387,7 @@ jobs:
           # Fetch + create-or-switch the ci-logs branch as an
           # orphan (no shared history with `working`, so it
           # can't pollute the main line).
-          # The build-number step intentionally edits Info.plist in
+          # The build-number step bakes BPBuild* keys into Info.plist in
           # the runner's working copy. Reset tracked files before
           # switching branches so that generated version changes do
           # not block checkout after a failed xcodebuild.
@@ -411,9 +410,9 @@ jobs:
       # ------------------------------------------------------------------
       # Derive a release tag from the build number we just bumped.
       # The patch component is the monotonically increasing build
-      # sequence: v0.5.3, v0.5.4, and so on.  The version line
-      # (0.4 → 0.5) follows `CFBundleShortVersionString` in
-      # Info.plist; bump both at once when shipping a new minor.
+      # sequence.  The version line (0.5 → 0.6) follows
+      # MARKETING_VERSION in project.pbxproj; edit it there when
+      # shipping a new minor.
       # ------------------------------------------------------------------
       - name: Resolve release tag
         id: tag
@@ -424,28 +423,14 @@ jobs:
             echo "::error::BUNDLE_VERSION is not set — did Bump build number run?"
             exit 1
           fi
-          # PLIST was defined inside the `Bump build number` step's
-          # `run:` block; each `run:` is a fresh shell so the
-          # variable does not carry over.  Recompute it here.
-          PLIST="$PROJECT_DIR/$PROJECT_NAME/Info.plist"
-          if [ ! -f "$PLIST" ]; then
-            echo "::error::Info.plist not found at $PLIST"
-            exit 1
-          fi
-          # Pull the marketing version (e.g. "0.5.1") from
-          # CFBundleShortVersionString so the tag always matches
-          # the Info.plist the user ships.  We use a permissive
-          # pattern (digits + dots) so a "0.5.1 BETA" suffix
-          # can't accidentally land in the tag — the CI gets the
-          # numeric version only.
-          MARKET_VERSION="$(/usr/bin/plutil -extract CFBundleShortVersionString raw "$PLIST" | grep -Eo '[0-9]+(\.[0-9]+)+' | head -n1)"
-          if [ -z "$MARKET_VERSION" ]; then
-            echo "::error::Could not parse CFBundleShortVersionString from $PLIST"
+          # MARKET_VERSION was set by `Bump marketing version` and is
+          # the same value xcodebuild stamped into the app.
+          if [ -z "${MARKET_VERSION:-}" ]; then
+            echo "::error::MARKET_VERSION is not set — did Bump marketing version run?"
             exit 1
           fi
           TAG="v${MARKET_VERSION}.${BUNDLE_VERSION}"
           echo "TAG=$TAG" >> "$GITHUB_ENV"
-          echo "MARKET_VERSION=$MARKET_VERSION" >> "$GITHUB_ENV"
           echo "Resolved tag: $TAG (CFBundleVersion=$BUNDLE_VERSION, CFBundleShortVersionString=$MARKET_VERSION)"
 
       - name: Package unsigned IPA

@@ -937,7 +937,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Paladala/Paladala.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 348;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = "";
 				EMBEDDED_CONTENT_CONTAINS_SWIFT = YES;
@@ -949,7 +949,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.4;
+				MARKETING_VERSION = 0.5.48;
 				PRODUCT_BUNDLE_IDENTIFIER = com.dt.paladala;
 				PRODUCT_NAME = Paladala;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -969,7 +969,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Paladala/Paladala.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 348;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = "";
 				EMBEDDED_CONTENT_CONTAINS_SWIFT = YES;
@@ -981,7 +981,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.4;
+				MARKETING_VERSION = 0.5.48;
 				PRODUCT_BUNDLE_IDENTIFIER = com.dt.paladala;
 				PRODUCT_NAME = Paladala;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -1000,7 +1000,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = PaladalaWidget/PaladalaWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 348;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PaladalaWidget/Info.plist;
@@ -1012,7 +1012,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.4;
+				MARKETING_VERSION = 0.5.48;
 				PRODUCT_BUNDLE_IDENTIFIER = com.dt.paladala.PaladalaWidget;
 				PRODUCT_NAME = PaladalaWidget;
 				SKIP_INSTALL = YES;
@@ -1031,7 +1031,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = PaladalaWidget/PaladalaWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 348;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PaladalaWidget/Info.plist;
@@ -1043,7 +1043,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.4;
+				MARKETING_VERSION = 0.5.48;
 				PRODUCT_BUNDLE_IDENTIFIER = com.dt.paladala.PaladalaWidget;
 				PRODUCT_NAME = PaladalaWidget;
 				SKIP_INSTALL = YES;
