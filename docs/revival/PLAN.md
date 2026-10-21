@@ -21,6 +21,9 @@ Root cause of the stall: the player stack decision (AVPlayer + local HLS proxy v
 ## 2. Revival plan
 
 ### Phase 0 — Stop the bleeding (2–3 days)
+
+> Status 2026-10-21: done. IJKPlayer workflows removed from `working`; version comes only from `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.pbxproj`; `.ipa`/`.backup` removed and README rewritten earlier; old changelog archived under `docs/history/`.
+
 1. **Freeze the engine decision.** Keep AVPlayer + `LocalHLSProxyServer` (it works and ships). Park IJKPlayer and `experimental/ffmpeg` on a branch; delete `ijkplayer-ci.yml` / `ijkplayer-spike.yml` from main. This removes the CI churn.
 2. **One version source**: Info.plist reads `MARKETING_VERSION`/build from xcconfig; CI only tags.
 3. **Repo cleanup**: remove the `.ipa` (use Releases), `.backup`, `.gitkeep-empty`; move the iLoader tutorial to `docs/sideload.md`; write a real README (what/screens/build/install/AltStore).
