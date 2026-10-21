@@ -13,6 +13,17 @@
 		100000000000000000000103 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000203 /* Models.swift */; };
 		100000000000000000000104 /* PaladalaTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000204 /* PaladalaTheme.swift */; };
 		100000000000000000000105 /* BilibiliAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000205 /* BilibiliAPIClient.swift */; };
+		AC0000000000000000000A01 /* BilibiliAPIClient+Feed.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0000000000000000000B01 /* BilibiliAPIClient+Feed.swift */; };
+		AC0000000000000000000A02 /* BilibiliAPIClient+Video.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0000000000000000000B02 /* BilibiliAPIClient+Video.swift */; };
+		AC0000000000000000000A03 /* BilibiliAPIClient+Playback.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0000000000000000000B03 /* BilibiliAPIClient+Playback.swift */; };
+		AC0000000000000000000A04 /* BilibiliAPIClient+Danmaku.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0000000000000000000B04 /* BilibiliAPIClient+Danmaku.swift */; };
+		AC0000000000000000000A05 /* BilibiliAPIClient+Search.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0000000000000000000B05 /* BilibiliAPIClient+Search.swift */; };
+		AC0000000000000000000A06 /* BilibiliAPIClient+Bangumi.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0000000000000000000B06 /* BilibiliAPIClient+Bangumi.swift */; };
+		AC0000000000000000000A07 /* BilibiliAPIClient+Live.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0000000000000000000B07 /* BilibiliAPIClient+Live.swift */; };
+		AC0000000000000000000A08 /* BilibiliAPIClient+Dynamic.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0000000000000000000B08 /* BilibiliAPIClient+Dynamic.swift */; };
+		AC0000000000000000000A09 /* BilibiliAPIClient+User.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0000000000000000000B09 /* BilibiliAPIClient+User.swift */; };
+		AC0000000000000000000A10 /* BilibiliAPIClient+Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0000000000000000000B10 /* BilibiliAPIClient+Library.swift */; };
+		AC0000000000000000000A11 /* BilibiliAPIClient+Comments.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0000000000000000000B11 /* BilibiliAPIClient+Comments.swift */; };
 		100000000000000000000106 /* PaladalaRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000206 /* PaladalaRepository.swift */; };
 		100000000000000000000107 /* ViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000207 /* ViewModels.swift */; };
 		100000000000000000000130 /* CommentPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000230 /* CommentPipeline.swift */; };
@@ -130,6 +141,17 @@
 		100000000000000000000203 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		100000000000000000000204 /* PaladalaTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaladalaTheme.swift; sourceTree = "<group>"; };
 		100000000000000000000205 /* BilibiliAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BilibiliAPIClient.swift; sourceTree = "<group>"; };
+		AC0000000000000000000B01 /* BilibiliAPIClient+Feed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BilibiliAPIClient+Feed.swift"; sourceTree = "<group>"; };
+		AC0000000000000000000B02 /* BilibiliAPIClient+Video.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BilibiliAPIClient+Video.swift"; sourceTree = "<group>"; };
+		AC0000000000000000000B03 /* BilibiliAPIClient+Playback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BilibiliAPIClient+Playback.swift"; sourceTree = "<group>"; };
+		AC0000000000000000000B04 /* BilibiliAPIClient+Danmaku.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BilibiliAPIClient+Danmaku.swift"; sourceTree = "<group>"; };
+		AC0000000000000000000B05 /* BilibiliAPIClient+Search.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BilibiliAPIClient+Search.swift"; sourceTree = "<group>"; };
+		AC0000000000000000000B06 /* BilibiliAPIClient+Bangumi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BilibiliAPIClient+Bangumi.swift"; sourceTree = "<group>"; };
+		AC0000000000000000000B07 /* BilibiliAPIClient+Live.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BilibiliAPIClient+Live.swift"; sourceTree = "<group>"; };
+		AC0000000000000000000B08 /* BilibiliAPIClient+Dynamic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BilibiliAPIClient+Dynamic.swift"; sourceTree = "<group>"; };
+		AC0000000000000000000B09 /* BilibiliAPIClient+User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BilibiliAPIClient+User.swift"; sourceTree = "<group>"; };
+		AC0000000000000000000B10 /* BilibiliAPIClient+Library.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BilibiliAPIClient+Library.swift"; sourceTree = "<group>"; };
+		AC0000000000000000000B11 /* BilibiliAPIClient+Comments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BilibiliAPIClient+Comments.swift"; sourceTree = "<group>"; };
 		100000000000000000000206 /* PaladalaRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaladalaRepository.swift; sourceTree = "<group>"; };
 		100000000000000000000207 /* ViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModels.swift; sourceTree = "<group>"; };
 		100000000000000000000230 /* CommentPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentPipeline.swift; sourceTree = "<group>"; };
@@ -293,6 +315,17 @@
 				100000000000000000000203 /* Models.swift */,
 				100000000000000000000204 /* PaladalaTheme.swift */,
 				100000000000000000000205 /* BilibiliAPIClient.swift */,
+				AC0000000000000000000B01 /* BilibiliAPIClient+Feed.swift */,
+				AC0000000000000000000B02 /* BilibiliAPIClient+Video.swift */,
+				AC0000000000000000000B03 /* BilibiliAPIClient+Playback.swift */,
+				AC0000000000000000000B04 /* BilibiliAPIClient+Danmaku.swift */,
+				AC0000000000000000000B05 /* BilibiliAPIClient+Search.swift */,
+				AC0000000000000000000B06 /* BilibiliAPIClient+Bangumi.swift */,
+				AC0000000000000000000B07 /* BilibiliAPIClient+Live.swift */,
+				AC0000000000000000000B08 /* BilibiliAPIClient+Dynamic.swift */,
+				AC0000000000000000000B09 /* BilibiliAPIClient+User.swift */,
+				AC0000000000000000000B10 /* BilibiliAPIClient+Library.swift */,
+				AC0000000000000000000B11 /* BilibiliAPIClient+Comments.swift */,
 				100000000000000000000206 /* PaladalaRepository.swift */,
 				100000000000000000000207 /* ViewModels.swift */,
 				100000000000000000000230 /* CommentPipeline.swift */,
@@ -694,6 +727,17 @@
 				100000000000000000000103 /* Models.swift in Sources */,
 				100000000000000000000104 /* PaladalaTheme.swift in Sources */,
 				100000000000000000000105 /* BilibiliAPIClient.swift in Sources */,
+				AC0000000000000000000A01 /* BilibiliAPIClient+Feed.swift in Sources */,
+				AC0000000000000000000A02 /* BilibiliAPIClient+Video.swift in Sources */,
+				AC0000000000000000000A03 /* BilibiliAPIClient+Playback.swift in Sources */,
+				AC0000000000000000000A04 /* BilibiliAPIClient+Danmaku.swift in Sources */,
+				AC0000000000000000000A05 /* BilibiliAPIClient+Search.swift in Sources */,
+				AC0000000000000000000A06 /* BilibiliAPIClient+Bangumi.swift in Sources */,
+				AC0000000000000000000A07 /* BilibiliAPIClient+Live.swift in Sources */,
+				AC0000000000000000000A08 /* BilibiliAPIClient+Dynamic.swift in Sources */,
+				AC0000000000000000000A09 /* BilibiliAPIClient+User.swift in Sources */,
+				AC0000000000000000000A10 /* BilibiliAPIClient+Library.swift in Sources */,
+				AC0000000000000000000A11 /* BilibiliAPIClient+Comments.swift in Sources */,
 				100000000000000000000106 /* PaladalaRepository.swift in Sources */,
 				100000000000000000000107 /* ViewModels.swift in Sources */,
 				100000000000000000000130 /* CommentPipeline.swift in Sources */,

@@ -11,6 +11,11 @@ One section per minor version. Per-build notes are published automatically as
   `project.pbxproj`; the app and widget `Info.plist`s read them as build settings.
   CI passes the next version to `xcodebuild` instead of editing `Info.plist`, and
   only tags releases.
+- Split `BilibiliAPIClient.swift` (5.5k lines) into a 1.4k-line core (session,
+  signing, WBI, `get`/`post`, shared DTOs) plus `BilibiliAPIClient+{Feed, Video,
+  Playback, Danmaku, Search, Bangumi, Live, Dynamic, User, Library, Comments}.swift`
+  extensions. No behavior change: code moved verbatim; 11 declarations went from
+  `private` to internal because another file now uses them.
 - Removed the seven parked IJKPlayer/FFmpeg workflows from the default branch; the
   last revision of them is commit `07fce19`.
 - Danmaku moved to WBI-signed protobuf segments; profile dynamic count and follow
