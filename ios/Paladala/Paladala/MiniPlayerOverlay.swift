@@ -355,6 +355,7 @@ private struct MiniPlayerChromeModifier: ViewModifier {
     @ViewBuilder
     private var chromeBackground: some View {
         if PaladalaTheme.usesNativeLayout {
+            #if compiler(>=6.2)
             if #available(iOS 26.0, *) {
                 Color.clear
                     .glassEffect(
@@ -365,6 +366,10 @@ private struct MiniPlayerChromeModifier: ViewModifier {
                 Color.clear
                     .background(.regularMaterial)
             }
+            #else
+            Color.clear
+                .background(.regularMaterial)
+            #endif
         } else {
             ZStack {
                 Rectangle()

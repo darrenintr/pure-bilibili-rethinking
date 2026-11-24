@@ -15,6 +15,7 @@ struct PaladalaGlassButtonStyle: ButtonStyle {
                 .padding(.horizontal, PaladalaTheme.Spacing.l)
                 .padding(.vertical, PaladalaTheme.Spacing.m)
                 .background {
+                    #if compiler(>=6.2)
                     if #available(iOS 26.0, *) {
                         Color.clear
                             .glassEffect(
@@ -26,6 +27,10 @@ struct PaladalaGlassButtonStyle: ButtonStyle {
                         Capsule()
                             .fill(PaladalaTheme.expressiveColor { $0.secondaryContainer })
                     }
+                    #else
+                    Capsule()
+                        .fill(PaladalaTheme.expressiveColor { $0.secondaryContainer })
+                    #endif
                 }
                 .scaleEffect(configuration.isPressed ? 0.95 : 1)
                 .animation(
@@ -300,6 +305,7 @@ extension View {
             style: PaladalaTheme.cornerStyle
         )
         if isExpressive {
+            #if compiler(>=6.2)
             if #available(iOS 26.0, *) {
                 self.glassEffect(.regular, in: shape)
             } else {
@@ -308,6 +314,12 @@ extension View {
                     in: shape
                 )
             }
+            #else
+            self.background(
+                PaladalaTheme.expressiveColor { $0.surfaceContainer },
+                in: shape
+            )
+            #endif
         } else {
             let effectiveFill: Color = isNative
                 ? Color(uiColor: .secondarySystemGroupedBackground)
@@ -340,6 +352,7 @@ extension View {
         _ design: MaterialDesign
     ) -> some View {
         if PaladalaTheme.activeVariant == .expressive {
+            #if compiler(>=6.2)
             if #available(iOS 26.0, *) {
                 self.glassEffect(.regular, in: Capsule())
             } else {
@@ -349,6 +362,13 @@ extension View {
                         in: Capsule()
                     )
             }
+            #else
+            self
+                .background(
+                    PaladalaTheme.expressiveColor { $0.surfaceHighest },
+                    in: Capsule()
+                )
+            #endif
         } else {
             self
                 .background(PaladalaTheme.paper)
@@ -520,6 +540,7 @@ extension View {
                         : PaladalaTheme.expressiveColor { $0.onSurfaceVariant }
                 )
                 .background {
+                    #if compiler(>=6.2)
                     if #available(iOS 26.0, *) {
                         Color.clear
                             .glassEffect(
@@ -544,6 +565,21 @@ extension View {
                             )
                         }
                     }
+                    #else
+                    shape.fill(
+                        isSelected
+                            ? PaladalaTheme.expressiveColor { $0.secondaryContainer }
+                            : Color.clear
+                    )
+                    .overlay {
+                        shape.strokeBorder(
+                            isSelected
+                                ? Color.clear
+                                : PaladalaTheme.expressiveColor { $0.outlineVariant },
+                            lineWidth: 1
+                        )
+                    }
+                    #endif
                 }
         } else if PaladalaTheme.usesNativeLayout {
             // iOS Native: capsule + systemFill background.
@@ -718,6 +754,7 @@ extension View {
             style: PaladalaTheme.cornerStyle
         )
         if isExpressive {
+            #if compiler(>=6.2)
             if #available(iOS 26.0, *) {
                 self.glassEffect(.regular, in: shape)
             } else {
@@ -726,6 +763,12 @@ extension View {
                     in: shape
                 )
             }
+            #else
+            self.background(
+                PaladalaTheme.expressiveColor { $0.surfaceContainer },
+                in: shape
+            )
+            #endif
         } else {
             let effectiveFill: Color = isNative
                 ? Color(uiColor: .secondarySystemGroupedBackground)

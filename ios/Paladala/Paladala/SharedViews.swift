@@ -728,12 +728,17 @@ struct MetricPill: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background {
+                    #if compiler(>=6.2)
                     if #available(iOS 26.0, *) {
                         Color.clear.glassEffect(.regular, in: Capsule())
                     } else {
                         Capsule()
                             .fill(PaladalaTheme.expressiveColor { $0.surfaceHighest })
                     }
+                    #else
+                    Capsule()
+                        .fill(PaladalaTheme.expressiveColor { $0.surfaceHighest })
+                    #endif
                 }
         } else {
             Label(text, systemImage: systemImage)
@@ -814,6 +819,7 @@ struct ErrorBanner: View {
                         .padding(.horizontal, 16)
                         .frame(minHeight: 36)
                         .background {
+                            #if compiler(>=6.2)
                             if #available(iOS 26.0, *) {
                                 Color.clear
                                     .glassEffect(
@@ -825,6 +831,10 @@ struct ErrorBanner: View {
                                 Capsule()
                                     .fill(PaladalaTheme.expressiveColor { $0.primary })
                             }
+                            #else
+                            Capsule()
+                                .fill(PaladalaTheme.expressiveColor { $0.primary })
+                            #endif
                         }
                 }
                 .buttonStyle(PaladalaPressBounceButtonStyle())
@@ -839,12 +849,17 @@ struct ErrorBanner: View {
                         .foregroundStyle(PaladalaTheme.expressiveColor { $0.onSurfaceVariant })
                         .frame(width: 36, height: 36)
                         .background {
+                            #if compiler(>=6.2)
                             if #available(iOS 26.0, *) {
                                 Color.clear.glassEffect(.regular, in: Circle())
                             } else {
                                 Circle()
                                     .fill(PaladalaTheme.expressiveColor { $0.surfaceHighest })
                             }
+                            #else
+                            Circle()
+                                .fill(PaladalaTheme.expressiveColor { $0.surfaceHighest })
+                            #endif
                         }
                 }
                 .buttonStyle(PaladalaPressBounceButtonStyle())
@@ -853,6 +868,7 @@ struct ErrorBanner: View {
         }
         .padding(12)
         .background {
+            #if compiler(>=6.2)
             if #available(iOS 26.0, *) {
                 Color.clear
                     .glassEffect(
@@ -863,6 +879,10 @@ struct ErrorBanner: View {
                 RoundedRectangle.ds(DSRadius.control)
                     .fill(PaladalaTheme.expressiveColor { $0.errorContainer })
             }
+            #else
+            RoundedRectangle.ds(DSRadius.control)
+                .fill(PaladalaTheme.expressiveColor { $0.errorContainer })
+            #endif
         }
     }
 
