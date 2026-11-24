@@ -727,10 +727,14 @@ struct MetricPill: View {
                 .foregroundStyle(PaladalaTheme.expressiveColor { $0.onSurfaceVariant })
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(
-                    PaladalaTheme.expressiveColor { $0.surfaceHighest },
-                    in: Capsule()
-                )
+                .background {
+                    if #available(iOS 26.0, *) {
+                        Color.clear.glassEffect(.regular, in: Capsule())
+                    } else {
+                        Capsule()
+                            .fill(PaladalaTheme.expressiveColor { $0.surfaceHighest })
+                    }
+                }
         } else {
             Label(text, systemImage: systemImage)
                 .font(PaladalaTheme.FontRole.labelMono)
@@ -809,7 +813,19 @@ struct ErrorBanner: View {
                         .foregroundStyle(PaladalaTheme.expressiveColor { $0.onPrimary })
                         .padding(.horizontal, 16)
                         .frame(minHeight: 36)
-                        .background(PaladalaTheme.expressiveColor { $0.primary }, in: Capsule())
+                        .background {
+                            if #available(iOS 26.0, *) {
+                                Color.clear
+                                    .glassEffect(
+                                        .regular.interactive()
+                                            .tint(PaladalaTheme.expressiveColor { $0.primary }),
+                                        in: Capsule()
+                                    )
+                            } else {
+                                Capsule()
+                                    .fill(PaladalaTheme.expressiveColor { $0.primary })
+                            }
+                        }
                 }
                 .buttonStyle(PaladalaPressBounceButtonStyle())
             }
@@ -822,20 +838,32 @@ struct ErrorBanner: View {
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(PaladalaTheme.expressiveColor { $0.onSurfaceVariant })
                         .frame(width: 36, height: 36)
-                        .background(
-                            PaladalaTheme.expressiveColor { $0.surfaceHighest },
-                            in: Circle()
-                        )
+                        .background {
+                            if #available(iOS 26.0, *) {
+                                Color.clear.glassEffect(.regular, in: Circle())
+                            } else {
+                                Circle()
+                                    .fill(PaladalaTheme.expressiveColor { $0.surfaceHighest })
+                            }
+                        }
                 }
                 .buttonStyle(PaladalaPressBounceButtonStyle())
                 .accessibilityLabel("重試")
             }
         }
         .padding(12)
-        .background(
-            PaladalaTheme.expressiveColor { $0.errorContainer },
-            in: RoundedRectangle.ds(DSRadius.control)
-        )
+        .background {
+            if #available(iOS 26.0, *) {
+                Color.clear
+                    .glassEffect(
+                        .regular.tint(PaladalaTheme.expressiveColor { $0.errorContainer }),
+                        in: RoundedRectangle.ds(DSRadius.control)
+                    )
+            } else {
+                RoundedRectangle.ds(DSRadius.control)
+                    .fill(PaladalaTheme.expressiveColor { $0.errorContainer })
+            }
+        }
     }
 
     private var streetBody: some View {

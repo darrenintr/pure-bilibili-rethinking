@@ -349,18 +349,22 @@ private struct MiniPlayerChromeModifier: ViewModifier {
             .accessibilityLabel("Mini player for \(videoTitle)")
     }
 
-    /// Variant-aware background.  iOS Native → system `.regularMaterial`,
-    /// which on iOS 26+ auto-promotes to Liquid Glass and on iOS 18-25
-    /// renders as the standard translucent material.  The deployment
-    /// target is iOS 18 (see `IPHONEOS_DEPLOYMENT_TARGET` in
-    /// `project.pbxproj`), so we can't use the iOS 26-only
-    /// `.glassEffect(_:)` modifier here — the Xcode 16 SDK doesn't
-    /// expose it.  Street → paper fill + 4pt ink hard shadow.
+    /// Variant-aware background.  iOS Native / Expressive → real
+    /// `.glassEffect` on iOS 26+, `.regularMaterial` on iOS 18–25.
+    /// Street → paper fill + 4pt ink hard shadow.
     @ViewBuilder
     private var chromeBackground: some View {
         if PaladalaTheme.usesNativeLayout {
-            Color.clear
-                .background(.regularMaterial)
+            if #available(iOS 26.0, *) {
+                Color.clear
+                    .glassEffect(
+                        .regular.interactive(),
+                        in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    )
+            } else {
+                Color.clear
+                    .background(.regularMaterial)
+            }
         } else {
             ZStack {
                 Rectangle()

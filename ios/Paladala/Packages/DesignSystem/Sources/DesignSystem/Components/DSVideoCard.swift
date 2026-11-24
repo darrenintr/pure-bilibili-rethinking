@@ -113,7 +113,14 @@ public struct DSVideoCard<Cover: View>: View {
                 .foregroundStyle(c.onScrim)
                 .padding(.horizontal, DSSpacing.s)
                 .padding(.vertical, DSSpacing.xxs + 1)
-                .background(c.scrim, in: Capsule())
+                .background {
+                    if #available(iOS 26.0, *) {
+                        Color.clear
+                            .glassEffect(.regular.tint(c.scrim), in: Capsule())
+                    } else {
+                        Capsule().fill(c.scrim)
+                    }
+                }
         }
     }
 

@@ -7,8 +7,6 @@ struct PaladalaGlassButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         if PaladalaTheme.activeVariant == .expressive {
-            // Expressive tonal button: full-round secondary-
-            // container pill with a spatial press dip.
             configuration.label
                 .font(.system(.subheadline, design: .rounded).weight(.semibold))
                 .foregroundStyle(
@@ -16,10 +14,19 @@ struct PaladalaGlassButtonStyle: ButtonStyle {
                 )
                 .padding(.horizontal, PaladalaTheme.Spacing.l)
                 .padding(.vertical, PaladalaTheme.Spacing.m)
-                .background(
-                    PaladalaTheme.expressiveColor { $0.secondaryContainer },
-                    in: Capsule()
-                )
+                .background {
+                    if #available(iOS 26.0, *) {
+                        Color.clear
+                            .glassEffect(
+                                .regular.interactive()
+                                    .tint(PaladalaTheme.expressiveColor { $0.secondaryContainer }),
+                                in: Capsule()
+                            )
+                    } else {
+                        Capsule()
+                            .fill(PaladalaTheme.expressiveColor { $0.secondaryContainer })
+                    }
+                }
                 .scaleEffect(configuration.isPressed ? 0.95 : 1)
                 .animation(
                     reduceMotion ? nil : DSMotion.spatialFast,
@@ -292,31 +299,40 @@ extension View {
             cornerRadius: (isNative || isExpressive) ? PaladalaTheme.cornerRadius : cornerRadius,
             style: PaladalaTheme.cornerStyle
         )
-        let effectiveFill: Color = isExpressive
-            ? PaladalaTheme.expressiveColor { $0.surfaceContainer }
-            : isNative
+        if isExpressive {
+            if #available(iOS 26.0, *) {
+                self.glassEffect(.regular, in: shape)
+            } else {
+                self.background(
+                    PaladalaTheme.expressiveColor { $0.surfaceContainer },
+                    in: shape
+                )
+            }
+        } else {
+            let effectiveFill: Color = isNative
                 ? Color(uiColor: .secondarySystemGroupedBackground)
                 : (tint ?? PaladalaTheme.cardBackground)
-        self
-            .background(effectiveFill, in: shape)
-            .overlay {
-                if !isNative && !isExpressive {
-                    shape.strokeBorder(
-                        stroke ?? PaladalaTheme.ink,
-                        lineWidth: stroke == nil ? PaladalaTheme.borderWidth : strokeWidth
-                    )
-                }
-            }
-            .background {
-                if !isNative && !isExpressive {
-                    shape
-                        .fill(PaladalaTheme.ink)
-                        .offset(
-                            x: PaladalaTheme.hardShadowOffset,
-                            y: PaladalaTheme.hardShadowOffset
+            self
+                .background(effectiveFill, in: shape)
+                .overlay {
+                    if !isNative {
+                        shape.strokeBorder(
+                            stroke ?? PaladalaTheme.ink,
+                            lineWidth: stroke == nil ? PaladalaTheme.borderWidth : strokeWidth
                         )
+                    }
                 }
-            }
+                .background {
+                    if !isNative {
+                        shape
+                            .fill(PaladalaTheme.ink)
+                            .offset(
+                                x: PaladalaTheme.hardShadowOffset,
+                                y: PaladalaTheme.hardShadowOffset
+                            )
+                    }
+                }
+        }
     }
 
     @ViewBuilder
@@ -324,11 +340,15 @@ extension View {
         _ design: MaterialDesign
     ) -> some View {
         if PaladalaTheme.activeVariant == .expressive {
-            self
-                .background(
-                    PaladalaTheme.expressiveColor { $0.surfaceHighest },
-                    in: Capsule()
-                )
+            if #available(iOS 26.0, *) {
+                self.glassEffect(.regular, in: Capsule())
+            } else {
+                self
+                    .background(
+                        PaladalaTheme.expressiveColor { $0.surfaceHighest },
+                        in: Capsule()
+                    )
+            }
         } else {
             self
                 .background(PaladalaTheme.paper)
@@ -348,12 +368,18 @@ extension View {
     @ViewBuilder
     func paladalaNavBarGlass(_ design: MaterialDesign = .liquidGlass) -> some View {
         if PaladalaTheme.activeVariant == .expressive {
-            self
-                .toolbarBackground(
-                    PaladalaTheme.expressiveColor { $0.surface },
-                    for: .navigationBar
-                )
-                .toolbarBackground(.visible, for: .navigationBar)
+            if #available(iOS 26.0, *) {
+                // Let the system's Liquid Glass nav chrome show —
+                // no painted background, no forced visibility.
+                self
+            } else {
+                self
+                    .toolbarBackground(
+                        PaladalaTheme.expressiveColor { $0.surface },
+                        for: .navigationBar
+                    )
+                    .toolbarBackground(.visible, for: .navigationBar)
+            }
         } else if PaladalaTheme.usesNativeLayout {
             self
         } else {
@@ -370,12 +396,16 @@ extension View {
     @ViewBuilder
     func paladalaToolbarGlass(_ design: MaterialDesign = .liquidGlass) -> some View {
         if PaladalaTheme.activeVariant == .expressive {
-            self
-                .toolbarBackground(
-                    PaladalaTheme.expressiveColor { $0.surface },
-                    for: .tabBar
-                )
-                .toolbarBackground(.visible, for: .tabBar)
+            if #available(iOS 26.0, *) {
+                self
+            } else {
+                self
+                    .toolbarBackground(
+                        PaladalaTheme.expressiveColor { $0.surface },
+                        for: .tabBar
+                    )
+                    .toolbarBackground(.visible, for: .tabBar)
+            }
         } else if PaladalaTheme.usesNativeLayout {
             self
         } else {
@@ -481,8 +511,6 @@ extension View {
         design: MaterialDesign
     ) -> some View {
         if PaladalaTheme.activeVariant == .expressive {
-            // Expressive chip: selected → secondary-container
-            // squircle; unselected → outlined round. Matches DSChip.
             let shape = RoundedRectangle.ds(isSelected ? DSRadius.chip : 22)
             self
                 .font(.system(.subheadline, design: .rounded).weight(.semibold))
@@ -491,19 +519,31 @@ extension View {
                         ? PaladalaTheme.expressiveColor { $0.onSecondaryContainer }
                         : PaladalaTheme.expressiveColor { $0.onSurfaceVariant }
                 )
-                .background(
-                    isSelected
-                        ? PaladalaTheme.expressiveColor { $0.secondaryContainer }
-                        : Color.clear,
-                    in: shape
-                )
-                .overlay {
-                    shape.strokeBorder(
-                        isSelected
-                            ? Color.clear
-                            : PaladalaTheme.expressiveColor { $0.outlineVariant },
-                        lineWidth: 1
-                    )
+                .background {
+                    if #available(iOS 26.0, *) {
+                        Color.clear
+                            .glassEffect(
+                                .regular.interactive()
+                                    .tint(isSelected
+                                        ? PaladalaTheme.expressiveColor { $0.secondaryContainer }
+                                        : nil),
+                                in: shape
+                            )
+                    } else {
+                        shape.fill(
+                            isSelected
+                                ? PaladalaTheme.expressiveColor { $0.secondaryContainer }
+                                : Color.clear
+                        )
+                        .overlay {
+                            shape.strokeBorder(
+                                isSelected
+                                    ? Color.clear
+                                    : PaladalaTheme.expressiveColor { $0.outlineVariant },
+                                lineWidth: 1
+                            )
+                        }
+                    }
                 }
         } else if PaladalaTheme.usesNativeLayout {
             // iOS Native: capsule + systemFill background.
@@ -631,9 +671,7 @@ extension View {
     func paladalaSheetGlass() -> some View {
         if PaladalaTheme.activeVariant == .expressive {
             self
-                .presentationBackground(
-                    PaladalaTheme.expressiveColor { $0.surface }
-                )
+                .presentationBackground(.regularMaterial)
                 .presentationCornerRadius(DSRadius.sheet)
         } else {
             self
@@ -668,6 +706,7 @@ extension View {
     /// make the card invisible.  All 9 current call sites pass
     /// `paper`; if a future caller wants a custom iOS Native fill,
     /// they can fork this modifier.
+    @ViewBuilder
     func paladalaStreetPanel(
         fill: Color = PaladalaTheme.paper,
         elevated: Bool = true
@@ -678,35 +717,44 @@ extension View {
             cornerRadius: PaladalaTheme.cornerRadius,
             style: PaladalaTheme.cornerStyle
         )
-        let effectiveFill: Color = isExpressive
-            ? PaladalaTheme.expressiveColor { $0.surfaceContainer }
-            : isNative
+        if isExpressive {
+            if #available(iOS 26.0, *) {
+                self.glassEffect(.regular, in: shape)
+            } else {
+                self.background(
+                    PaladalaTheme.expressiveColor { $0.surfaceContainer },
+                    in: shape
+                )
+            }
+        } else {
+            let effectiveFill: Color = isNative
                 ? Color(uiColor: .secondarySystemGroupedBackground)
                 : fill
-        return self
-            .background(effectiveFill, in: shape)
-            .overlay {
-                if !isNative && !isExpressive {
-                    shape
-                        .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
+            self
+                .background(effectiveFill, in: shape)
+                .overlay {
+                    if !isNative {
+                        shape
+                            .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
+                    }
                 }
-            }
-            .background {
-                // Hard shadow only renders for non-iosNative variants.
-                // iOS Native already has `hardShadowOffset == 0` (so
-                // the offset is a no-op), but skipping the whole
-                // `fill(.ink)` layer also keeps the panel from
-                // interfering with `.regularMaterial` glass backgrounds
-                // stacked above it.
-                if elevated, !isNative, !isExpressive {
-                    shape
-                        .fill(PaladalaTheme.ink)
-                        .offset(
-                            x: PaladalaTheme.hardShadowOffset,
-                            y: PaladalaTheme.hardShadowOffset
-                        )
+                .background {
+                    // Hard shadow only renders for non-iosNative variants.
+                    // iOS Native already has `hardShadowOffset == 0` (so
+                    // the offset is a no-op), but skipping the whole
+                    // `fill(.ink)` layer also keeps the panel from
+                    // interfering with `.regularMaterial` glass backgrounds
+                    // stacked above it.
+                    if elevated, !isNative {
+                        shape
+                            .fill(PaladalaTheme.ink)
+                            .offset(
+                                x: PaladalaTheme.hardShadowOffset,
+                                y: PaladalaTheme.hardShadowOffset
+                            )
+                    }
                 }
-            }
+        }
     }
 
     @ViewBuilder

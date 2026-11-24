@@ -69,9 +69,21 @@ public struct DSNavBar<Tab: Hashable>: View {
             }
         }
         .frame(height: DSSize.navBar)
-        .background(c.surfaceHigh, in: RoundedRectangle.ds(DSRadius.sheet))
+        .background { navBarBackground }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("主要導覽")
+    }
+
+    /// Liquid Glass capsule on iOS 26+; tonal surface below.
+    @ViewBuilder
+    private var navBarBackground: some View {
+        if #available(iOS 26.0, *) {
+            Color.clear
+                .glassEffect(.regular.interactive(), in: Capsule())
+        } else {
+            RoundedRectangle.ds(DSRadius.sheet)
+                .fill(c.surfaceHigh)
+        }
     }
 
     private func tab(_ item: DSNavItem<Tab>) -> some View {
