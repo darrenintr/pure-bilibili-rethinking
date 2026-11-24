@@ -428,7 +428,7 @@ struct BangumiSeasonDetailView: View {
                     .background(PaladalaTheme.paper)
                     .overlay {
                         Rectangle()
-                            .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
+                            .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
                     }
             }
             .buttonStyle(.plain)
@@ -498,7 +498,7 @@ struct BangumiSeasonDetailView: View {
             .clipped()
             .overlay {
                 Rectangle()
-                    .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.hairlineWidth)
+                    .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
             }
         } else {
             Rectangle()
@@ -506,7 +506,7 @@ struct BangumiSeasonDetailView: View {
                 .frame(width: 96, height: 128)
                 .overlay {
                     Rectangle()
-                        .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.hairlineWidth)
+                        .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
                 }
         }
     }
@@ -779,7 +779,7 @@ private struct BangumiCardRow: View {
             .clipped()
             .overlay {
                 Rectangle()
-                    .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.hairlineWidth)
+                    .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
             }
         } else {
             Rectangle()
@@ -787,7 +787,7 @@ private struct BangumiCardRow: View {
                 .frame(width: 88, height: 60)
                 .overlay {
                     Rectangle()
-                        .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.hairlineWidth)
+                        .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
                 }
         }
     }

@@ -354,7 +354,7 @@ struct LiveRoomCard: View {
                 .background(PaladalaTheme.biliPink)
                 .overlay {
                     Rectangle()
-                        .stroke(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
+                        .stroke(PaladalaTheme.glassStroke, lineWidth: 0.5)
                 }
         }
     }
@@ -1005,7 +1005,7 @@ struct BangumiErrorView: View {
                 .background(PaladalaTheme.paper)
                 .overlay {
                     Rectangle()
-                        .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
+                        .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
                 }
         }
         .buttonStyle(.plain)

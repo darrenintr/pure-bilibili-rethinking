@@ -114,7 +114,7 @@ struct OnboardingView: View {
         .background(PaladalaTheme.paper)
         .overlay {
             Rectangle()
-                .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
+                .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
         }
     }
 }

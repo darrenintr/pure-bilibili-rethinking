@@ -674,42 +674,23 @@ struct VideoDetailView: View {
     private var upEntryCard: some View {
         NavigationLink(value: UPProfileRoute.up(mid: video.ownerMid)) {
             HStack(spacing: 12) {
-                Image(systemName: "person.crop.square.fill")
-                    .font(.title2.weight(.black))
-                    .foregroundStyle(PaladalaTheme.ink)
-                    .frame(width: 44, height: 44)
-                    .background(PaladalaTheme.coolGray)
-                    .overlay {
-                        Rectangle()
-                            .strokeBorder(
-                                PaladalaTheme.ink,
-                                lineWidth: PaladalaTheme.borderWidth
-                            )
-                    }
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.system(size: 38))
+                    .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(model.detail.ownerName)
-                        .font(PaladalaTheme.FontRole.cardTitle)
-                        .foregroundStyle(PaladalaTheme.ink)
-                        .textCase(.uppercase)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
                         .lineLimit(1)
                     Text("檢視 UP 主個人主頁")
-                        .font(PaladalaTheme.FontRole.labelMono)
-                        .foregroundStyle(PaladalaTheme.mutedInk)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "arrow.up.right")
-                    .font(.body.weight(.black))
-                    .foregroundStyle(PaladalaTheme.ink)
-                    .frame(width: 38, height: 38)
-                    .background(PaladalaTheme.biliPink)
-                    .overlay {
-                        Rectangle()
-                            .strokeBorder(
-                                PaladalaTheme.ink,
-                                lineWidth: PaladalaTheme.borderWidth
-                            )
-                    }
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
             }
             .padding(PaladalaTheme.Spacing.m)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -863,29 +844,14 @@ struct VideoDetailView: View {
         // (play/pause, skip) sit in the centre of the view and
         // are not clipped by the rounded rectangle.
         .clipShape(RoundedRectangle(cornerRadius: PaladalaTheme.cardRadius, style: PaladalaTheme.cornerStyle))
-        .overlay {
-            Rectangle()
-                .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
-        }
     }
 
     @ViewBuilder
     private var titleText: some View {
-        if PaladalaTheme.activeVariant == .expressive {
-            // Rounded title — CJK titles gain nothing from the
-            // Street uppercase + tight-tracking treatment.
-            Text(model.detail.title)
-                .font(.system(.title3, design: .rounded).weight(.bold))
-                .foregroundStyle(PaladalaTheme.expressiveColor { $0.onSurface })
-                .fixedSize(horizontal: false, vertical: true)
-        } else {
-            Text(model.detail.title)
-                .font(PaladalaTheme.FontRole.displayMedium)
-                .foregroundStyle(PaladalaTheme.ink)
-                .textCase(.uppercase)
-                .tracking(-0.6)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+        Text(model.detail.title)
+            .font(.title3.weight(.semibold))
+            .foregroundStyle(.primary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var titleBlock: some View {
@@ -998,8 +964,9 @@ struct VideoDetailView: View {
             .overlay(alignment: .trailing) {
                 if showsDivider {
                     Rectangle()
-                        .fill(PaladalaTheme.ink)
-                        .frame(width: PaladalaTheme.borderWidth)
+                        .fill(PaladalaTheme.glassStroke)
+                        .frame(width: 0.5)
+                        .padding(.vertical, 18)
                 }
             }
     }
@@ -2139,7 +2106,7 @@ private struct NestedReplyRow: View {
         .background(PaladalaTheme.coolGray)
         .overlay {
             Rectangle()
-                .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.hairlineWidth)
+                .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
         }
     }
 }
@@ -2334,7 +2301,7 @@ private struct CoinToastBanner: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "bitcoinsign.circle.fill")
-                .foregroundStyle(PaladalaTheme.biliPink)
+                .foregroundStyle(.white)
             Text(text)
                 .font(.footnote.weight(.semibold))
                 .lineLimit(2)
@@ -2343,19 +2310,8 @@ private struct CoinToastBanner: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PaladalaTheme.biliPink)
-        .overlay {
-            Rectangle()
-                .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
-        }
-        .background {
-            Rectangle()
-                .fill(PaladalaTheme.ink)
-                .offset(
-                    x: PaladalaTheme.hardShadowOffset,
-                    y: PaladalaTheme.hardShadowOffset
-                )
-        }
+        .background(.tint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .foregroundStyle(.white)
     }
 }
 

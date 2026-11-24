@@ -74,7 +74,7 @@ struct AboutView: View {
                 )
                 .overlay {
                     Rectangle()
-                        .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
+                        .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
                 }
 
             Text("Paladala")
@@ -124,7 +124,7 @@ struct AboutView: View {
             .background(PaladalaTheme.paper)
             .overlay {
                 Rectangle()
-                    .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
+                    .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
             }
             .background {
                 Rectangle()
@@ -254,7 +254,7 @@ struct AboutView: View {
             .background(PaladalaTheme.paper)
             .overlay {
                 Rectangle()
-                    .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
+                    .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
             }
             .background {
                 Rectangle()
@@ -385,7 +385,7 @@ struct AboutView: View {
                 .background(PaladalaTheme.biliPink)
                 .overlay {
                     Rectangle()
-                        .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
+                        .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
                 }
                 .background {
                     Rectangle()
@@ -420,7 +420,7 @@ struct AboutView: View {
                 .background(PaladalaTheme.biliPink.opacity(0.5))
                 .overlay {
                     Rectangle()
-                        .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
+                        .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
                 }
                 .background {
                     Rectangle()
