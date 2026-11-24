@@ -14,17 +14,17 @@ public enum DSSpacing {
     public static let gutter: CGFloat = l
 }
 
-/// Continuous corner radii: 8 · 12 · 16 · 28 · full. Covers are 16:9 at 20,
-/// sheets and cards-on-surface at 28. No hard borders or offset shadows.
+/// Continuous corner radii: 8 · 14 · 18 · 24 · 32 · full. Covers are 16:9 at
+/// 24, sheets and cards-on-surface at 32. No hard borders or offset shadows.
 public enum DSRadius {
     /// Inner corners of a connected button group.
     public static let inner: CGFloat = 8
-    public static let chip: CGFloat = 12
-    public static let control: CGFloat = 16
+    public static let chip: CGFloat = 14
+    public static let control: CGFloat = 18
     /// Video covers.
-    public static let card: CGFloat = 20
+    public static let card: CGFloat = 24
     /// Sheets, panels, hero covers, nav bar.
-    public static let sheet: CGFloat = 28
+    public static let sheet: CGFloat = 32
     /// Press target: a pressed round button squares off to this.
     public static let pressed: CGFloat = 12
     /// Stands in for "fully round" — clamps to half the shortest side.

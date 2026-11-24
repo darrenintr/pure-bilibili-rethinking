@@ -721,16 +721,28 @@ struct MetricPill: View {
     let text: String
 
     var body: some View {
-        Label(text, systemImage: systemImage)
-            .font(PaladalaTheme.FontRole.labelMono)
-            .foregroundStyle(PaladalaTheme.ink)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(PaladalaTheme.paper)
-            .overlay {
-                Rectangle()
-                    .stroke(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
-            }
+        if PaladalaTheme.activeVariant == .expressive {
+            Label(text, systemImage: systemImage)
+                .font(.system(.caption, design: .rounded).weight(.medium).monospacedDigit())
+                .foregroundStyle(PaladalaTheme.expressiveColor { $0.onSurfaceVariant })
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    PaladalaTheme.expressiveColor { $0.surfaceHighest },
+                    in: Capsule()
+                )
+        } else {
+            Label(text, systemImage: systemImage)
+                .font(PaladalaTheme.FontRole.labelMono)
+                .foregroundStyle(PaladalaTheme.ink)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(PaladalaTheme.paper)
+                .overlay {
+                    Rectangle()
+                        .stroke(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
+                }
+        }
     }
 }
 
@@ -774,6 +786,59 @@ struct ErrorBanner: View {
     }
 
     var body: some View {
+        if PaladalaTheme.activeVariant == .expressive {
+            expressiveBody
+        } else {
+            streetBody
+        }
+    }
+
+    private var expressiveBody: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Label(message, systemImage: "exclamationmark.triangle.fill")
+                .font(.system(.subheadline, design: .rounded))
+                .foregroundStyle(PaladalaTheme.expressiveColor { $0.onErrorContainer })
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let primary {
+                Button {
+                    Haptics.tap()
+                    primary.action()
+                } label: {
+                    Text(primary.label)
+                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                        .foregroundStyle(PaladalaTheme.expressiveColor { $0.onPrimary })
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 36)
+                        .background(PaladalaTheme.expressiveColor { $0.primary }, in: Capsule())
+                }
+                .buttonStyle(PaladalaPressBounceButtonStyle())
+            }
+            if retry != nil {
+                Button {
+                    Haptics.tap()
+                    retry?()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(PaladalaTheme.expressiveColor { $0.onSurfaceVariant })
+                        .frame(width: 36, height: 36)
+                        .background(
+                            PaladalaTheme.expressiveColor { $0.surfaceHighest },
+                            in: Circle()
+                        )
+                }
+                .buttonStyle(PaladalaPressBounceButtonStyle())
+                .accessibilityLabel("重試")
+            }
+        }
+        .padding(12)
+        .background(
+            PaladalaTheme.expressiveColor { $0.errorContainer },
+            in: RoundedRectangle.ds(DSRadius.control)
+        )
+    }
+
+    private var streetBody: some View {
         HStack(alignment: .center, spacing: 12) {
             Label(message, systemImage: "exclamationmark.triangle.fill")
                 .font(PaladalaTheme.FontRole.bodySmall)

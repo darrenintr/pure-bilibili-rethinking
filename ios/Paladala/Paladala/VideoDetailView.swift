@@ -861,14 +861,28 @@ struct VideoDetailView: View {
         }
     }
 
-    private var titleBlock: some View {
-        VStack(alignment: .leading, spacing: PaladalaTheme.Spacing.m) {
+    @ViewBuilder
+    private var titleText: some View {
+        if PaladalaTheme.activeVariant == .expressive {
+            // Rounded title — CJK titles gain nothing from the
+            // Street uppercase + tight-tracking treatment.
+            Text(model.detail.title)
+                .font(.system(.title3, design: .rounded).weight(.bold))
+                .foregroundStyle(PaladalaTheme.expressiveColor { $0.onSurface })
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
             Text(model.detail.title)
                 .font(PaladalaTheme.FontRole.displayMedium)
                 .foregroundStyle(PaladalaTheme.ink)
                 .textCase(.uppercase)
                 .tracking(-0.6)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: PaladalaTheme.Spacing.m) {
+            titleText
             // Consumption metrics: 播放 / 彈幕 / 評論 / 時長.
             // 評論 is the *comment* count (`replyCount`), distinct
             // from 彈幕 (danmaku).  Previously the second pill was

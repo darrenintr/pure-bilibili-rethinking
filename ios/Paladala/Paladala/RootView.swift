@@ -972,9 +972,9 @@ private struct ExpressivePhoneNavigation: ViewModifier {
                         DSNavItem(tab: MainTab.live, title: "直播", systemImage: "play.tv", shape: .puffy),
                         DSNavItem(tab: MainTab.profile, title: "我的", systemImage: "person", shape: .sunny)
                     ], selection: $selection)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(colors.surface)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+                    .shadow(color: .black.opacity(0.14), radius: 16, y: 6)
                 }
         } else {
             content

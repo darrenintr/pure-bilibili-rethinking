@@ -111,9 +111,9 @@ public struct DSVideoCard<Cover: View>: View {
             Text(durationText)
                 .font(DSFont.badge)
                 .foregroundStyle(c.onScrim)
-                .padding(.horizontal, DSSpacing.s - 1)
-                .padding(.vertical, DSSpacing.xxs)
-                .background(c.scrim, in: RoundedRectangle.ds(DSRadius.inner))
+                .padding(.horizontal, DSSpacing.s)
+                .padding(.vertical, DSSpacing.xxs + 1)
+                .background(c.scrim, in: Capsule())
         }
     }
 
