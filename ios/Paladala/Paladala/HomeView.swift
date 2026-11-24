@@ -60,11 +60,12 @@ struct HomeView: View {
                      count: PaladalaTheme.activeVariant == .expressive ? 2 : 1)
     }
 
-    /// Street-style search bar extracted out of `body` so the
-    /// body expression stays under the Swift type-checker
-    /// budget.  Lives in `.safeAreaInset(edge: .top)` so it
-    /// sits flush with the nav bar above and pushes the feed
-    /// content below.
+    /// Search field rendered as a plain rounded system-style
+    /// row pinned under the nav bar. `.searchable` cannot be
+    /// used: navigation modifiers inside TabView children never
+    /// reach the outer NavigationStack on iOS 26, so the system
+    /// search field would be invisible. The large title lives on
+    /// the TabView itself in RootView for the same reason.
     private var searchBar: some View {
         UISearchFieldBridge(
             text: $model.searchQuery,
@@ -83,16 +84,8 @@ struct HomeView: View {
         )
         .padding(.horizontal, PaladalaTheme.Spacing.l)
         .padding(.vertical, PaladalaTheme.Spacing.s)
-        .background(PaladalaTheme.paper)
     }
 
-    /// Search bar plus a live keystroke-rate suggestions
-    /// dropdown.  Wrapped in a VStack so the dropdown sits
-    /// flush under the bridge and the whole stack is one
-    /// `safeAreaInset` insertion.  The dropdown is empty
-    /// (and therefore zero-height) when the user hasn't
-    /// typed yet, so it doesn't push the feed content
-    /// down at idle.
     private var searchBarSection: some View {
         VStack(spacing: 0) {
             searchBar
@@ -100,14 +93,6 @@ struct HomeView: View {
                 SuggestionList(
                     suggestions: model.searchSuggestions,
                     onSelect: { suggestion in
-                        // Tap-to-fill: mirror the old
-                        // `.searchCompletion` behaviour.  The
-                        // bridge updates its text via the
-                        // binding, then we run the same
-                        // submit path so the feed jumps to
-                        // the chosen result without waiting
-                        // for the user to hit the keyboard's
-                        // search button.
                         model.searchQuery = suggestion.displayName
                         model.clearSuggestions()
                         model.category = .search
@@ -125,7 +110,6 @@ struct HomeView: View {
         ScrollViewReader { proxy in
             feedContent(scrollProxy: proxy)
                 .background(Color.clear)
-                .navigationTitle("Paladala")
                 // Apple large-title guidance for top-level
                 // navigation: the title collapses into the
                 // chrome on scroll and re-expands when the
@@ -152,11 +136,10 @@ struct HomeView: View {
                 // longer wires up automatically — see the
                 // bridge's doc-comment for follow-up.
                 //
-                // Extracted into `searchBarSection` (private
-                // computed property) so the body expression
-                // stays readable for the Swift type-checker
-                // and so the live keystroke suggestions have
-                // somewhere to live under the bridge.
+                // Native system search — the search field lives
+                // inside the navigation bar itself (Apple Music /
+                // Podcasts pattern), so there is no custom inset
+                // bar and no dead space under the large title.
                 .safeAreaInset(edge: .top, spacing: 0) { searchBarSection }
                 // PR-fix-2026-07-10: the trailing toolbar
                 // column (5 icons on the right of the nav

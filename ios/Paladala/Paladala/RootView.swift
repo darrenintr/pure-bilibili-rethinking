@@ -421,9 +421,7 @@ private struct PhoneRootView: View {
                 // State is preserved across tab switches via the
                 // wrapper's own @State, so going to Settings and back
                 // does not re-init HomeView. PR-A, audit #5.
-                LazyTab(tag: MainTab.home, activeTag: router.selectedTab) {
-                    HomeView(repository: repository, heroNamespace: heroNamespace)
-                }
+                HomeView(repository: repository, heroNamespace: heroNamespace)
                 .tabItem {
                     // Apple's recommended "select bounce" — the
                     // SF Symbol scales up + back down when the
@@ -482,6 +480,8 @@ private struct PhoneRootView: View {
                 .tag(MainTab.profile)
             }
             .paladalaTabBarBehavior()
+            .navigationTitle(router.selectedTab.title)
+            .navigationBarTitleDisplayMode(.large)
             .navigationDestination(for: BiliVideo.self) { video in
                 VideoDetailView(video: video, repository: repository, heroNamespace: heroNamespace)
             }

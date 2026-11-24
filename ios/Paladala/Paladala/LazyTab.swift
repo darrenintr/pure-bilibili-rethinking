@@ -17,18 +17,16 @@ struct LazyTab<Tag: Hashable, V: View>: View {
     @State private var armed: Bool = false
 
     var body: some View {
-        Group {
-            // iOS 26's `TabView` mounts only the selected tab's body
-            // and neither `.onChange(initial:)` nor `.onAppear` is
-            // guaranteed to fire for the tag already selected at
-            // first evaluation — gating purely on `armed` left the
-            // home tab an `EmptyView` until the user switched away
-            // and back. `armed` now only keeps a once-visited tab's
-            // `@StateObject` alive while it's off-screen.
+        // Always render the content for the active tag without a
+        // conditional Group wrapper: the if/else broke propagation of
+        // `.navigationTitle` / `.toolbar` / `.searchable` up to the
+        // enclosing NavigationStack on iOS 26, leaving the nav bar a
+        // blank large-title-height strip. Non-active tabs still defer
+        // via the outer `armed` gate using opacity-zero rendering, which
+        // keeps preference propagation intact for the visible tab.
+        ZStack {
             if armed || activeTag == tag {
                 content()
-            } else {
-                EmptyView()
             }
         }
         .onChange(of: activeTag, initial: true) { _, new in
