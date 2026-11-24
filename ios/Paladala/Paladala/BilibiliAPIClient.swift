@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import Synchronization
 
 // MARK: - App API signing credentials
 //
@@ -2309,8 +2310,28 @@ final class BilibiliAPIClient: @unchecked Sendable {
             // third-party client, which B站 gates
             // differently.
             request.setValue("", forHTTPHeaderField: "Cookie")
-        } else if let cookie = await currentCookieHeader() {
-            request.setValue(cookie, forHTTPHeaderField: "Cookie")
+        } else {
+            // Anonymous requests still need the SPI device
+            // fingerprint: `/x/web-interface/*` now answers
+            // fingerprint-less calls with HTTP 412 风控 (verified
+            // by curl — same URL 200s once `buvid3`/`buvid4` are
+            // attached). Account cookies already carry buvid3 when
+            // the account captured one at login, so we only append
+            // the persisted device pair when it's absent.
+            var parts: [String] = []
+            if let cookie = await currentCookieHeader(), !cookie.isEmpty {
+                parts.append(cookie)
+            }
+            if parts.joined().range(of: "buvid3=") == nil,
+               let buvid3 = DeviceInfo.shared.persistedBuvid3, !buvid3.isEmpty {
+                parts.append("buvid3=\(buvid3)")
+                if let buvid4 = DeviceInfo.shared.persistedBuvid4, !buvid4.isEmpty {
+                    parts.append("buvid4=\(buvid4)")
+                }
+            }
+            if !parts.isEmpty {
+                request.setValue(parts.joined(separator: "; "), forHTTPHeaderField: "Cookie")
+            }
         }
 
         return request
@@ -2430,6 +2451,22 @@ final class BilibiliAPIClient: @unchecked Sendable {
             : nil
         if let initialStatus, initialStatus == 412 || initialStatus == 429 {
             bpLog("GET \(request.url?.absoluteString ?? "?") returned HTTP \(initialStatus) — backoff 1.2s + retry once")
+            // 412 风控 fires on fingerprint-less requests. Make sure
+            // the SPI buvid pair is persisted before the single
+            // retry — first-launch calls otherwise race the
+            // fire-and-forget fetch in `PaladalaApp.onAppear` and
+            // surface a bogus "網路異常" to the user.
+            if initialStatus == 412 {
+                await DeviceInfo.shared.ensureBuvids()
+                request = try await buildSignedRequest(
+                    baseURL: baseURL,
+                    path: path,
+                    queryItems: queryItems,
+                    signWithWBI: signWithWBI,
+                    referer: referer,
+                    anonymousRequest: anonymousRequest
+                )
+            }
             try await Task.sleep(for: .milliseconds(1_200))
             resolved = try await session.data(for: request)
         } else if signWithWBI, let initialCode,
@@ -2657,13 +2694,13 @@ private actor WbiSigner {
     /// the instance cache is the source of truth for
     /// staleness; the static cache is only the boot
     /// speed-up.
-    private static var prewarmedKeys: CachedKeys?
+    private static let prewarmedKeys = Mutex<CachedKeys?>(nil)
 
     /// Best-effort boot-time fetch.  No-ops if the keys are
     /// already populated or the network call fails — the
     /// regular `loadKeys()` path will pick up the slack.
     static func prewarm(using session: URLSession) async {
-        guard prewarmedKeys == nil else { return }
+        guard prewarmedKeys.withLock({ $0 == nil }) else { return }
         do {
             var request = URLRequest(url: URL(string: "https://api.bilibili.com/x/web-interface/nav")!)
             request.cachePolicy = .reloadIgnoringLocalCacheData
@@ -2673,11 +2710,13 @@ private actor WbiSigner {
             let payload = try JSONDecoder().decode(WbiNavResponse.self, from: data)
             let imgURL = payload.data.wbiImg.imgURL
             let subURL = payload.data.wbiImg.subURL
-            prewarmedKeys = CachedKeys(
-                imgKey: imgURL.deletingPathExtension().lastPathComponent,
-                subKey: subURL.deletingPathExtension().lastPathComponent,
-                fetchedAt: Date()
-            )
+            prewarmedKeys.withLock {
+                $0 = CachedKeys(
+                    imgKey: imgURL.deletingPathExtension().lastPathComponent,
+                    subKey: subURL.deletingPathExtension().lastPathComponent,
+                    fetchedAt: Date()
+                )
+            }
             bpLog("WbiSigner prewarm: keys cached")
         } catch {
             // Non-fatal. First signed request will retry.
@@ -2694,7 +2733,7 @@ private actor WbiSigner {
     /// without a relaunch.
     func invalidate() {
         cachedKeys = nil
-        Self.prewarmedKeys = nil
+        Self.prewarmedKeys.withLock { $0 = nil }
         bpLog("WbiSigner invalidated — keys will be re-fetched on next sign")
     }
 
@@ -2728,7 +2767,7 @@ private actor WbiSigner {
         // before going to the network.  Static cache is only
         // consulted when the instance cache is empty or
         // expired — TTL still applies.
-        if let prewarmed = Self.prewarmedKeys,
+        if let prewarmed = Self.prewarmedKeys.withLock({ $0 }),
            Date().timeIntervalSince(prewarmed.fetchedAt) < keyTTL {
             cachedKeys = prewarmed
             return prewarmed

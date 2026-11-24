@@ -323,6 +323,15 @@ private struct SpiResponse: Decodable, Sendable {
     struct SpiData: Decodable, Sendable {
         let b3: String
         let b4: String
+        // The SPI envelope uses underscored keys (`b_3`/`b_4`); the
+        // unmapped names decoded nothing and every anonymous launch
+        // logged "buvid3 fetch failed: data missing", leaving the
+        // client without a device fingerprint and web-interface
+        // endpoints answering 412 风控.
+        enum CodingKeys: String, CodingKey {
+            case b3 = "b_3"
+            case b4 = "b_4"
+        }
     }
 }
 

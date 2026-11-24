@@ -1,5 +1,17 @@
-import ActivityKit
+#if !targetEnvironment(macCatalyst)
+@preconcurrency import ActivityKit
+#endif
 import Foundation
+
+#if targetEnvironment(macCatalyst)
+/// Placeholder so `end(reason:)` keeps the same signature on
+/// platforms without ActivityKit (Mac Catalyst has no Live
+/// Activities; the coordinator's methods become no-ops).
+enum ActivityUIDismissalPolicy: Sendable {
+    case `default`
+    case immediate
+}
+#endif
 
 /// Thin lifecycle manager for the live-room Live Activity.
 ///
@@ -14,7 +26,9 @@ import Foundation
 final class LiveActivityCoordinator {
     static let shared = LiveActivityCoordinator()
 
+    #if !targetEnvironment(macCatalyst)
     private var currentActivity: Activity<LiveRoomActivityAttributes>?
+    #endif
 
     private init() {}
 
@@ -24,9 +38,11 @@ final class LiveActivityCoordinator {
     /// setting both have to be honoured, so the check is
     /// two-step.
     static var isSupported: Bool {
+        #if !targetEnvironment(macCatalyst)
         if #available(iOS 16.1, *) {
             return ActivityAuthorizationInfo().areActivitiesEnabled
         }
+        #endif
         return false
     }
 
@@ -36,6 +52,7 @@ final class LiveActivityCoordinator {
     /// sees one LIVE pill at a time.
     func start(for room: BiliLiveRoom) {
         guard Self.isSupported else { return }
+        #if !targetEnvironment(macCatalyst)
         end(reason: .immediate)
         let attributes = LiveRoomActivityAttributes(
             roomId: String(room.id),
@@ -64,27 +81,32 @@ final class LiveActivityCoordinator {
             // banner is the only thing missing.
             bpLog("Live Activity request failed: \(error)")
         }
+        #endif
     }
 
     /// Update the viewer count in the existing activity.
     /// A no-op when no activity is on screen so a stale
     /// `viewerCount` is never sent after `.onDisappear`.
     func update(viewerCount: Int) {
+        #if !targetEnvironment(macCatalyst)
         guard #available(iOS 16.1, *), let activity = currentActivity else { return }
         let state = LiveRoomActivityState(viewerCount: viewerCount, isLive: true)
         Task {
             await activity.update(ActivityContent(state: state, staleDate: nil))
         }
+        #endif
     }
 
     /// End the live activity. Called from the view's
     /// `.onDisappear` so the banner is dismissed the
     /// moment the user leaves the live room.
     func end(reason: ActivityUIDismissalPolicy = .default) {
+        #if !targetEnvironment(macCatalyst)
         guard #available(iOS 16.1, *), let activity = currentActivity else { return }
         currentActivity = nil
         Task {
             await activity.end(activity.content, dismissalPolicy: reason)
         }
+        #endif
     }
 }

@@ -63,7 +63,7 @@
 		100000000000000000000472 /* PaladalaWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000471 /* PaladalaWidgetBundle.swift */; };
 		100000000000000000000474 /* LiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000473 /* LiveActivityWidget.swift */; };
 		100000000000000000000475 /* LiveRoomActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000464 /* LiveRoomActivityAttributes.swift */; };
-		10000000000000000000047A /* PaladalaWidget.appex in Embed PlugIns */ = {isa = PBXBuildFile; fileRef = 100000000000000000000479 /* PaladalaWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		10000000000000000000047A /* PaladalaWidget.appex in Embed PlugIns */ = {isa = PBXBuildFile; fileRef = 100000000000000000000479 /* PaladalaWidget.appex */; platformFilters = (ios, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		500000000000000000000551 /* DownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 500000000000000000000550 /* DownloadManager.swift */; };
 		500000000000000000000553 /* DownloadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 500000000000000000000552 /* DownloadStore.swift */; };
 		500000000000000000000571 /* PlayProgressStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 500000000000000000000570 /* PlayProgressStore.swift */; };
@@ -604,6 +604,7 @@
 /* Begin PBXTargetDependency section */
 		100000000000000000000480 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilters = (ios, );
 			target = 10000000000000000000047B /* PaladalaWidget */;
 			targetProxy = 100000000000000000000481 /* PBXContainerItemProxy */;
 		};
@@ -953,7 +954,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.dt.paladala;
 				PRODUCT_NAME = Paladala;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MACCATALYST = YES;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Paladala/Paladala-Bridging-Header.h";
@@ -985,7 +986,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.dt.paladala;
 				PRODUCT_NAME = Paladala;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
+					SUPPORTS_MACCATALYST = YES;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Paladala/Paladala-Bridging-Header.h";

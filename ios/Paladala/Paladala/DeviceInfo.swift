@@ -24,6 +24,7 @@
 import Foundation
 import Network
 import Combine
+import Synchronization
 import UIKit
 
 @MainActor
@@ -65,6 +66,45 @@ final class DeviceInfo: ObservableObject {
     /// `nil` on first launch / after a fresh install.
     nonisolated var persistedBuvid3: String? {
         UserDefaults.standard.string(forKey: Self.buvid3DefaultsKey)
+    }
+
+    /// Thread-safe read of the persisted buvid4, paired with
+    /// `persistedBuvid3`.
+    nonisolated var persistedBuvid4: String? {
+        UserDefaults.standard.string(forKey: Self.buvid4DefaultsKey)
+    }
+
+    /// In-flight SPI fetch, guarded by a `Mutex` so a burst of
+    /// callers (launch tasks + the 412 retry path) shares one network
+    /// hop instead of stampeding `/x/frontend/finger/spi`.
+    /// `Mutex` (not `NSLock`) because `lock()`/`unlock()` are banned
+    /// from async contexts under Swift 6 concurrency checking.
+    nonisolated let buvidFetchTask = Mutex<Task<Void, Never>?>(nil)
+
+    /// Ensure a device-fingerprint pair is persisted, fetching it from
+    /// `/x/frontend/finger/spi` when missing. Safe to call from any
+    /// context; concurrent callers await the same fetch. B 站's
+    /// `/x/web-interface/*` endpoints 412 fingerprint-less requests,
+    /// so `BilibiliAPIClient.get` calls this on the 412 retry path.
+    nonisolated func ensureBuvids() async {
+        if persistedBuvid3 != nil { return }
+        let task: Task<Void, Never> = buvidFetchTask.withLock { slot in
+            if let existing = slot { return existing }
+            let created = Task<Void, Never> {
+                do {
+                    let ids = try await BilibiliAuthAPI().fetchDeviceID()
+                    await MainActor.run {
+                        DeviceInfo.shared.setBuvids(buvid3: ids.buvid3, buvid4: ids.buvid4)
+                    }
+                } catch {
+                    bpLog("DeviceInfo: buvid3 fetch failed: \(error.localizedDescription)")
+                }
+                DeviceInfo.shared.buvidFetchTask.withLock { $0 = nil }
+            }
+            slot = created
+            return created
+        }
+        await task.value
     }
 
     /// Persist a freshly-fetched SPI device-fingerprint pair.

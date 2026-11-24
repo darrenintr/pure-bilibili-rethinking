@@ -227,20 +227,13 @@ struct PaladalaApp: App {
                     // .persistedBuvid3`. Errors are logged so a
                     // regression is diagnosable from the in-app
                     // log export.
+                    // Shares the single in-flight SPI fetch with the
+                    // API client's 412-retry path (`DeviceInfo
+                    // .ensureBuvids`) so a launch burst can't
+                    // stampede `/x/frontend/finger/spi`.
                     if DeviceInfo.shared.persistedBuvid3 == nil {
-                        let api = BilibiliAuthAPI()
                         Task {
-                            do {
-                                let ids = try await api.fetchDeviceID()
-                                await MainActor.run {
-                                    DeviceInfo.shared.setBuvids(
-                                        buvid3: ids.buvid3,
-                                        buvid4: ids.buvid4
-                                    )
-                                }
-                            } catch {
-                                bpLog("PaladalaApp: anonymous buvid3 fetch failed: \(error.localizedDescription)")
-                            }
+                            await DeviceInfo.shared.ensureBuvids()
                         }
                     }
 

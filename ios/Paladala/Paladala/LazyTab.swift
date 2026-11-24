@@ -18,7 +18,14 @@ struct LazyTab<Tag: Hashable, V: View>: View {
 
     var body: some View {
         Group {
-            if armed {
+            // iOS 26's `TabView` mounts only the selected tab's body
+            // and neither `.onChange(initial:)` nor `.onAppear` is
+            // guaranteed to fire for the tag already selected at
+            // first evaluation — gating purely on `armed` left the
+            // home tab an `EmptyView` until the user switched away
+            // and back. `armed` now only keeps a once-visited tab's
+            // `@StateObject` alive while it's off-screen.
+            if armed || activeTag == tag {
                 content()
             } else {
                 EmptyView()
@@ -27,6 +34,11 @@ struct LazyTab<Tag: Hashable, V: View>: View {
         .onChange(of: activeTag, initial: true) { _, new in
             // `new` is `Tag?`; lift to compare with the non-optional `tag`.
             if let unwrapped = new, unwrapped == tag, !armed {
+                armed = true
+            }
+        }
+        .onAppear {
+            if !armed, activeTag == nil || activeTag == tag {
                 armed = true
             }
         }

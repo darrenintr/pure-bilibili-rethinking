@@ -3033,7 +3033,13 @@ final class LocalHLSProxyServer: @unchecked Sendable {
                 .map { frag -> Int64 in
                     let bytes = Int64(frag.byteRange.upperBound
                                       - frag.byteRange.lowerBound)
-                    return bytes * 8 / Int64(frag.duration)
+                    // `duration` is a `Double` in seconds — a
+                    // fragment shorter than 1 s truncates to 0
+                    // through `Int64()` and the integer division
+                    // traps ("Division by zero" on the proxy queue,
+                    // killing the app mid-manifest). Compute in
+                    // Double and convert the *result*.
+                    return Int64((Double(bytes) * 8.0 / frag.duration).rounded())
                 }
                 .max() ?? 0
         }

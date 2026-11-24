@@ -1,4 +1,6 @@
+#if !targetEnvironment(macCatalyst)
 import ActivityKit
+#endif
 import Foundation
 
 /// ActivityKit attributes for the live-room Live Activity.
@@ -13,6 +15,7 @@ import Foundation
 /// The `ContentState` is the only field that changes during
 /// the lifetime of the activity; the static fields are set
 /// once at `Activity.request(_:)` time.
+#if !targetEnvironment(macCatalyst)
 public struct LiveRoomActivityAttributes: ActivityAttributes, Sendable {
     public typealias ContentState = LiveRoomActivityState
 
@@ -32,6 +35,7 @@ public struct LiveRoomActivityAttributes: ActivityAttributes, Sendable {
         self.areaName = areaName
     }
 }
+#endif
 
 /// Mutable payload pushed by the host app while the live
 /// room is open. The widget extension renders `viewerCount`
