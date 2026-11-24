@@ -393,14 +393,14 @@ final class LocalHLSProxyServerTests: XCTestCase {
         // Reproduction of the BV1kN3m6eEPK diagnostic:
         // declared video=6,311,344 bps + audio=103,120 bps,
         // sidx peak segment = 5,255,891 bytes / 4.77s ≈
-        // 8,815,308 bps.  The pre-fix code emitted
+        // 8,814,911 bps.  The pre-fix code emitted
         // 6,414,464 bps → AVPlayer's "Segment exceeds
         // specified bandwidth for variant" check tripped on
         // the 8.8 Mbps actual peak.  Post-fix, the chosen
         // value is the larger of:
-        //   1. 8,815,308 * 1.15 = 10,137,604
+        //   1. 8,814,911 * 1.15 = 10,137,148
         //   2. 6,414,464 * 1.5  =  9,621,696
-        // so 10,137,604 wins.
+        // so 10,137,148 wins.
         let videoFrags = [
             makeMediaFragment(bytes: 5_255_891, duration: 4.77),
             makeMediaFragment(bytes: 4_900_000, duration: 4.50)
@@ -411,7 +411,12 @@ final class LocalHLSProxyServerTests: XCTestCase {
             videoFragments: videoFrags,
             audioFragments: []
         )
-        let expectedPeak = Int64(5_255_891 * 8 / 4)  // integer-truncated
+        // Measured in Double: sub-second durations must not
+        // truncate to 0 (division-by-zero crash) and
+        // fractional seconds must not be truncated either —
+        // `Int64(4.77) = 4` used to inflate the peak to
+        // 10.5 Mbps.
+        let expectedPeak = Int64((5_255_891.0 * 8.0 / 4.77).rounded())
         XCTAssertEqual(decision.videoPeakBps, expectedPeak)
         XCTAssertEqual(decision.audioPeakBps, 0)
         XCTAssertEqual(decision.measuredPeakBps, expectedPeak)
