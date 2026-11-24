@@ -110,6 +110,7 @@ struct HomeView: View {
         ScrollViewReader { proxy in
             feedContent(scrollProxy: proxy)
                 .background(Color.clear)
+                .navigationTitle("首頁")
                 // Apple large-title guidance for top-level
                 // navigation: the title collapses into the
                 // chrome on scroll and re-expands when the
@@ -122,9 +123,7 @@ struct HomeView: View {
                 // Street stays on `.inline` because the hard-edged
                 // style works better with a permanently compact
                 // title.
-                .navigationBarTitleDisplayMode(
-                    PaladalaTheme.usesNativeLayout ? .large : .inline
-                )
+                .navigationBarTitleDisplayMode(.inline)
                 // PR-fix-2026-07-10: replace `.searchable` with
                 // a hand-rolled `UISearchFieldBridge` so the
                 // search bar carries Street Minimal chrome

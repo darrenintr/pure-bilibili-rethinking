@@ -413,7 +413,6 @@ private struct PhoneRootView: View {
     @Namespace private var heroNamespace
 
     var body: some View {
-        NavigationStack(path: $router.path) {
             TabView(selection: $router.selectedTab) {
                 // Each tab body is wrapped in LazyTab so the inner
                 // View (and its `@StateObject` / @State) is only
@@ -421,7 +420,10 @@ private struct PhoneRootView: View {
                 // State is preserved across tab switches via the
                 // wrapper's own @State, so going to Settings and back
                 // does not re-init HomeView. PR-A, audit #5.
-                HomeView(repository: repository, heroNamespace: heroNamespace)
+                LazyTabNavStack(tag: MainTab.home, activeTag: router.selectedTab, path: $router.homePath) {
+                    HomeView(repository: repository, heroNamespace: heroNamespace)
+                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
+                }
                 .tabItem {
                     // Apple's recommended "select bounce" — the
                     // SF Symbol scales up + back down when the
@@ -440,8 +442,9 @@ private struct PhoneRootView: View {
                 }
                 .tag(MainTab.home)
 
-                LazyTab(tag: MainTab.dynamic, activeTag: router.selectedTab) {
+                LazyTabNavStack(tag: MainTab.dynamic, activeTag: router.selectedTab, path: $router.dynamicPath) {
                     DynamicFeedView(repository: repository, heroNamespace: heroNamespace)
+                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
                 }
                 .tabItem {
                     Label {
@@ -453,8 +456,9 @@ private struct PhoneRootView: View {
                 }
                 .tag(MainTab.dynamic)
 
-                LazyTab(tag: MainTab.live, activeTag: router.selectedTab) {
+                LazyTabNavStack(tag: MainTab.live, activeTag: router.selectedTab, path: $router.livePath) {
                     LiveRoomsView(repository: repository)
+                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
                 }
                 .tabItem {
                     Label {
@@ -466,8 +470,9 @@ private struct PhoneRootView: View {
                 }
                 .tag(MainTab.live)
 
-                LazyTab(tag: MainTab.profile, activeTag: router.selectedTab) {
+                LazyTabNavStack(tag: MainTab.profile, activeTag: router.selectedTab, path: $router.profilePath) {
                     ProfileSettingsView(repository: repository)
+                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
                 }
                 .tabItem {
                     Label {
@@ -480,49 +485,6 @@ private struct PhoneRootView: View {
                 .tag(MainTab.profile)
             }
             .paladalaTabBarBehavior()
-            .navigationTitle(router.selectedTab.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationDestination(for: BiliVideo.self) { video in
-                VideoDetailView(video: video, repository: repository, heroNamespace: heroNamespace)
-            }
-            .navigationDestination(for: ProfileRoute.self) { route in
-                profileRouteView(route, repository: repository)
-            }
-            .navigationDestination(for: ReplyRoute.self) { route in
-                ReplyListView(video: route.video, rootComment: route.rootComment, repository: repository)
-            }
-            .navigationDestination(for: LocalVideoRoute.self) { route in
-                switch route {
-                case .local(let record):
-                    VideoDetailView(
-                        video: record.video,
-                        repository: repository,
-                        heroNamespace: heroNamespace,
-                        localRecord: record
-                    )
-                }
-            }
-            .navigationDestination(for: BangumiRoute.self) { route in
-                switch route {
-                case .timeline:
-                    BangumiHomeView(repository: repository, heroNamespace: heroNamespace)
-                case .seasonDetail(let seasonId):
-                    BangumiSeasonDetailView(
-                        repository: repository,
-                        seasonId: seasonId
-                    )
-                }
-            }
-            .navigationDestination(for: UPProfileRoute.self) { route in
-                switch route {
-                case .up(let mid):
-                    UPProfileView(mid: mid, repository: repository)
-                }
-            }
-        }
-        // System-provided interactive pop gesture handles back
-        // navigation; `NavigationStack` (iOS 16+) ships with
-        // swipe-from-edge built in. No custom gesture needed.
     }
 }
 
@@ -552,48 +514,7 @@ private struct PadRootView: View {
             )
             .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 320)
         } detail: {
-            NavigationStack(path: $router.path) {
-                selectedView
-                    .navigationDestination(for: BiliVideo.self) { video in
-                        VideoDetailView(video: video, repository: repository, heroNamespace: heroNamespace)
-                    }
-                    .navigationDestination(for: ProfileRoute.self) { route in
-                        profileRouteView(route, repository: repository)
-                    }
-                    .navigationDestination(for: ReplyRoute.self) { route in
-                        ReplyListView(video: route.video, rootComment: route.rootComment, repository: repository)
-                    }
-                    .navigationDestination(for: LocalVideoRoute.self) { route in
-                        switch route {
-                        case .local(let record):
-                            VideoDetailView(
-                                video: record.video,
-                                repository: repository,
-                                heroNamespace: heroNamespace,
-                                localRecord: record
-                            )
-                        }
-                    }
-                    .navigationDestination(for: BangumiRoute.self) { route in
-                        switch route {
-                        case .timeline:
-                            BangumiHomeView(repository: repository, heroNamespace: heroNamespace)
-                        case .seasonDetail(let seasonId):
-                            BangumiSeasonDetailView(
-                                repository: repository,
-                                seasonId: seasonId
-                            )
-                        }
-                    }
-                    .navigationDestination(for: UPProfileRoute.self) { route in
-                        switch route {
-                        case .up(let mid):
-                            UPProfileView(mid: mid, repository: repository)
-                        }
-                    }
-            }
-            // System-provided interactive pop gesture handles
-            // back navigation; no custom recognizer needed.
+            selectedView
         }
     }
 
@@ -617,23 +538,35 @@ private struct PadRootView: View {
         ZStack {
             switch router.selectedTab {
             case .home:
-                HomeView(
-                    repository: repository,
-                    heroNamespace: heroNamespace,
-                    iPadColumns: iPadColumns
-                )
+                NavigationStack(path: $router.homePath) {
+                    HomeView(
+                        repository: repository,
+                        heroNamespace: heroNamespace,
+                        iPadColumns: iPadColumns
+                    )
+                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
+                }
                     .transition(ScreenSwitchTransition.active)
                     .id(MainTab.home)
             case .dynamic:
-                DynamicFeedView(repository: repository, heroNamespace: heroNamespace)
+                NavigationStack(path: $router.dynamicPath) {
+                    DynamicFeedView(repository: repository, heroNamespace: heroNamespace)
+                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
+                }
                     .transition(ScreenSwitchTransition.active)
                     .id(MainTab.dynamic)
             case .live:
-                LiveRoomsView(repository: repository)
+                NavigationStack(path: $router.livePath) {
+                    LiveRoomsView(repository: repository)
+                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
+                }
                     .transition(ScreenSwitchTransition.active)
                     .id(MainTab.live)
             case .profile:
-                ProfileSettingsView(repository: repository)
+                NavigationStack(path: $router.profilePath) {
+                    ProfileSettingsView(repository: repository)
+                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
+                }
                     .transition(ScreenSwitchTransition.active)
                     .id(MainTab.profile)
             }
@@ -787,4 +720,94 @@ private func profileRouteView(_ route: ProfileRoute, repository: PaladalaReposit
 /// The custom DSNavBar / Street overlays are deleted.
 private struct _RemovedLegacyChromeModifiers: ViewModifier {
     func body(content: Content) -> some View { content }
+}
+
+
+/// Shared navigation-destination registrations, applied inside each
+/// tab's own `NavigationStack`. Every tab can therefore push videos,
+/// replies, UP profiles, bangumi and local downloads independently —
+/// the Apple-native per-tab stack pattern.
+private struct PaladalaNavDestinations: ViewModifier {
+    let repository: PaladalaRepository
+    let heroNamespace: Namespace.ID?
+
+    func body(content: Content) -> some View {
+        content
+            .navigationDestination(for: BiliVideo.self) { video in
+                VideoDetailView(video: video, repository: repository, heroNamespace: heroNamespace)
+            }
+            .navigationDestination(for: ProfileRoute.self) { route in
+                profileRouteView(route, repository: repository)
+            }
+            .navigationDestination(for: ReplyRoute.self) { route in
+                ReplyListView(video: route.video, rootComment: route.rootComment, repository: repository)
+            }
+            .navigationDestination(for: LocalVideoRoute.self) { route in
+                switch route {
+                case .local(let record):
+                    VideoDetailView(
+                        video: record.video,
+                        repository: repository,
+                        heroNamespace: heroNamespace,
+                        localRecord: record
+                    )
+                }
+            }
+            .navigationDestination(for: BangumiRoute.self) { route in
+                switch route {
+                case .timeline:
+                    BangumiHomeView(repository: repository, heroNamespace: heroNamespace)
+                case .seasonDetail(let seasonId):
+                    BangumiSeasonDetailView(repository: repository, seasonId: seasonId)
+                }
+            }
+            .navigationDestination(for: UPProfileRoute.self) { route in
+                switch route {
+                case .up(let mid):
+                    UPProfileView(mid: mid, repository: repository)
+                }
+            }
+    }
+}
+
+extension View {
+    func paladalaNavDestinations(repository: PaladalaRepository, heroNamespace: Namespace.ID?) -> some View {
+        modifier(PaladalaNavDestinations(repository: repository, heroNamespace: heroNamespace))
+    }
+}
+
+/// Per-tab `NavigationStack` + lazy arming. Combines `LazyTab`'s
+/// deferred `@StateObject` construction with each tab owning its
+/// navigation stack, which is what makes `.navigationTitle`,
+/// `.toolbar` and `.searchable` inside the tab render in the bar
+/// (they cannot propagate through a TabView to an outer stack).
+private struct LazyTabNavStack<Tag: Hashable, V: View>: View {
+    let tag: Tag
+    let activeTag: Tag?
+    @Binding var path: NavigationPath
+    @ViewBuilder let content: () -> V
+
+    @State private var armed: Bool = false
+
+    var body: some View {
+        Group {
+            if armed || activeTag == tag {
+                NavigationStack(path: $path) {
+                    content()
+                }
+            } else {
+                EmptyView()
+            }
+        }
+        .onChange(of: activeTag, initial: true) { _, new in
+            if let unwrapped = new, unwrapped == tag, !armed {
+                armed = true
+            }
+        }
+        .onAppear {
+            if !armed, activeTag == nil || activeTag == tag {
+                armed = true
+            }
+        }
+    }
 }

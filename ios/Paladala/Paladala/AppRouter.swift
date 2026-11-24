@@ -125,7 +125,37 @@ final class AppRouter: ObservableObject {
             UserDefaults.standard.set(selectedTab.rawValue, forKey: "paladala.selectedTab")
         }
     }
-    @Published var path = NavigationPath()
+    /// Per-tab navigation paths. Each tab owns an independent
+    /// `NavigationStack` (the Apple-native pattern — TabView children
+    /// cannot propagate `.navigationTitle`/`.toolbar`/`.searchable` to
+    /// an outer stack on iOS 26, which previously left every tab with a
+    /// blank bar and dead toolbar buttons).
+    @Published var homePath = NavigationPath()
+    @Published var dynamicPath = NavigationPath()
+    @Published var livePath = NavigationPath()
+    @Published var profilePath = NavigationPath()
+
+    /// Proxy forwarding to the currently selected tab's path so the
+    /// existing push helpers (`openVideo`, `open`, ...) keep working
+    /// unchanged — pushes always land in the visible tab's stack.
+    var path: NavigationPath {
+        get {
+            switch selectedTab {
+            case .home: return homePath
+            case .dynamic: return dynamicPath
+            case .live: return livePath
+            case .profile: return profilePath
+            }
+        }
+        set {
+            switch selectedTab {
+            case .home: homePath = newValue
+            case .dynamic: dynamicPath = newValue
+            case .live: livePath = newValue
+            case .profile: profilePath = newValue
+            }
+        }
+    }
     @Published var pendingSearchQuery = ""
     /// Set to `true` to present the login sheet. The sheet sets it back
     /// to `false` when it dismisses itself.
