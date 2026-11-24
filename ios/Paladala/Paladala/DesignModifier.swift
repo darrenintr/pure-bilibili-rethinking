@@ -380,20 +380,17 @@ extension View {
         isSelected: Bool,
         design: MaterialDesign
     ) -> some View {
-        // Native capsule chip — selected uses the accent tint,
-        // unselected a system fill.  Glass styling comes from
-        // `paladalaGlassSurface` callers that opt in.
+        // Native capsule chip — glass in liquid mode, tinted
+        // capsule when selected.
         self
             .font(PaladalaTheme.IOSNative.subheadline)
             .foregroundStyle(isSelected ? Color.white : Color.primary)
             .padding(.horizontal, 14)
             .padding(.vertical, 7)
-            .background(
-                isSelected
-                    ? Color.accentColor
-                    : Color(uiColor: .systemFill)
+            .paladalaGlassSurface(
+                in: Capsule(),
+                tint: isSelected ? Color.accentColor.opacity(0.85) : nil
             )
-            .clipShape(Capsule())
     }
 
     /// Picker-style chip. Tap to set `selection` to `value`. Renders

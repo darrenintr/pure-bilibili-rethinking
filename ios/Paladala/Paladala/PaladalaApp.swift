@@ -334,105 +334,10 @@ struct PaladalaApp: App {
         }
     }
 
-    /// Configure system-owned navigation and tab chrome with opaque paper
-    /// surfaces. Search, share, document picker, and AVPlayer remain native
-    /// controls for accessibility, but their surrounding bars no longer
-    /// reintroduce translucent material into the Street Minimal hierarchy.
-    private static func configureStreetAppearance() {
-        if PaladalaTheme.activeVariant == .expressive {
-            let navigation = UINavigationBarAppearance()
-            navigation.configureWithDefaultBackground()
-            UINavigationBar.appearance().standardAppearance = navigation
-            UINavigationBar.appearance().compactAppearance = navigation
-            UINavigationBar.appearance().scrollEdgeAppearance = navigation
-            let tabs = UITabBarAppearance()
-            tabs.configureWithDefaultBackground()
-            UITabBar.appearance().standardAppearance = tabs
-            UITabBar.appearance().scrollEdgeAppearance = tabs
-            return
-        }
-        let ink = UIColor { traits in
-            traits.userInterfaceStyle == .dark ? .white : .black
-        }
-        let paper = UIColor { traits in
-            traits.userInterfaceStyle == .dark ? .black : .white
-        }
-        let coolGray = UIColor { traits in
-            traits.userInterfaceStyle == .dark
-                ? UIColor(red: 0.11, green: 0.11, blue: 0.11, alpha: 1)
-                : UIColor(red: 0.957, green: 0.957, blue: 0.957, alpha: 1)
-        }
-        let pink = UIColor(red: 1, green: 0.38, blue: 0.58, alpha: 1)
-
-        let navigation = UINavigationBarAppearance()
-        navigation.configureWithOpaqueBackground()
-        navigation.backgroundColor = paper
-        navigation.shadowColor = ink
-        navigation.titleTextAttributes = [
-            .foregroundColor: ink,
-            .font: UIFont.systemFont(ofSize: 17, weight: .black)
-        ]
-        navigation.largeTitleTextAttributes = [
-            .foregroundColor: ink,
-            .font: UIFont.systemFont(ofSize: 34, weight: .black)
-        ]
-        UINavigationBar.appearance().standardAppearance = navigation
-        UINavigationBar.appearance().compactAppearance = navigation
-        UINavigationBar.appearance().scrollEdgeAppearance = navigation
-
-        let tab = UITabBarAppearance()
-        tab.configureWithOpaqueBackground()
-        tab.backgroundColor = paper
-        tab.shadowColor = ink
-        for itemAppearance in [
-            tab.stackedLayoutAppearance,
-            tab.inlineLayoutAppearance,
-            tab.compactInlineLayoutAppearance
-        ] {
-            itemAppearance.selected.iconColor = pink
-            itemAppearance.selected.titleTextAttributes = [.foregroundColor: pink]
-            itemAppearance.normal.iconColor = ink
-            itemAppearance.normal.titleTextAttributes = [.foregroundColor: ink]
-        }
-        UITabBar.appearance().standardAppearance = tab
-        UITabBar.appearance().scrollEdgeAppearance = tab
-
-        let segmented = UISegmentedControl.appearance()
-        segmented.backgroundColor = coolGray
-        segmented.selectedSegmentTintColor = pink
-        segmented.setTitleTextAttributes([.foregroundColor: ink], for: .normal)
-        segmented.setTitleTextAttributes([.foregroundColor: UIColor.black], for: .selected)
-
-        UIPageControl.appearance().currentPageIndicatorTintColor = pink
-        UIPageControl.appearance().pageIndicatorTintColor = ink.withAlphaComponent(0.28)
-
-        // PR-fix-2026-07-10 (A): the trailing toolbar column on
-        // `HomeView` (离线缓存 / 短视频 / 刷新 / 动态 / 我的) was
-        // rendering with the iOS 26 Liquid Glass material so the
-        // icons looked like they were floating on a separate
-        // surface.  UIKit has no `UIBarButtonItemAppearance`
-        // style API on iOS 26 (it lives on `UINavigationBar` /
-        // `UITabBar` / `UIToolbar` only); the right knob for
-        // SwiftUI's `ToolbarItemGroup(placement: .topBarTrailing)`
-        // is `.toolbarBackground(_:for: .navigationBar)`.  Applied
-        // to every screen at the `RootView` level so the chrome
-        // is consistent without touching every view file.
-        //
-        // PR-fix-2026-07-10 (B): `.searchable(...)` in
-        // `HomeView` was rendering the iOS 26 default round
-        // search bar.  `UISearchBar` has no appearance-level
-        // background API on iOS 26 (only the deprecated
-        // `searchFieldBackgroundImage`), and the inner text
-        // field is private.  The only viable routes are
-        // (a) wrap a custom `UISearchBar` in a
-        // `UIViewRepresentable` and own its background there,
-        // or (b) drop `.searchable` and use a hand-rolled
-        // `TextField` + magnifier icon.  Both are out of scope
-        // for a chrome-pass PR — flagging for a follow-up.
-        // The toolbar fix above should at least pull the nav
-        // bar into visual alignment, leaving the search bar
-        // as the remaining tinted surface.
-    }
+    /// System chrome is left at UIKit defaults so navigation and
+    /// tab bars keep the platform material (Liquid Glass on
+    /// iOS 26+, system material below).
+    private static func configureStreetAppearance() {}
 }
 
 // MARK: - Logger

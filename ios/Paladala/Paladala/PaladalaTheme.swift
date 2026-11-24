@@ -153,7 +153,10 @@ enum PaladalaTheme {
     }
 
     // MARK: - Brand colors (variant-agnostic)
-    static var biliPink: Color { activeVariant == .expressive ? expressiveColor { $0.primary } : Color(red: 1.0, green: 0.38, blue: 0.58) } // #FF6194
+    /// Brand accent — now maps to the system accent color so the
+    /// whole app follows the native iOS look instead of the old
+    /// hard-coded Bilibili pink.
+    static var biliPink: Color { Color.accentColor }
     static let biliPinkDim = Color(red: 0.70, green: 0.14, blue: 0.35)
 
     // MARK: - Adaptive ink + paper (variant-aware)

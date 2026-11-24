@@ -139,7 +139,14 @@ struct VideoCard: View {
                     .minimumScaleFactor(0.75)
                 }
                 .padding(.horizontal, 4)
+                .padding(.bottom, PaladalaTheme.Spacing.s)
             }
+            .paladalaGlassSurface(
+                in: RoundedRectangle(
+                    cornerRadius: PaladalaTheme.cornerRadius,
+                    style: .continuous
+                )
+            )
             .contentShape(Rectangle())
         }
     }
