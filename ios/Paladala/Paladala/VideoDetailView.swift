@@ -223,6 +223,11 @@ struct VideoDetailView: View {
     /// a sheet offers "继续观看 MM:SS" or "重新播放".  Auto-dismisses
     /// to nil after the user picks (or taps outside).
     @State private var resumePromptSeconds: Double?
+    /// Set once we've shown the resume sheet for this detail
+    /// view — without it `.task` re-runs on every re-appear
+    /// (e.g. dismissing fullscreen playback) and the sheet
+    /// pops again even though the user already chose.
+    @State private var didPromptResume = false
     /// Default countdown duration. YouTube uses 5 s; matches
     /// the HIG-recommended transition window for video
     /// chrome.
@@ -492,11 +497,14 @@ struct VideoDetailView: View {
             // from where they left off or restart.  Gated > 30 s
             // of progress so trivial re-opens (skipped a tab,
             // came back) don't pepper the user.
-            if let saved = PlayProgressStore.shared.lastProgress(for: model.detail.bvid),
-               saved.currentTime > 30,
-               let duration = playerController?.duration, duration > 0,
-               saved.currentTime < duration - 30 {
-                resumePromptSeconds = saved.currentTime
+            if !didPromptResume {
+                didPromptResume = true
+                if let saved = PlayProgressStore.shared.lastProgress(for: model.detail.bvid),
+                   saved.currentTime > 30,
+                   let duration = playerController?.duration, duration > 0,
+                   saved.currentTime < duration - 30 {
+                    resumePromptSeconds = saved.currentTime
+                }
             }
         }
         .modifier(ResumePromptSheetModifier(
@@ -1783,18 +1791,8 @@ struct VideoDetailView: View {
     private var commentInputField: some View {
         HStack(spacing: 12) {
             TextField("說點什麼…", text: $newCommentText)
-                .font(PaladalaTheme.FontRole.bodySmall)
-                .textFieldStyle(.plain)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 44)
-                .background(PaladalaTheme.paper)
-                .overlay {
-                    Rectangle()
-                        .strokeBorder(
-                            PaladalaTheme.ink,
-                            lineWidth: PaladalaTheme.borderWidth
-                        )
-                }
+                .textFieldStyle(.roundedBorder)
+                .frame(minHeight: 36)
                 .disabled(isSubmittingComment)
 
             Button {
@@ -1811,26 +1809,14 @@ struct VideoDetailView: View {
             } label: {
                 if isSubmittingComment {
                     ProgressView().controlSize(.small)
+                        .frame(minWidth: 52)
                 } else {
-                    // Mixed-script bug fix from A11y honourable
-                    // mentions — the rest of the app is 简体 so
-                    // the comment-publish button was reading
-                    // 繁體 against the rest.  Use the localized key.
                     Text(L10n.video.publish)
-                        .font(PaladalaTheme.FontRole.labelMono)
-                        .foregroundStyle(PaladalaTheme.ink)
-                        .frame(minWidth: 52, minHeight: 44)
-                        .background(PaladalaTheme.biliPink)
-                        .overlay {
-                            Rectangle()
-                                .strokeBorder(
-                                    PaladalaTheme.ink,
-                                    lineWidth: PaladalaTheme.borderWidth
-                                )
-                        }
+                        .frame(minWidth: 52, minHeight: 32)
                 }
             }
-            .buttonStyle(PaladalaPressBounceButtonStyle())
+            .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.capsule)
             .disabled(newCommentText.isEmpty || isSubmittingComment)
         }
     }
@@ -2404,8 +2390,8 @@ private struct ResumePromptSheet: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Rectangle()
-                .fill(PaladalaTheme.ink)
+            Capsule()
+                .fill(Color.secondary.opacity(0.35))
                 .frame(width: 36, height: 5)
                 .padding(.top, 8)
             Text("繼續觀看 \(mmss)？")
@@ -2432,7 +2418,6 @@ private struct ResumePromptSheet: View {
                         .fontWeight(.semibold)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(PaladalaTheme.biliPink)
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 16)

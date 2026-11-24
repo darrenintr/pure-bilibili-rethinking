@@ -672,23 +672,10 @@ enum ScreenSwitchTransition {
     static let animation: Animation = .spring(response: 0.26, dampingFraction: 0.86)
 }
 
-/// New iPad sidebar matching the redesigned mockup:
-///
-///  ┌────────────────────────────┐
-///  │ 🏠  首頁   (pink pill)      │   <- active row gets a
-///  │ 🧭  動態                    │      rounded pink capsule
-///  │ ((•))  直播                 │
-///  │                            │
-///  │  ┌──────┐                  │   <- user card: avatar +
-///  │  │ {un} │ 我的              │      username + 我的 label
-///  │  └──────┘                  │
-///  │                            │
-///  │ ≡<  收合                    │   <- collapse button
-///  └────────────────────────────┘
-///
-/// All copy is Traditional Chinese; the pink highlight uses
-/// `PaladalaTheme.biliPink` to stay consistent with the rest of
-/// the app.
+/// Native iPad sidebar — a `.sidebar`-styled `List` so the rows
+/// get the system selection pill and the column renders the
+/// platform's translucent material (Liquid Glass on iPadOS 26).
+/// The custom pink/Street chrome is deleted.
 private struct PadSidebar: View {
     let tabs: [MainTab]
     @Binding var columnVisibility: NavigationSplitViewVisibility
@@ -696,95 +683,51 @@ private struct PadSidebar: View {
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var authStore: AuthStore
 
+    private var selection: Binding<MainTab?> {
+        Binding(
+            get: { router.selectedTab },
+            set: { newValue in
+                if let tab = newValue { router.open(tab) }
+            }
+        )
+    }
+
     var body: some View {
-        VStack(spacing: PaladalaTheme.Spacing.xl) {
-            tabList
-            Spacer(minLength: 0)
-            userCard
-            collapseButton
-        }
-        .padding(.horizontal, PaladalaTheme.Spacing.xl)
-        .padding(.top, PaladalaTheme.Spacing.xxl)
-        .padding(.bottom, PaladalaTheme.Spacing.xl)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(PaladalaTheme.canvas)
-        .overlay(alignment: .trailing) {
-            Rectangle()
-                .fill(PaladalaTheme.ink)
-                .frame(width: PaladalaTheme.borderWidth)
-                .accessibilityHidden(true)
-        }
-    }
-
-    private var tabList: some View {
-        VStack(spacing: PaladalaTheme.Spacing.m) {
+        List(selection: selection) {
             ForEach(tabs) { tab in
-                SidebarRow(
-                    tab: tab,
-                    isActive: router.selectedTab == tab
-                ) {
-                    router.open(tab)
+                Label(tab.title, systemImage: tab.sidebarSymbolName)
+                    .tag(tab)
+            }
+            Section {
+                Label {
+                    HStack(spacing: 10) {
+                        sidebarAvatar
+                            .frame(width: 28, height: 28)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(usernameText)
+                                .lineLimit(1)
+                            Text("我的")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } icon: {
+                    EmptyView()
                 }
+                .tag(MainTab.profile)
             }
-        }
-    }
-
-    @ViewBuilder
-    private var userCard: some View {
-        Button {
-            router.open(.profile)
-        } label: {
-            HStack(spacing: PaladalaTheme.Spacing.m) {
-                sidebarAvatar
-                    .frame(width: 44, height: 44)
-                VStack(alignment: .leading, spacing: PaladalaTheme.Spacing.xs) {
-                    Text(usernameText)
-                        .font(PaladalaTheme.FontRole.headline)
-                        .foregroundStyle(PaladalaTheme.ink)
-                        .lineLimit(1)
-                    Text("我的")
-                        .font(PaladalaTheme.FontRole.labelMono)
-                        .foregroundStyle(PaladalaTheme.ink)
+            Section {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        columnVisibility = .detailOnly
+                    }
+                } label: {
+                    Label("收合", systemImage: "sidebar.leading")
                 }
-                Spacer(minLength: 0)
-                Image(systemName: "arrow.up.right")
-                    .font(.caption.weight(.black))
-                    .foregroundStyle(PaladalaTheme.ink)
+                .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, PaladalaTheme.Spacing.m)
-            .padding(.vertical, PaladalaTheme.Spacing.s)
-            .modifier(StreetSidebarSurface(
-                fill: router.selectedTab == .profile
-                    ? PaladalaTheme.biliPink
-                    : PaladalaTheme.paper
-            ))
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-    }
-
-    private var collapseButton: some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.22)) {
-                columnVisibility = .detailOnly
-            }
-        } label: {
-            HStack(spacing: PaladalaTheme.Spacing.m) {
-                Image(systemName: "line.3.horizontal.decrease.circle")
-                    .font(.title3)
-                    .foregroundStyle(PaladalaTheme.ink)
-                    .frame(width: 24)
-                Text("收合")
-                    .font(PaladalaTheme.FontRole.labelMono)
-                    .foregroundStyle(PaladalaTheme.ink)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, PaladalaTheme.Spacing.m)
-            .padding(.vertical, PaladalaTheme.Spacing.m)
-            .modifier(StreetSidebarSurface(fill: PaladalaTheme.paper))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+        .listStyle(.sidebar)
     }
 
     private var usernameText: String {
@@ -793,123 +736,29 @@ private struct PadSidebar: View {
 
     @ViewBuilder
     private var sidebarAvatar: some View {
-        let isNative = PaladalaTheme.usesNativeLayout
         if let url = authStore.activeAccount?.faceURL {
             ResilientImage(url: url)
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: isNative ? 12 : 0,
-                        style: .continuous
-                    )
-                )
-                .overlay {
-                    if !isNative {
-                        Rectangle()
-                            .strokeBorder(
-                                PaladalaTheme.ink,
-                                lineWidth: PaladalaTheme.borderWidth
-                            )
-                    }
-                }
+                .clipShape(Circle())
         } else {
-            RoundedRectangle(cornerRadius: isNative ? 12 : 0, style: .continuous)
-                .fill(PaladalaTheme.biliPink)
-                .overlay(
-                    Image(systemName: "person.fill")
-                        .font(.body)
-                        .foregroundStyle(PaladalaTheme.ink)
-                )
-                .overlay {
-                    if !isNative {
-                        Rectangle()
-                            .strokeBorder(
-                                PaladalaTheme.ink,
-                                lineWidth: PaladalaTheme.borderWidth
-                            )
-                    }
-                }
+            Image(systemName: "person.crop.circle.fill")
+                .font(.title2)
+                .foregroundStyle(.secondary)
         }
-    }
-}
-
-/// One row in the iPad sidebar. Every row uses the same hard-edged
-/// paper surface; the active destination switches to signal pink.
-private struct SidebarRow: View {
-    let tab: MainTab
-    let isActive: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: PaladalaTheme.Spacing.m) {
-                Image(systemName: tab.sidebarSymbolName)
-                    .font(.body.weight(.black))
-                    .frame(width: 24)
-                    .foregroundStyle(PaladalaTheme.ink)
-                Text(tab.title)
-                    .font(PaladalaTheme.FontRole.labelMono)
-                    .foregroundStyle(PaladalaTheme.ink)
-                Spacer(minLength: 0)
-                if isActive {
-                    Rectangle()
-                        .fill(PaladalaTheme.ink)
-                        .frame(width: 8, height: 8)
-                        .accessibilityHidden(true)
-                }
-            }
-            .padding(.horizontal, PaladalaTheme.Spacing.l)
-            .padding(.vertical, PaladalaTheme.Spacing.m)
-            .modifier(StreetSidebarSurface(
-                fill: isActive ? PaladalaTheme.biliPink : PaladalaTheme.paper
-            ))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 }
 
 private struct StreetSidebarSurface: ViewModifier {
     let fill: Color
 
-    @ViewBuilder
     func body(content: Content) -> some View {
-        if PaladalaTheme.usesNativeLayout {
-            // iOS Native: rounded corner, no border, no hard shadow,
-            // system `fill` background. The active tab still uses
-            // `PaladalaTheme.biliPink` as the accent fill so the
-            // "selected" affordance is preserved — the user can
-            // override via system tint if the brand color ever
-            // changes, but the active-state cue stays consistent.
-            content
-                .background(
-                    fill,
-                    in: RoundedRectangle(
-                        cornerRadius: PaladalaTheme.cornerRadius,
-                        style: PaladalaTheme.cornerStyle
-                    )
+        content
+            .background(
+                fill,
+                in: RoundedRectangle(
+                    cornerRadius: PaladalaTheme.cornerRadius,
+                    style: PaladalaTheme.cornerStyle
                 )
-        } else {
-            content
-                .background {
-                    ZStack {
-                        Rectangle()
-                            .fill(PaladalaTheme.ink)
-                            .offset(
-                                x: PaladalaTheme.hardShadowOffset,
-                                y: PaladalaTheme.hardShadowOffset
-                            )
-                        Rectangle()
-                            .fill(fill)
-                    }
-                }
-                .overlay {
-                    Rectangle()
-                        .strokeBorder(
-                            PaladalaTheme.ink,
-                            lineWidth: PaladalaTheme.borderWidth
-                        )
-                }
-        }
+            )
     }
 }
 

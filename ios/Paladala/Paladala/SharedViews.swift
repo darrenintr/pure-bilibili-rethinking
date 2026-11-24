@@ -81,8 +81,6 @@ struct VideoCard: View {
             VStack(alignment: .leading, spacing: PaladalaTheme.Spacing.s) {
                 coverImage
                     .modifier(HeroSourceModifier(videoID: video.id, namespace: heroNamespace))
-                    .aspectRatio(16/9, contentMode: .fill)
-                    .frame(maxWidth: .infinity)
                     .clipShape(RoundedRectangle(
                         cornerRadius: PaladalaTheme.IOSNative.cardRadius,
                         style: .continuous

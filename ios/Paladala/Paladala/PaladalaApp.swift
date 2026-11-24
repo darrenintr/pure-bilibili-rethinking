@@ -170,7 +170,6 @@ struct PaladalaApp: App {
                 .environmentObject(errorCenter)
                 .appErrorAlerts(errorCenter)
                 .font(PaladalaTheme.FontRole.body)
-                .tint(PaladalaTheme.biliPink)
                 .dsTheme(DSTheme(seedHex: expressiveSeed))
                 .onChange(of: expressiveSeed) { _, seed in
                     PaladalaTheme.expressiveTheme = DSTheme(seedHex: seed)
