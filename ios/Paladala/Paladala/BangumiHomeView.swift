@@ -62,7 +62,6 @@ struct BangumiHomeView: View {
         }
         .navigationTitle("追番")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(PaladalaTheme.paper, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .task {
             await load()
@@ -305,7 +304,6 @@ struct BangumiSeasonDetailView: View {
         }
         .navigationTitle(detail?.title ?? "番劇詳情")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(PaladalaTheme.paper, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .task(id: seasonId) { await load() }
         .sheet(item: $fallbackURL) { wrapped in

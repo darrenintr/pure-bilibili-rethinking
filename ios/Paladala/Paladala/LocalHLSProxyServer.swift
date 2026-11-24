@@ -3552,55 +3552,260 @@ fileprivate func proxySegmentRange(
         )
         return
     }
-    let activeURL = activeUpstream(for: track)
-    var upstreamReq = URLRequest(url: activeURL)
-    upstreamReq.setValue(referer, forHTTPHeaderField: "Referer")
-    upstreamReq.setValue(
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) "
-        + "AppleWebKit/605.1.15 (KHTML, like Gecko) "
-        + "Version/18.0 Mobile/15E148 Safari/604.1",
-        forHTTPHeaderField: "User-Agent"
-    )
     let byteCount = frag.byteRange.count
-    upstreamReq.setValue(
-        "bytes=\(frag.byteRange.lowerBound)-\(frag.byteRange.upperBound - 1)",
-        forHTTPHeaderField: "Range"
-    )
-    upstreamReq.httpMethod = "GET"
-
-    let stream = StreamingProxyTask(
-        server: self,
-        connection: connection,
-        upstream: activeURL,
-        request: upstreamReq,
-        mode: "segment[\(idx)]",
-        // Segment URLs are independent resources — no Range
-        // shifting math, AVPlayer treats each as a self-
-        // contained segment.
-        clientSentRange: false,
-        contentRangeShift: nil,
-        passContentRange: false,
-        connID: connID,
-        rangeStart: frag.byteRange.lowerBound,
-        rangeEnd: frag.byteRange.upperBound - 1
-    )
-    retain(stream: stream)
-    stream.start()
-
-    if Self.requestMetadataLogEnabled {
-        diagLog(.playback, "LocalHLSProxyServer /segment served",
-                details: [
-                    "conn": connID,
-                    "kind": params["k"] ?? "?",
-                    "n": idx,
-                    "startTime": String(format: "%.3f", frag.startTime),
-                    "duration": String(format: "%.3f", frag.duration),
-                    "byteRange": "\(frag.byteRange.lowerBound)"
-                        + "-\(frag.byteRange.upperBound - 1)",
-                    "bytes": byteCount
-                ])
+    // BTR (Bilibili-thread-ripper style): split the segment
+    // into parallel Range chunks fanned across the track's CDN
+    // mirrors when enabled and the segment is big enough to
+    // benefit. Small segments and inits stay on the single
+    // stream — chunking them only adds round trips.
+    if Self.btrEnabled, byteCount >= Self.btrMinBytes {
+        serveSegmentViaBTR(
+            track: track,
+            byteRange: frag.byteRange,
+            idx: idx,
+            kind: params["k"] ?? "?",
+            referer: referer,
+            connection: connection,
+            connID: connID
+        )
+        return
     }
+    serveSegmentSingleStream(
+        track: track,
+        byteRange: frag.byteRange,
+        idx: idx,
+        kind: params["k"] ?? "?",
+        referer: referer,
+        connection: connection,
+        connID: connID
+    )
 }
+
+    /// Single-connection segment serve — the pre-BTR path and
+    /// the fallback when the chunked fetch fails or is disabled.
+    private func serveSegmentSingleStream(
+        track: BiliDashSource.Track,
+        byteRange: Range<Int64>,
+        idx: Int,
+        kind: String,
+        referer: String,
+        connection: NWConnection,
+        connID: String
+    ) {
+        let activeURL = activeUpstream(for: track)
+        var upstreamReq = URLRequest(url: activeURL)
+        upstreamReq.setValue(referer, forHTTPHeaderField: "Referer")
+        upstreamReq.setValue(
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) "
+            + "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+            + "Version/18.0 Mobile/15E148 Safari/604.1",
+            forHTTPHeaderField: "User-Agent"
+        )
+        upstreamReq.setValue(
+            "bytes=\(byteRange.lowerBound)-\(byteRange.upperBound - 1)",
+            forHTTPHeaderField: "Range"
+        )
+        upstreamReq.httpMethod = "GET"
+
+        let stream = StreamingProxyTask(
+            server: self,
+            connection: connection,
+            upstream: activeURL,
+            request: upstreamReq,
+            mode: "segment[\(idx)]",
+            // Segment URLs are independent resources — no Range
+            // shifting math, AVPlayer treats each as a self-
+            // contained segment.
+            clientSentRange: false,
+            contentRangeShift: nil,
+            passContentRange: false,
+            connID: connID,
+            rangeStart: byteRange.lowerBound,
+            rangeEnd: byteRange.upperBound - 1
+        )
+        retain(stream: stream)
+        stream.start()
+
+        if Self.requestMetadataLogEnabled {
+            diagLog(.playback, "LocalHLSProxyServer /segment served",
+                    details: [
+                        "conn": connID,
+                        "kind": kind,
+                        "n": idx,
+                        "byteRange": "\(byteRange.lowerBound)"
+                            + "-\(byteRange.upperBound - 1)",
+                        "bytes": byteRange.count
+                    ])
+        }
+    }
+
+    // MARK: - BTR (thread-ripper) chunked fetch
+
+    /// Whether the multi-threaded segment fetch is on. Stored in
+    /// UserDefaults so the 設定 toggle applies without a restart;
+    /// defaults to on.
+    private static var btrEnabled: Bool {
+        UserDefaults.standard.object(forKey: "paladala.btrEnabled") as? Bool ?? true
+    }
+    /// Threads per segment. `paladala.btrThreads == 0` means
+    /// auto → 4, matching BTR's default; the UI slider writes
+    /// 1...8.
+    private static var btrThreads: Int {
+        let raw = UserDefaults.standard.integer(forKey: "paladala.btrThreads")
+        return raw > 0 ? min(raw, 8) : 4
+    }
+    /// Segments below this size are not worth chunking.
+    private static let btrMinBytes: Int64 = 384 * 1024
+    /// Target chunk size; the actual count is also capped by
+    /// `btrThreads` so big segments spread wider.
+    private static let btrChunkBytes: Int64 = 256 * 1024
+    private static let btrMaxChunks = 8
+
+    /// Fetch `byteRange` as N contiguous chunks, each issued to a
+    /// different CDN mirror from `[track.baseURL] + backupURLs`
+    /// round-robin, then splice the bodies in order and serve as
+    /// one 200 response — downstream-identical to the
+    /// single-stream path. On any chunk exhausting every mirror
+    /// we fall back to `serveSegmentSingleStream`.
+    private func serveSegmentViaBTR(
+        track: BiliDashSource.Track,
+        byteRange: Range<Int64>,
+        idx: Int,
+        kind: String,
+        referer: String,
+        connection: NWConnection,
+        connID: String
+    ) {
+        var candidates: [URL] = []
+        for url in [track.baseURL] + track.backupURLs where !candidates.contains(url) {
+            candidates.append(url)
+        }
+        guard !candidates.isEmpty else {
+            serveSegmentSingleStream(
+                track: track, byteRange: byteRange, idx: idx,
+                kind: kind, referer: referer,
+                connection: connection, connID: connID
+            )
+            return
+        }
+        let total = byteRange.upperBound - byteRange.lowerBound
+        let chunkCount = max(
+            1,
+            min(Self.btrThreads, Self.btrMaxChunks,
+                Int(total / Self.btrChunkBytes))
+        )
+        let base = total / Int64(chunkCount)
+        let rem = total % Int64(chunkCount)
+        var chunks: [Range<Int64>] = []
+        chunks.reserveCapacity(chunkCount)
+        var cursor = byteRange.lowerBound
+        for i in 0..<chunkCount {
+            let size = base + (Int64(i) < rem ? 1 : 0)
+            chunks.append(cursor..<(cursor + size))
+            cursor += size
+        }
+        let startedAt = Date()
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let body = try await self.btrFetchChunks(
+                    chunks: chunks,
+                    candidates: candidates,
+                    referer: referer,
+                    purpose: "segment[\(idx)] \(kind)"
+                )
+                if Self.requestMetadataLogEnabled {
+                    diagLog(.playback,
+                            "LocalHLSProxyServer /segment served via BTR",
+                            details: [
+                                "conn": connID,
+                                "kind": kind,
+                                "n": idx,
+                                "chunks": chunkCount,
+                                "mirrors": candidates.count,
+                                "bytes": body.count,
+                                "elapsedMs":
+                                    elapsedMilliseconds(since: startedAt)
+                            ])
+                }
+                self.respondBytes(
+                    connection: connection,
+                    status: 200,
+                    contentType: "video/mp4",
+                    body: body,
+                    extraHeaders: ["Content-Length": "\(body.count)"],
+                    connID: connID,
+                    label: "BTR segment[\(idx)] \(byteRange.lowerBound)"
+                        + "-\(byteRange.upperBound - 1)"
+                )
+            } catch {
+                diagLog(.playback,
+                        "LocalHLSProxyServer BTR fetch failed, single-stream fallback",
+                        details: [
+                            "conn": connID,
+                            "kind": kind,
+                            "n": idx,
+                            "error": "\(error)"
+                        ])
+                self.serveSegmentSingleStream(
+                    track: track,
+                    byteRange: byteRange,
+                    idx: idx,
+                    kind: kind,
+                    referer: referer,
+                    connection: connection,
+                    connID: connID
+                )
+            }
+        }
+    }
+
+    /// Fan `chunks` across `candidates` round-robin; each chunk
+    /// retries on the next mirror before failing the whole fetch.
+    /// Parts land out of order in the task group and are spliced
+    /// back into index order — same as BTR's reassembly.
+    private func btrFetchChunks(
+        chunks: [Range<Int64>],
+        candidates: [URL],
+        referer: String,
+        purpose: String
+    ) async throws -> Data {
+        var parts = [Data?](repeating: nil, count: chunks.count)
+        try await withThrowingTaskGroup(of: (Int, Data).self) { group in
+            for (index, chunk) in chunks.enumerated() {
+                group.addTask { [self] in
+                    var lastError: Error = RangeFetchError.timedOut
+                    for attempt in 0..<candidates.count {
+                        let url = candidates[(index + attempt) % candidates.count]
+                        do {
+                            let outcome = try await self.fetchExactRange(
+                                url: url,
+                                range: chunk,
+                                referer: referer,
+                                purpose: "\(purpose) chunk \(index)"
+                            )
+                            return (index, outcome.data)
+                        } catch {
+                            lastError = error
+                        }
+                    }
+                    throw lastError
+                }
+            }
+            for try await (index, data) in group {
+                parts[index] = data
+            }
+        }
+        var body = Data()
+        body.reserveCapacity(
+            chunks.reduce(0) { $0 + Int($1.upperBound - $1.lowerBound) }
+        )
+        for part in parts {
+            guard let part else { throw RangeFetchError.timedOut }
+            body.append(part)
+        }
+        return body
+    }
 
     /// Proxy a single segment request.  AVPlayer issues
     /// `GET /init?...` for the fMP4 map and `GET /media?...`

@@ -175,7 +175,8 @@ struct HomeView: View {
                 // scroll, otherwise the system re-introduces
                 // the glass material when the user scrolls
                 // the feed.
-                .toolbarBackground(PaladalaTheme.paper, for: .navigationBar)
+                // Nav bar stays on the system material so the
+                // iOS 26 Liquid Glass chrome shows through.
                 .toolbarBackground(.visible, for: .navigationBar)
                 .toolbar {
                     ToolbarItemGroup(placement: .topBarTrailing) {
@@ -195,6 +196,21 @@ struct HomeView: View {
                             }
                             .accessibilityLabel(L10n.home.refresh)
                             Menu {
+                                Section("分類") {
+                                    ForEach(HomeCategory.androidTabs) { category in
+                                        Button {
+                                            Haptics.selection()
+                                            model.category = category
+                                        } label: {
+                                            if model.category == category {
+                                                Label(category.title, systemImage: "checkmark")
+                                            } else {
+                                                Text(category.title)
+                                            }
+                                        }
+                                    }
+                                }
+                                Divider()
                                 Button {
                                     Haptics.tap()
                                     router.open(.downloads)
@@ -332,10 +348,6 @@ struct HomeView: View {
                     .frame(height: 0)
                     .id("feedTop")
 
-                categoryStrip
-                if model.category == .popular {
-                    popularSubCategoryStrip
-                }
                 if let error = model.errorMessage {
                     VStack(spacing: 10) {
                         ErrorBanner(message: error)
@@ -429,60 +441,6 @@ struct HomeView: View {
             await model.load(repository: repository, accountMid: accountMid)
             withAnimation(.easeOut(duration: 0.2)) {
                 proxy.scrollTo("feedTop", anchor: .top)
-            }
-        }
-    }
-
-    private var categoryStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            PaladalaGlassContainer(materialDesign: materialDesign, spacing: 8) {
-                HStack(spacing: 8) {
-                    ForEach(HomeCategory.androidTabs) { category in
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                model.category = category
-                            }
-                            Haptics.selection()
-                        } label: {
-                            Text(category.title)
-                                .font(PaladalaTheme.FontRole.labelMono)
-                                .padding(.horizontal, 13)
-                                .padding(.vertical, 9)
-                                .paladalaSelectionChip(
-                                    isSelected: model.category == category,
-                                    design: materialDesign
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-    }
-
-    private var popularSubCategoryStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            PaladalaGlassContainer(materialDesign: materialDesign, spacing: 8) {
-                HStack(spacing: 8) {
-                    ForEach(PopularSubCategory.allCases) { subCategory in
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                model.popularSubCategory = subCategory
-                            }
-                            Haptics.selection()
-                        } label: {
-                            Text(subCategory.title)
-                                .font(PaladalaTheme.FontRole.labelMono)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .paladalaSelectionChip(
-                                    isSelected: model.popularSubCategory == subCategory,
-                                    design: materialDesign
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
             }
         }
     }

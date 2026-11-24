@@ -59,6 +59,8 @@ struct ProfileSettingsView: View {
     /// `MiniPlayerStore.detachInline()`.
     @AppStorage("paladala.miniPlayerOnExit") private var miniPlayerOnExit: Bool = true
     @AppStorage("paladala.autoPlayNext") private var autoPlayNext: Bool = false
+    @AppStorage("paladala.btrEnabled") private var btrEnabled = true
+    @AppStorage("paladala.btrThreads") private var btrThreads = 0
     /// iCloud sync toggle stub. Defaults to `false` because the
     /// CloudKit / `NSUbiquitousKeyValueStore` plumbing does not
     /// exist yet — the toggle is rendered disabled with a
@@ -240,6 +242,11 @@ struct ProfileSettingsView: View {
                 // on. Disabling tears the controller down on
                 // `VideoDetailView.onDisappear` instead.
                 Toggle("離開後保留小窗播放", isOn: $miniPlayerOnExit)
+                Toggle("線程撕裂加速", isOn: $btrEnabled)
+                if btrEnabled {
+                    Stepper("並行線程：\(btrThreads == 0 ? "自動" : "\(btrThreads)")",
+                            value: $btrThreads, in: 0...8)
+                }
             }
 
             Section {
