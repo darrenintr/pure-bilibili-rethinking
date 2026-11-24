@@ -43,8 +43,12 @@ struct ProfileSettingsView: View {
     @StateObject private var profileModel = ProfileViewModel()
     @AppStorage("paladala.themeMode") private var themeMode: ThemeMode = .system
     @AppStorage("paladala.materialDesign") private var materialDesign: MaterialDesign = .liquidGlass
-    @AppStorage("paladala.expressiveSeed") private var expressiveSeed = "#FF6194"
-    @AppStorage("paladala.designVariant") private var designVariant: DesignVariant = .expressive
+    @AppStorage("paladala.designVariant") private var designVariant: DesignVariant = .iosNative
+    /// 5-level glass intensity: 無玻璃 / 超薄玻璃 / 毛玻璃 /
+    /// 厚玻璃 / 液體玻璃 (iOS 26+). Stored as the raw case name;
+    /// `GlassStyle` maps it onto the material ladder.
+    @AppStorage("paladala.glassStyle") private var glassStyleRaw = GlassStyle.liquid.rawValue
+    @State private var glassLevel = Double(GlassStyle.liquid.level)
     @AppStorage("paladala.danmakuEnabled") private var danmakuEnabled = true
     @AppStorage("paladala.backgroundAudio") private var backgroundAudio = false
     /// When `true` (default), navigating away from a playing
@@ -169,39 +173,44 @@ struct ProfileSettingsView: View {
                         value: newValue.rawValue
                     )
                 }
-                // Hidden while Expressive is the only shipped
-                // design (`userFacingCases.count == 1`).
-                if DesignVariant.userFacingCases.count > 1 {
-                    Picker("介面設計", selection: $designVariant) {
-                        ForEach(DesignVariant.userFacingCases) { variant in
-                            Text(variant.title).tag(variant)
+                // 玻璃風格 — 5-step ladder (無玻璃 → 液體玻璃)
+                // applied live to every surface.  Sliders like
+                // this are the same pattern Apple's own Settings
+                // uses for intensity controls.
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("玻璃風格")
+                        Spacer()
+                        Text(GlassStyle(level: Int(glassLevel)).title)
+                            .foregroundStyle(.secondary)
+                    }
+                    Slider(value: $glassLevel, in: 0...4, step: 1)
+                        .onChange(of: glassLevel) { _, newValue in
+                            let style = GlassStyle(level: Int(newValue))
+                            glassStyleRaw = style.rawValue
+                            ICloudSync.shared.mirror(
+                                key: "paladala.glassStyle",
+                                value: style.rawValue
+                            )
                         }
-                    }
-                    .onChange(of: designVariant) { _, newValue in
-                    // The picker writes to `UserDefaults`
-                    // automatically; we additionally reapply
-                    // it to the static `PaladalaTheme` enum
-                    // so all computed tokens flip in the
-                    // current render pass.  iCloud-mirrored
-                    // so the choice follows the user across
-                    // their other devices.
-                        PaladalaTheme.apply(newValue)
-                        ICloudSync.shared.mirror(
-                            key: "paladala.designVariant",
-                            value: newValue.rawValue
-                        )
-                    }
-                }
-                if designVariant == .expressive {
-                    Picker("主題色", selection: $expressiveSeed) {
-                        ForEach(DSTheme.seeds) { seed in
-                            Text(seed.name).tag(seed.rgb.hex)
+                        .onAppear {
+                            glassLevel = Double(
+                                (GlassStyle(rawValue: glassStyleRaw) ?? .liquid).level
+                            )
                         }
+                    HStack {
+                        Text("無")
+                        Spacer()
+                        Text("液體玻璃")
                     }
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
                 }
-                Text(designVariant.blurb)
-                    .font(PaladalaTheme.FontRole.bodySmall)
-                    .foregroundStyle(PaladalaTheme.mutedInk)
+                if !GlassStyle.liquidAvailable {
+                    Text("液體玻璃需要 iOS 26 或以上。")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section("播放設定") {

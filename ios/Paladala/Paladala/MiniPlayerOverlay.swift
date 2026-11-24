@@ -349,39 +349,13 @@ private struct MiniPlayerChromeModifier: ViewModifier {
             .accessibilityLabel("Mini player for \(videoTitle)")
     }
 
-    /// Variant-aware background.  iOS Native / Expressive → real
-    /// `.glassEffect` on iOS 26+, `.regularMaterial` on iOS 18–25.
-    /// Street → paper fill + 4pt ink hard shadow.
-    @ViewBuilder
+    /// Glass-style-aware background driven by the 5-level
+    /// 玻璃風格 setting (material ladder → `.glassEffect`).
     private var chromeBackground: some View {
-        if PaladalaTheme.usesNativeLayout {
-            #if compiler(>=6.2)
-            if #available(iOS 26.0, *) {
-                Color.clear
-                    .glassEffect(
-                        .regular.interactive(),
-                        in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    )
-            } else {
-                Color.clear
-                    .background(.regularMaterial)
-            }
-            #else
-            Color.clear
-                .background(.regularMaterial)
-            #endif
-        } else {
-            ZStack {
-                Rectangle()
-                    .fill(PaladalaTheme.ink)
-                    .offset(
-                        x: PaladalaTheme.hardShadowOffset,
-                        y: PaladalaTheme.hardShadowOffset
-                    )
-                Rectangle()
-                    .fill(PaladalaTheme.paper)
-            }
-        }
+        Color.clear
+            .paladalaGlassSurface(
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+            )
     }
 }
 

@@ -57,157 +57,10 @@ struct VideoCard: View {
             }
     }
 
-    /// Variant dispatcher — picks between the hard-edged Street
-    /// body and the iOS Native body.  Both branches share the
-    /// same outer modifiers (frame, button style, context menu,
-    /// impression analytics) so the change is purely visual.
-    @ViewBuilder
+    /// The app renders only the native iOS card now — the
+    /// Street and Expressive bodies are deleted.
     private var contentView: some View {
-        if designVariant == .expressive {
-            expressiveBody
-        } else if PaladalaTheme.usesNativeLayout {
-            iosNativeBody
-        } else {
-            streetBody
-        }
-    }
-
-    private var expressiveBody: some View {
-        Button {
-            Analytics.log("card_select", ["bvid": video.id, "duration": video.duration])
-            Haptics.tap()
-            action()
-        } label: {
-            DSVideoCard(
-                title: video.title, author: video.ownerName,
-                viewsText: "\(video.viewCount.compactCount) 次播放",
-                durationText: video.duration.mmss, authorID: String(video.ownerMid)
-            ) {
-                CoverImage(url: video.coverURL)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .modifier(HeroSourceModifier(videoID: video.id, namespace: heroNamespace))
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    /// Street Minimal body — 街頭硬影視頻卡片
-    /// - 16:10 封面（保留舊邏輯）
-    /// - 1.5pt 全黑邊 + 4pt 硬陰影
-    /// - 24pt bold 標題
-    /// - mono metadata（UP 名 / 統計 / 日期）
-    private var streetBody: some View {
-        Button {
-            // Centralised "user tapped a card" analytics hook —
-            // single point of instrumentation covers home / follow
-            // / search / history / favorites / watch-later /
-            // dynamic feeds because every call site uses
-            // `VideoCard`. `bvid` is the only identifying param
-            // we ship; everything else (duration, view count,
-            // etc.) is recoverable by joining against the
-            // server-side bvid table.
-            Analytics.log("card_select", [
-                "bvid": video.id,
-                "duration": video.duration
-            ])
-            Haptics.tap()
-            action()
-        } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                ZStack(alignment: .bottomTrailing) {
-                    // Register the cover image as a matched
-                    // transition source so the system can zoom
-                    // out of it on push. We only attach the
-                    // modifier when a namespace is provided —
-                    // the transition is a no-op otherwise and
-                    // would be dead weight in the view tree.
-                    coverImage
-                        .modifier(HeroSourceModifier(videoID: video.id, namespace: heroNamespace))
-                    Text(video.duration.mmss)
-                        .font(PaladalaTheme.FontRole.labelMono)
-                        .foregroundStyle(PaladalaTheme.paper)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(PaladalaTheme.ink)
-                        .padding(12)
-                }
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(PaladalaTheme.ink)
-                        .frame(height: PaladalaTheme.borderWidth)
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(video.title)
-                        .font(PaladalaTheme.FontRole.headline)
-                        .foregroundStyle(PaladalaTheme.ink)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .topLeading)
-                    // Owner name + optional 大会员 chip. The chip
-                    // uses the compact icon-only flavour because
-                    // the home-feed cards have a fixed name
-                    // row width; the full chip would crowd out
-                    // the playback counts below. The owner's
-                    // badge, when present, comes from the
-                    // upstream `owner` block on the feed rows
-                    // that publish it (home / recommend feed).
-                    // Falls back to plain muted text when no
-                    // badge is decoded.
-                    HStack(spacing: 4) {
-                        Text(video.ownerName)
-                            .font(PaladalaTheme.FontRole.labelMono)
-                            .foregroundStyle(
-                                vipBadgeNicknameColor(for: video.ownerVIPBadge)
-                                    ?? PaladalaTheme.mutedInk
-                            )
-                            .lineLimit(1)
-                        if let badge = video.ownerVIPBadge, badge.isActive {
-                            VipBadgeCompact(badge: badge, pointSize: 10)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                    HStack(spacing: 12) {
-                        Label(video.viewCount.compactCount, systemImage: "play.fill")
-                        Label(video.danmakuCount.compactCount, systemImage: "text.bubble")
-                        // Reply / comment count.  The
-                        // `text.bubble.fill` SF Symbol is the
-                        // standard "comments" affordance on iOS
-                        // 17+; the older `text.bubble` (used for
-                        // danmaku above) would visually
-                        // duplicate, so use the fill variant
-                        // here to keep the two side-by-side
-                        // icons distinguishable.
-                        Label(video.replyCount.compactCount, systemImage: "text.bubble.fill")
-                    }
-                    .font(PaladalaTheme.FontRole.labelMono)
-                    .foregroundStyle(PaladalaTheme.mutedInk)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                    // Publish date — `relativeDateLabel` returns
-                    // "刚刚" / "N 天前" / "yyyy-MM-dd" depending
-                    // on age.  We hide the row entirely when the
-                    // upstream didn't surface `pubdate` (search
-                    // previews, dynamic-feed archive rows) rather
-                    // than rendering a "—" placeholder.
-                    if let date = video.publishDate {
-                        HStack(spacing: 6) {
-                            Image(systemName: "calendar")
-                                .font(PaladalaTheme.FontRole.labelMono)
-                            Text(date.relativeDateLabel)
-                                .font(PaladalaTheme.FontRole.labelMono)
-                        }
-                        .foregroundStyle(PaladalaTheme.mutedInk)
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                    }
-                }
-                .padding(16)
-            }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-            .paladalaCardSurface(materialDesign)
-            .contentShape(Rectangle())
-        }
+        iosNativeBody
     }
 
     /// iOS Native body — 純蘋果原生視頻卡片
@@ -721,37 +574,12 @@ struct MetricPill: View {
     let text: String
 
     var body: some View {
-        if PaladalaTheme.activeVariant == .expressive {
-            Label(text, systemImage: systemImage)
-                .font(.system(.caption, design: .rounded).weight(.medium).monospacedDigit())
-                .foregroundStyle(PaladalaTheme.expressiveColor { $0.onSurfaceVariant })
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background {
-                    #if compiler(>=6.2)
-                    if #available(iOS 26.0, *) {
-                        Color.clear.glassEffect(.regular, in: Capsule())
-                    } else {
-                        Capsule()
-                            .fill(PaladalaTheme.expressiveColor { $0.surfaceHighest })
-                    }
-                    #else
-                    Capsule()
-                        .fill(PaladalaTheme.expressiveColor { $0.surfaceHighest })
-                    #endif
-                }
-        } else {
-            Label(text, systemImage: systemImage)
-                .font(PaladalaTheme.FontRole.labelMono)
-                .foregroundStyle(PaladalaTheme.ink)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(PaladalaTheme.paper)
-                .overlay {
-                    Rectangle()
-                        .stroke(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
-                }
-        }
+        Label(text, systemImage: systemImage)
+            .font(.caption.weight(.medium).monospacedDigit())
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .paladalaGlassSurface(in: Capsule())
     }
 }
 
@@ -795,18 +623,10 @@ struct ErrorBanner: View {
     }
 
     var body: some View {
-        if PaladalaTheme.activeVariant == .expressive {
-            expressiveBody
-        } else {
-            streetBody
-        }
-    }
-
-    private var expressiveBody: some View {
         HStack(alignment: .center, spacing: 12) {
             Label(message, systemImage: "exclamationmark.triangle.fill")
-                .font(.system(.subheadline, design: .rounded))
-                .foregroundStyle(PaladalaTheme.expressiveColor { $0.onErrorContainer })
+                .font(.subheadline)
+                .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if let primary {
                 Button {
@@ -814,30 +634,12 @@ struct ErrorBanner: View {
                     primary.action()
                 } label: {
                     Text(primary.label)
-                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                        .foregroundStyle(PaladalaTheme.expressiveColor { $0.onPrimary })
+                        .font(.subheadline.weight(.semibold))
+                        .frame(minHeight: 36)
                         .padding(.horizontal, 16)
-                        .frame(minHeight: 36)
-                        .background {
-                            #if compiler(>=6.2)
-                            if #available(iOS 26.0, *) {
-                                Color.clear
-                                    .glassEffect(
-                                        .regular.interactive()
-                                            .tint(PaladalaTheme.expressiveColor { $0.primary }),
-                                        in: Capsule()
-                                    )
-                            } else {
-                                Capsule()
-                                    .fill(PaladalaTheme.expressiveColor { $0.primary })
-                            }
-                            #else
-                            Capsule()
-                                .fill(PaladalaTheme.expressiveColor { $0.primary })
-                            #endif
-                        }
                 }
-                .buttonStyle(PaladalaPressBounceButtonStyle())
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.capsule)
             }
             if retry != nil {
                 Button {
@@ -846,109 +648,20 @@ struct ErrorBanner: View {
                 } label: {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(PaladalaTheme.expressiveColor { $0.onSurfaceVariant })
                         .frame(width: 36, height: 36)
-                        .background {
-                            #if compiler(>=6.2)
-                            if #available(iOS 26.0, *) {
-                                Color.clear.glassEffect(.regular, in: Circle())
-                            } else {
-                                Circle()
-                                    .fill(PaladalaTheme.expressiveColor { $0.surfaceHighest })
-                            }
-                            #else
-                            Circle()
-                                .fill(PaladalaTheme.expressiveColor { $0.surfaceHighest })
-                            #endif
-                        }
                 }
-                .buttonStyle(PaladalaPressBounceButtonStyle())
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.circle)
                 .accessibilityLabel("重試")
             }
         }
         .padding(12)
-        .background {
-            #if compiler(>=6.2)
-            if #available(iOS 26.0, *) {
-                Color.clear
-                    .glassEffect(
-                        .regular.tint(PaladalaTheme.expressiveColor { $0.errorContainer }),
-                        in: RoundedRectangle.ds(DSRadius.control)
-                    )
-            } else {
-                RoundedRectangle.ds(DSRadius.control)
-                    .fill(PaladalaTheme.expressiveColor { $0.errorContainer })
-            }
-            #else
-            RoundedRectangle.ds(DSRadius.control)
-                .fill(PaladalaTheme.expressiveColor { $0.errorContainer })
-            #endif
-        }
+        .paladalaGlassSurface(
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous),
+            tint: Color(uiColor: .systemRed).opacity(0.12)
+        )
     }
 
-    private var streetBody: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Label(message, systemImage: "exclamationmark.triangle.fill")
-                .font(PaladalaTheme.FontRole.bodySmall)
-                .foregroundStyle(PaladalaTheme.ink)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if let primary {
-                Button {
-                    Haptics.tap()
-                    primary.action()
-                } label: {
-                    Text(primary.label)
-                        .font(PaladalaTheme.FontRole.labelMono)
-                        .foregroundStyle(PaladalaTheme.ink)
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 36)
-                        .background(PaladalaTheme.biliPink)
-                        .overlay {
-                            Rectangle()
-                                .stroke(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
-                        }
-                }
-                .buttonStyle(PaladalaPressBounceButtonStyle())
-            }
-            if retry != nil {
-                Button {
-                    Haptics.tap()
-                    retry?()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(PaladalaTheme.ink)
-                        .frame(width: 36, height: 36)
-                        .background(PaladalaTheme.paper)
-                        .overlay {
-                            Rectangle()
-                                .stroke(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
-                        }
-                }
-                .buttonStyle(PaladalaPressBounceButtonStyle())
-                .accessibilityLabel("重試")
-            }
-        }
-        .padding(12)
-        .background(PaladalaTheme.paper)
-        .overlay(alignment: .leading) {
-            Rectangle()
-                .fill(PaladalaTheme.biliPink)
-                .frame(width: 6)
-        }
-        .overlay {
-            Rectangle()
-                .stroke(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
-        }
-        .background {
-            Rectangle()
-                .fill(PaladalaTheme.ink)
-                .offset(
-                    x: PaladalaTheme.hardShadowOffset,
-                    y: PaladalaTheme.hardShadowOffset
-                )
-        }
-    }
 }
 
 // MARK: - Video context menu

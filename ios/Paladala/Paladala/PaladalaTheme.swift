@@ -12,10 +12,9 @@ enum DesignVariant: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 
     static func storedChoice(rawValue: String?, migrationVersion: Int) -> DesignVariant {
-        // Paladala Expressive (Material You) is the only
-        // design language — legacy persisted variants are
-        // migrated to it unconditionally.
-        .expressive
+        // The Street / Expressive designs are removed — every
+        // persisted choice migrates to the native iOS look.
+        .iosNative
     }
 
     /// User-facing label shown in the Settings toggle.
@@ -44,18 +43,75 @@ enum DesignVariant: String, CaseIterable, Identifiable, Sendable {
     }
 
     /// The design languages the product ships to
-    /// end-users.  Excludes `.classic`, which is kept in the
-    /// enum only for legacy `UserDefaults` migration (older
-    /// builds persisted the variant under that rawValue).
-    /// Any new user-facing picker (onboarding, settings) should
-    /// iterate this list, not `allCases`, so `.classic` is
-    /// never re-introduced as a user choice.
+    /// end-users.  Only the native iOS look ships now — the
+    /// Street / Expressive designs are deleted and the enum
+    /// cases stay only for legacy `UserDefaults` migration.
     static var userFacingCases: [DesignVariant] {
-        // Expressive is the only shipped design language; the
-        // other enum cases stay for legacy migration and the
-        // modifier code paths still referencing them.  A
-        // single entry keeps the style pickers hidden.
-        [.expressive]
+        [.iosNative]
+    }
+}
+
+/// User-selectable glass treatment applied to cards, pills,
+/// chips, banners and the mini player — a five-step ladder
+/// mirroring Apple's own material thickness scale, topped by
+/// iOS 26's Liquid Glass: `clear` (no material), `ultraThin`,
+/// `frosted` (.regularMaterial), `thick` (.thickMaterial) and
+/// `liquid` (.glassEffect). Below iOS 26 `liquid` falls back
+/// to `frosted`.
+enum GlassStyle: String, CaseIterable, Identifiable, Sendable {
+    case clear
+    case ultraThin
+    case frosted
+    case thick
+    case liquid
+
+    var id: String { rawValue }
+
+    /// 0-4 position for the 5-step slider.
+    var level: Int {
+        switch self {
+        case .clear: 0
+        case .ultraThin: 1
+        case .frosted: 2
+        case .thick: 3
+        case .liquid: 4
+        }
+    }
+
+    init(level: Int) {
+        self = Self.allCases.first { $0.level == level } ?? .frosted
+    }
+
+    var title: String {
+        switch self {
+        case .clear: "無玻璃"
+        case .ultraThin: "超薄玻璃"
+        case .frosted: "毛玻璃"
+        case .thick: "厚玻璃"
+        case .liquid: "液體玻璃"
+        }
+    }
+
+    /// The system material for the four frosted levels; `nil`
+    /// for `clear` (plain secondarySystemFill) and `liquid`
+    /// (handled by `.glassEffect`).
+    var material: Material? {
+        switch self {
+        case .clear: nil
+        case .ultraThin: .ultraThinMaterial
+        case .frosted: .regularMaterial
+        case .thick: .thickMaterial
+        case .liquid: nil
+        }
+    }
+
+    /// True when `.glassEffect` is compiled in AND the runtime
+    /// is iOS 26+. Compiled out under the Xcode 16 toolchain.
+    static var liquidAvailable: Bool {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) { return true }
+        #endif
+        return false
     }
 }
 
@@ -68,16 +124,23 @@ enum PaladalaTheme {
     // the main actor. Swift 6 strict concurrency refuses plain
     // `static var` outside an actor; this is the documented
     // escape hatch for "I know what I'm doing" globals.
-    nonisolated(unsafe) static var activeVariant: DesignVariant = .expressive
+    nonisolated(unsafe) static var activeVariant: DesignVariant = .iosNative
 
     /// Apply a new variant. Called from the Settings toggle and
-    /// from `PaladalaApp.init` on launch.  Expressive is the
-    /// only design language, so the value is pinned to it.
+    /// from `PaladalaApp.init` on launch.  The native iOS look
+    /// is the only design, so the value is pinned to it.
     static func apply(_ variant: DesignVariant) {
-        activeVariant = .expressive
+        activeVariant = .iosNative
     }
 
-    static var usesNativeLayout: Bool { activeVariant == .iosNative || activeVariant == .expressive }
+    /// Persisted glass treatment ("paladala.glassStyle").
+    /// Read at modifier-application time — cheap UserDefaults
+    /// read, consistent with how other appearance prefs work.
+    static var glassStyle: GlassStyle {
+        GlassStyle(rawValue: UserDefaults.standard.string(forKey: "paladala.glassStyle") ?? "") ?? .liquid
+    }
+
+    static var usesNativeLayout: Bool { true }
     nonisolated(unsafe) static var expressiveTheme = DSTheme.paladala
 
     static func expressiveColor(_ role: @escaping @Sendable (DSScheme) -> DSRGB) -> Color {

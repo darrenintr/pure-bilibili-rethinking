@@ -937,54 +937,15 @@ private func profileRouteView(_ route: ProfileRoute, repository: PaladalaReposit
     }
 }
 
-/// Keep the native tab bar semantics while forcing an opaque paper
-/// background and signal-pink selection. This avoids translucent
-/// material without replacing the accessible system `TabView`.
-/// iOS Native is a no-op so the system draws its default tab bar
-/// (with the user-chosen accent color tint — no pink override).
+/// Native system tab bar on every OS version — iOS 26 renders
+/// it as Liquid Glass, earlier versions as system material.
+/// The custom DSNavBar / Street overlays are deleted.
 private struct StreetTabBarModifier: ViewModifier {
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if PaladalaTheme.usesNativeLayout {
-            content
-        } else {
-            content
-                .toolbarBackground(PaladalaTheme.paper, for: .tabBar)
-                .toolbarBackground(.visible, for: .tabBar)
-                .tint(PaladalaTheme.biliPink)
-        }
-    }
+    func body(content: Content) -> some View { content }
 }
 
 private struct ExpressivePhoneNavigation: ViewModifier {
     @Binding var selection: MainTab
-    @DSPalette private var colors
 
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if PaladalaTheme.activeVariant == .expressive {
-            if #available(iOS 26.0, *) {
-                // iOS 26's native tab bar IS Liquid Glass — let the
-                // system draw it (floats over content, minimizes on
-                // scroll) instead of the custom DSNavBar.
-                content
-            } else {
-                content
-                    .toolbar(.hidden, for: .tabBar)
-                    .safeAreaInset(edge: .bottom, spacing: 0) {
-                        DSNavBar([
-                            DSNavItem(tab: MainTab.home, title: "探索", systemImage: "house", shape: .cookie9),
-                            DSNavItem(tab: MainTab.dynamic, title: "動態", systemImage: "person.2", shape: .clover8),
-                            DSNavItem(tab: MainTab.live, title: "直播", systemImage: "play.tv", shape: .puffy),
-                            DSNavItem(tab: MainTab.profile, title: "我的", systemImage: "person", shape: .sunny)
-                        ], selection: $selection)
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 8)
-                        .shadow(color: .black.opacity(0.14), radius: 16, y: 6)
-                    }
-            }
-        } else {
-            content
-        }
-    }
+    func body(content: Content) -> some View { content }
 }
