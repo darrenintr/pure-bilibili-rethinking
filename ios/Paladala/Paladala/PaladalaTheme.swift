@@ -12,11 +12,10 @@ enum DesignVariant: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 
     static func storedChoice(rawValue: String?, migrationVersion: Int) -> DesignVariant {
-        guard migrationVersion >= 1, let rawValue,
-              let variant = DesignVariant(rawValue: rawValue), variant != .classic else {
-            return .expressive
-        }
-        return variant
+        // Paladala Expressive (Material You) is the only
+        // design language — legacy persisted variants are
+        // migrated to it unconditionally.
+        .expressive
     }
 
     /// User-facing label shown in the Settings toggle.
@@ -52,7 +51,11 @@ enum DesignVariant: String, CaseIterable, Identifiable, Sendable {
     /// iterate this list, not `allCases`, so `.classic` is
     /// never re-introduced as a user choice.
     static var userFacingCases: [DesignVariant] {
-        [.expressive, .iosNative, .streetRedesign]
+        // Expressive is the only shipped design language; the
+        // other enum cases stay for legacy migration and the
+        // modifier code paths still referencing them.  A
+        // single entry keeps the style pickers hidden.
+        [.expressive]
     }
 }
 
@@ -68,9 +71,10 @@ enum PaladalaTheme {
     nonisolated(unsafe) static var activeVariant: DesignVariant = .expressive
 
     /// Apply a new variant. Called from the Settings toggle and
-    /// from `PaladalaApp.init` on launch.
+    /// from `PaladalaApp.init` on launch.  Expressive is the
+    /// only design language, so the value is pinned to it.
     static func apply(_ variant: DesignVariant) {
-        activeVariant = variant
+        activeVariant = .expressive
     }
 
     static var usesNativeLayout: Bool { activeVariant == .iosNative || activeVariant == .expressive }

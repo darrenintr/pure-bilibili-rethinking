@@ -68,8 +68,9 @@ final class AppVersionTests: XCTestCase {
 
     func test_formatIdentifier_padsShortInputs() {
         let formatted = AppVersion.formatIdentifier("ab")
-        // 2 hex chars → padded to 12, all but the first 2 land in the trailing groups
-        XCTAssertEqual(formatted, "PD-0000-00AB-0000")
+        // 2 hex chars → left-padded to 12 so the value digits
+        // stay right-aligned in the last group.
+        XCTAssertEqual(formatted, "PD-0000-0000-00AB")
     }
 
     // MARK: - VersionComparator

@@ -6,6 +6,10 @@ on:
     branches:
       - working
       - main
+      # Devin branches build the unsigned IPA artifact too
+      # (publish/release steps stay gated to `working` below),
+      # so work-in-progress can ship a downloadable IPA.
+      - 'devin/**'
     paths-ignore:
       - 'README.md'
       - 'CHANGELOG.md'

@@ -9,10 +9,13 @@ import XCTest
 @MainActor
 final class PlaybackAndDesignTests: XCTestCase {
     func testExistingInstallsMigrateToExpressiveOnce() {
+        // Expressive is the only shipped design language —
+        // every stored choice (including previously valid
+        // ones) resolves to it.
         XCTAssertEqual(DesignVariant.storedChoice(rawValue: "streetRedesign", migrationVersion: 0), .expressive)
         XCTAssertEqual(DesignVariant.storedChoice(rawValue: nil, migrationVersion: 0), .expressive)
-        XCTAssertEqual(DesignVariant.storedChoice(rawValue: "iosNative", migrationVersion: 1), .iosNative)
-        XCTAssertTrue(DesignVariant.userFacingCases.contains(.expressive))
+        XCTAssertEqual(DesignVariant.storedChoice(rawValue: "iosNative", migrationVersion: 1), .expressive)
+        XCTAssertEqual(DesignVariant.userFacingCases, [.expressive])
     }
 
     func testAnUnknownTimelineCannotReportVideoCompletion() {

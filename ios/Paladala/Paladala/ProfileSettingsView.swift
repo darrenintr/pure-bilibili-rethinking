@@ -169,15 +169,15 @@ struct ProfileSettingsView: View {
                         value: newValue.rawValue
                     )
                 }
-                Picker("介面設計", selection: $designVariant) {
-                    // Same legacy-classic filter as the onboarding
-                    // picker — only the two shipped design languages
-                    // are offered.
-                    ForEach(DesignVariant.userFacingCases) { variant in
-                        Text(variant.title).tag(variant)
+                // Hidden while Expressive is the only shipped
+                // design (`userFacingCases.count == 1`).
+                if DesignVariant.userFacingCases.count > 1 {
+                    Picker("介面設計", selection: $designVariant) {
+                        ForEach(DesignVariant.userFacingCases) { variant in
+                            Text(variant.title).tag(variant)
+                        }
                     }
-                }
-                .onChange(of: designVariant) { _, newValue in
+                    .onChange(of: designVariant) { _, newValue in
                     // The picker writes to `UserDefaults`
                     // automatically; we additionally reapply
                     // it to the static `PaladalaTheme` enum
@@ -185,11 +185,12 @@ struct ProfileSettingsView: View {
                     // current render pass.  iCloud-mirrored
                     // so the choice follows the user across
                     // their other devices.
-                    PaladalaTheme.apply(newValue)
-                    ICloudSync.shared.mirror(
-                        key: "paladala.designVariant",
-                        value: newValue.rawValue
-                    )
+                        PaladalaTheme.apply(newValue)
+                        ICloudSync.shared.mirror(
+                            key: "paladala.designVariant",
+                            value: newValue.rawValue
+                        )
+                    }
                 }
                 if designVariant == .expressive {
                     Picker("主題色", selection: $expressiveSeed) {

@@ -1475,6 +1475,10 @@ final class LocalHLSProxyServer: @unchecked Sendable {
 
     private let queue = DispatchQueue(label: "Paladala.LocalHLSProxy")
     fileprivate let lock = NSRecursiveLock()
+    /// Counters for rate-limited hot-path diag lines
+    /// (see `respondBytes` / `tryLocalSegment`).
+    private var responseLogCount = 0
+    private var localMissCount = 0
     private var listener: NWListener?
     private var lanListener: NWListener?
     /// Test seam — exposes the listener's current state for XCTest assertions.
@@ -3107,8 +3111,18 @@ final class LocalHLSProxyServer: @unchecked Sendable {
         var lines: [String] = [
             "#EXTM3U",
             "#EXT-X-VERSION:6",
-            "#EXT-X-INDEPENDENT-SEGMENTS",
         ]
+        // Only declare INDEPENDENT-SEGMENTS when every video
+        // fragment really starts on a SAP.  Declaring it on a
+        // stream whose fragments don't is a spec violation —
+        // a seek into a non-SAP segment starts decoding
+        // mid-GOP and the player shows green frames until
+        // the next keyframe.
+        let allSAP = (videoSegments?.fragments ?? [])
+            .allSatisfy { $0.startsWithSAP }
+        if videoSegments == nil || allSAP {
+            lines.append("#EXT-X-INDEPENDENT-SEGMENTS")
+        }
         if source.audio != nil {
             lines.append(
                 "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"aac\","
@@ -4560,8 +4574,9 @@ fileprivate func proxySegmentRange(
         qn: Int,
         cid: Int64,
         kind: PrefetchKind,
-        absRange: Range<Int64>
+        absRange requestedRange: Range<Int64>
     ) -> (data: Data, totalSize: Int64)? {
+        var absRange = requestedRange
         let key = PlaybackPrefetchManager.cacheKey(
             bvid: bvid, qn: qn, cid: cid
         )
@@ -4590,26 +4605,43 @@ fileprivate func proxySegmentRange(
             // cache but the bytes were wrong" once the
             // `served from local cache` log has the
             // miss count next to it.
-            diagLog(.playback,
-                    "LocalHLSProxyServer /segment local cache miss",
-                    details: [
-                        "key": key,
-                        "kind": kind == .video ? "video" : "audio",
-                        "range":
-                            "\(absRange.lowerBound)"
-                            + "-\(absRange.upperBound - 1)",
-                        "filePath": fileURL.path
-                    ])
+            // Per-miss diag is high-cardinality (one line
+            // per segment request during playback), so rate-
+            // limit to every 20th miss with the total count.
+            lock.lock()
+            localMissCount += 1
+            let missSeq = localMissCount
+            lock.unlock()
+            if missSeq % 20 == 1 {
+                diagLog(.playback,
+                        "LocalHLSProxyServer /segment local cache miss",
+                        details: [
+                            "key": key,
+                            "kind": kind == .video ? "video" : "audio",
+                            "range":
+                                "\(absRange.lowerBound)"
+                                + "-\(absRange.upperBound - 1)",
+                            "missCount": missSeq
+                        ])
+            }
             return nil
         }
-        // Clamp the requested range to the actual file
-        // size.  `absRange.upperBound` may be `Int64.max`
-        // for "read to EOF" ranges; clamping here turns
-        // that into a real bound so the FileHandle read
-        // doesn't have to.
-        let clampedEnd = min(absRange.upperBound, totalSize)
-        guard clampedEnd > absRange.lowerBound else { return nil }
-        let clamped = absRange.lowerBound..<clampedEnd
+        // The cache file may still be mid-write from a
+        // concurrent prefetch.  Only serve a range the file
+        // fully covers — clamping would hand AVPlayer a
+        // truncated body under a Content-Range that declares
+        // more bytes than were delivered, and the decoder
+        // shows that corruption as green frames.
+        // `absRange.upperBound == Int64.max` means "read to
+        // EOF": clamp to totalSize so the response can
+        // legally 206 to end-of-file.
+        if absRange.upperBound == Int64.max {
+            guard totalSize > absRange.lowerBound else { return nil }
+            absRange = absRange.lowerBound..<totalSize
+        } else {
+            guard absRange.upperBound <= totalSize else { return nil }
+        }
+        let clamped = absRange
         guard let handle = try? FileHandle(forReadingFrom: fileURL)
         else { return nil }
         defer { try? handle.close() }
@@ -4793,6 +4825,18 @@ fileprivate func proxySegmentRange(
             extraHeaders: extraHeaders
         )
         response.append(body)
+        // Rate-limit the per-response diag line: AVPlayer
+        // fires 5-10 concurrent requests per buffer fill, so
+        // logging every send means constant log.jsonl writes
+        // on the playback hot path.  Keep every 20th as a
+        // heartbeat, tagged with the total count.
+        let seq: Int = {
+            lock.lock()
+            defer { lock.unlock() }
+            responseLogCount += 1
+            return responseLogCount
+        }()
+        let logThisResponse = seq % 20 == 1
         if Self.wireDumpEnabled {
             // Diagnostic: dump the actual bytes we are about
             // to hand to `connection.send` so we can see the
@@ -4809,22 +4853,17 @@ fileprivate func proxySegmentRange(
         connection.send(
             content: response,
             completion: .contentProcessed { _ in
-                // PR-B B7: log the connection.cancel()
-                // that fires after a successful body send.
-                // Without this line, the only signal in
-                // the dump is the connection-state
-                // transition a few ms later; the operator
-                // can't tell whether the cancel was
-                // expected (response complete) or a
-                // peer-closed race.
-                diagLog(.proxy,
-                        "respondBytes: connection.cancel",
-                        details: [
-                            "conn": connID,
-                            "label": label,
-                            "status": status,
-                            "bytesSent": body.count
-                        ])
+                if logThisResponse {
+                    diagLog(.proxy,
+                            "respondBytes: connection.cancel",
+                            details: [
+                                "conn": connID,
+                                "label": label,
+                                "status": status,
+                                "bytesSent": body.count,
+                                "responsesServed": seq
+                            ])
+                }
                 connection.cancel()
             }
         )
