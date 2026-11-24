@@ -166,167 +166,58 @@ enum PaladalaTheme {
     // remains legible without falling back to blur, translucency,
     // or a separate visual language. Pink is a signal color only.
     static var ink: Color {
-        if activeVariant == .expressive { return expressiveColor { $0.onSurface } }
-        switch activeVariant {
-        case .streetRedesign:
-            return Color(uiColor: UIColor { traits in
-                traits.userInterfaceStyle == .dark ? .white : .black
-            })
-        case .classic:
-            return .primary
-        case .iosNative, .expressive:
-            // 純蘋果原生：直接用 .primary，0 自定義顏色
-            return .primary
-        }
+        return .primary
     }
     static var paper: Color {
-        if activeVariant == .expressive { return expressiveColor { $0.surface } }
-        switch activeVariant {
-        case .streetRedesign:
-            return Color(uiColor: UIColor { traits in
-                traits.userInterfaceStyle == .dark ? .black : .white
-            })
-        case .classic:
-            return Color(uiColor: .systemBackground)
-        case .iosNative, .expressive:
-            // iOS Native 用 systemGroupedBackground 當頁面底色
-            return Color(uiColor: .systemGroupedBackground)
-        }
+        return Color(uiColor: .systemGroupedBackground)
     }
     static var canvas: Color {
-        if activeVariant == .expressive { return expressiveColor { $0.surface } }
-        switch activeVariant {
-        case .streetRedesign:
-            return Color(uiColor: UIColor { traits in
-                traits.userInterfaceStyle == .dark
-                    ? UIColor(red: 0.045, green: 0.045, blue: 0.045, alpha: 1)
-                    : UIColor(red: 0.976, green: 0.976, blue: 0.976, alpha: 1)
-            })
-        case .classic:
-            return Color.clear
-        case .iosNative, .expressive:
-            return Color(uiColor: .systemGroupedBackground)
-        }
+        return Color(uiColor: .systemGroupedBackground)
     }
     static var coolGray: Color {
-        if activeVariant == .expressive { return expressiveColor { $0.surfaceContainer } }
-        switch activeVariant {
-        case .streetRedesign:
-            return Color(uiColor: UIColor { traits in
-                traits.userInterfaceStyle == .dark
-                    ? UIColor(red: 0.11, green: 0.11, blue: 0.11, alpha: 1)
-                    : UIColor(red: 0.957, green: 0.957, blue: 0.957, alpha: 1)
-            })
-        case .classic:
-            return .primary.opacity(0.055)
-        case .iosNative, .expressive:
-            return Color(uiColor: .secondarySystemGroupedBackground)
-        }
+        return Color(uiColor: .secondarySystemGroupedBackground)
     }
     static var mutedInk: Color {
-        if activeVariant == .expressive { return expressiveColor { $0.onSurfaceVariant } }
-        switch activeVariant {
-        case .streetRedesign:
-            return Color(uiColor: UIColor { traits in
-                traits.userInterfaceStyle == .dark
-                    ? UIColor(red: 0.78, green: 0.78, blue: 0.78, alpha: 1)
-                    : UIColor(red: 0.30, green: 0.27, blue: 0.27, alpha: 1)
-            })
-        case .classic:
-            return .secondary
-        case .iosNative, .expressive:
-            return .secondary
-        }
+        return .secondary
     }
     static var cyan: Color {
-        if activeVariant == .expressive { return expressiveColor { $0.secondary } }
-        switch activeVariant {
-        case .streetRedesign: return ink
-        case .classic: return Color(red: 0.24, green: 0.78, blue: 0.94)
-        case .iosNative, .expressive: return Color.accentColor
-        }
+        return Color.accentColor
     }
     static var violet: Color {
-        if activeVariant == .expressive { return expressiveColor { $0.tertiary } }
-        switch activeVariant {
-        case .streetRedesign: return biliPink
-        case .classic: return Color(red: 0.48, green: 0.34, blue: 0.96)
-        case .iosNative, .expressive: return Color(uiColor: .systemPurple)
-        }
+        return Color(uiColor: .systemPurple)
     }
 
     // MARK: - Geometry (variant-aware)
     static var cornerRadius: CGFloat {
-        switch activeVariant {
-        case .streetRedesign: return 0
-        case .classic: return 24
-        case .iosNative: return 16
-        case .expressive: return DSRadius.card
-        }
+        return 16
     }
     static var cardRadius: CGFloat { cornerRadius }
     static var pillRadius: CGFloat { cornerRadius }
     static var heroRadius: CGFloat { cornerRadius }
     static let cornerStyle: RoundedCornerStyle = .continuous
     static var borderWidth: CGFloat {
-        if activeVariant == .expressive { return 0 }
-        switch activeVariant {
-        case .streetRedesign: return 1.5
-        case .classic: return 0
-        case .iosNative, .expressive: return 0.5
-        }
+        return 0.5
     }
     static var hairlineWidth: CGFloat {
-        switch activeVariant {
-        case .streetRedesign: return 1
-        case .classic: return 0.5
-        case .iosNative, .expressive: return 0.5
-        }
+        return 0.5
     }
     static var hardShadowOffset: CGFloat {
-        switch activeVariant {
-        case .streetRedesign: return 4
-        case .classic: return 0
-        case .iosNative, .expressive: return 0
-        }
+        return 0
     }
     static var pressedOffset: CGFloat {
-        switch activeVariant {
-        case .streetRedesign: return 4
-        case .classic: return 0
-        case .iosNative, .expressive: return 0
-        }
+        return 0
     }
     static var pageBackground: Color {
-        if activeVariant == .expressive { return expressiveColor { $0.surface } }
-        switch activeVariant {
-        case .streetRedesign: return canvas
-        case .classic: return Color.clear
-        case .iosNative, .expressive: return Color(uiColor: .systemGroupedBackground)
-        }
+        return Color(uiColor: .systemGroupedBackground)
     }
     static var cardBackground: Color {
-        if activeVariant == .expressive { return expressiveColor { $0.surfaceContainer } }
-        switch activeVariant {
-        case .streetRedesign: return paper
-        case .classic: return Color.primary.opacity(0.055)
-        case .iosNative, .expressive: return Color(uiColor: .secondarySystemGroupedBackground)
-        }
+        return Color(uiColor: .secondarySystemGroupedBackground)
     }
     static var glassStroke: Color {
-        if activeVariant == .expressive { return expressiveColor { $0.outlineVariant } }
-        switch activeVariant {
-        case .streetRedesign: return ink
-        case .classic: return Color.white.opacity(0.24)
-        case .iosNative, .expressive: return Color(uiColor: .separator)
-        }
+        return Color(uiColor: .separator)
     }
     static var glassShadow: Color {
-        switch activeVariant {
-        case .streetRedesign: return ink
-        case .classic: return Color.black.opacity(0.08)
-        case .iosNative, .expressive: return .clear
-        }
+        return .clear
     }
 
     // MARK: - Spacing scale (xs … xxxl)
@@ -460,84 +351,24 @@ enum PaladalaTheme {
         /// Dynamic Type fallback without shipping multi-megabyte web fonts.
         /// In the classic variant, falls back to `.largeTitle` so callers
         /// that adopt the new role don't crash.
-        static var displayLarge: Font {
-            switch PaladalaTheme.activeVariant {
-            case .streetRedesign: return .system(size: 36, weight: .black, design: .rounded)
-            case .classic: return .largeTitle
-            case .iosNative, .expressive: return .largeTitle
-            }
-        }
-        static var displayMedium: Font {
-            switch PaladalaTheme.activeVariant {
-            case .streetRedesign: return .system(size: 28, weight: .black, design: .rounded)
-            case .classic: return .title
-            case .iosNative, .expressive: return .title
-            }
-        }
-        static var headline: Font {
-            switch PaladalaTheme.activeVariant {
-            case .streetRedesign: return .system(size: 24, weight: .bold, design: .default)
-            case .classic: return .headline
-            case .iosNative, .expressive: return .headline
-            }
-        }
-        static var body: Font {
-            switch PaladalaTheme.activeVariant {
-            case .streetRedesign: return .system(size: 16, weight: .regular, design: .default)
-            case .classic: return .body
-            case .iosNative, .expressive: return .body
-            }
-        }
-        static var bodySmall: Font {
-            switch PaladalaTheme.activeVariant {
-            case .streetRedesign: return .system(size: 14, weight: .regular, design: .default)
-            case .classic: return .callout
-            case .iosNative, .expressive: return .callout
-            }
-        }
-        static var labelMono: Font {
-            switch PaladalaTheme.activeVariant {
-            case .streetRedesign: return .system(size: 12, weight: .medium, design: .monospaced)
-            case .classic: return .caption2
-            case .iosNative, .expressive: return .caption2
-            }
-        }
+        static var displayLarge: Font { .largeTitle }
+        static var displayMedium: Font { .title }
+        static var headline: Font { .headline }
+        static var body: Font { .body }
+        static var bodySmall: Font { .callout }
+        static var labelMono: Font { .caption2 }
         /// Card / row title — same weight as a section title but smaller.
-        static var cardTitle: Font {
-            switch PaladalaTheme.activeVariant {
-            case .streetRedesign: return .system(size: 16, weight: .bold, design: .rounded)
-            case .classic: return .headline
-            case .iosNative, .expressive: return .headline
-            }
-        }
+        static var cardTitle: Font { .headline }
         /// Section header in a scroll view — slightly larger.
-        static var sectionHeader: Font {
-            switch PaladalaTheme.activeVariant {
-            case .streetRedesign: return .system(size: 20, weight: .black, design: .rounded)
-            case .classic: return .title3.weight(.semibold)
-            case .iosNative, .expressive: return .title3.weight(.semibold)
-            }
-        }
+        static var sectionHeader: Font { .title3.weight(.semibold) }
         /// Large icon for an empty / placeholder state.
         static let emptyStateIcon: Font = .system(size: 56, weight: .light)
         /// Very large hero icon (onboarding).
         static let heroIcon: Font = .system(size: 96, weight: .light)
         /// Live / LIVE badge inside a card.
-        static var badge: Font {
-            switch PaladalaTheme.activeVariant {
-            case .streetRedesign: return .system(size: 11, weight: .bold, design: .monospaced)
-            case .classic: return .caption2.weight(.bold)
-            case .iosNative, .expressive: return .caption2.weight(.bold)
-            }
-        }
+        static var badge: Font { .caption2.weight(.bold) }
         /// Compact monospaced caption (log viewer timestamps).
-        static var monospacedCaption: Font {
-            switch PaladalaTheme.activeVariant {
-            case .streetRedesign: return labelMono
-            case .classic: return .system(.caption2, design: .monospaced)
-            case .iosNative, .expressive: return .system(.caption2, design: .monospaced)
-            }
-        }
+        static var monospacedCaption: Font { .system(.caption2, design: .monospaced) }
     }
 
     // MARK: - iOS Native tokens (集中命名空間)

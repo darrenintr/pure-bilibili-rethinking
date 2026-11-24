@@ -133,11 +133,8 @@ struct RootView: View {
             // secondary gesture affordance.
             LoginSheet()
                 .presentationDragIndicator(.visible)
-                .presentationBackground(PaladalaTheme.paper)
-                .presentationCornerRadius(0)
         }
         .paladalaToggleStyle()
-        .modifier(StreetTabBarModifier())
         .fullScreenCover(isPresented: Binding(
             get: { hasPresentedFirstFrame && !didOnboard },
             set: { newValue in
@@ -485,7 +482,6 @@ private struct PhoneRootView: View {
                 .tag(MainTab.profile)
             }
             .paladalaTabBarBehavior()
-            .modifier(ExpressivePhoneNavigation(selection: $router.selectedTab))
             .navigationDestination(for: BiliVideo.self) { video in
                 VideoDetailView(video: video, repository: repository, heroNamespace: heroNamespace)
             }
@@ -789,12 +785,6 @@ private func profileRouteView(_ route: ProfileRoute, repository: PaladalaReposit
 /// Native system tab bar on every OS version — iOS 26 renders
 /// it as Liquid Glass, earlier versions as system material.
 /// The custom DSNavBar / Street overlays are deleted.
-private struct StreetTabBarModifier: ViewModifier {
-    func body(content: Content) -> some View { content }
-}
-
-private struct ExpressivePhoneNavigation: ViewModifier {
-    @Binding var selection: MainTab
-
+private struct _RemovedLegacyChromeModifiers: ViewModifier {
     func body(content: Content) -> some View { content }
 }
