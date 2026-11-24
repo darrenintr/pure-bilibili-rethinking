@@ -481,7 +481,7 @@ private struct PhoneRootView: View {
             }
             .paladalaTabBarBehavior()
             .navigationTitle(router.selectedTab.title)
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: BiliVideo.self) { video in
                 VideoDetailView(video: video, repository: repository, heroNamespace: heroNamespace)
             }
