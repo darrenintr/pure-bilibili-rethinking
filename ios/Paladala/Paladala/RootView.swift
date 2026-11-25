@@ -491,87 +491,42 @@ private struct PhoneRootView: View {
 private struct PadRootView: View {
     let repository: PaladalaRepository
     @EnvironmentObject private var router: AppRouter
-    /// Single shared namespace for the hero / zoom transition.
     @Namespace private var heroNamespace
-    /// Sidebar visibility. The collapse button flips this to
-    /// `.detailOnly`; the system chevron / drag handle brings it
-    /// back to `.all`. `NavigationSplitView` owns the actual
-    /// show/hide animation — we just hand it a binding.
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
-
-    /// Tabs rendered in the sidebar's main list. Excludes `.profile`
-    /// because the new design surfaces 我的 as a user card at the
-    /// bottom of the sidebar instead of a regular row. The five-case
-    /// `MainTab` enum stays unchanged so the phone tab bar keeps
-    /// working.
-    private static let sidebarTabs: [MainTab] = [.home, .dynamic, .live]
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            PadSidebar(
-                tabs: Self.sidebarTabs,
-                columnVisibility: $columnVisibility
-            )
-            .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 320)
-        } detail: {
-            selectedView
-        }
-    }
-
-    @ViewBuilder
-    private var selectedView: some View {
-        // Wrap the tab content in a ZStack keyed by `router.selectedTab`
-        // so swapping tabs animates the outgoing / incoming view
-        // with a crossfade + slide instead of a hard cut.  The
-        // `.id(...)` on the inner view forces SwiftUI to discard the
-        // previous tab's state (scroll position, async tasks) which
-        // also fixes the "iPad sidebar tap doesn't switch" symptom —
-        // without the id the navigation stack would sometimes keep
-        // showing the prior destination when both tabs route to the
-        // same `NavigationStack` shape.
-        //
-        // iPad column count: 3 when the sidebar is hidden
-        // (`.detailOnly` / `.doubleColumn`-ish), 2 when it is
-        // visible.  Threaded down to `HomeView` so the video grid
-        // re-flows on sidebar collapse / expand.
-        let iPadColumns = (columnVisibility == .detailOnly) ? 3 : 2
-        ZStack {
-            switch router.selectedTab {
-            case .home:
-                NavigationStack(path: $router.homePath) {
-                    HomeView(
-                        repository: repository,
-                        heroNamespace: heroNamespace,
-                        iPadColumns: iPadColumns
-                    )
+        // iPadOS 18+ native sidebar-adaptable TabView. In regular
+        // width it renders as a Liquid Glass sidebar; when the user
+        // collapses it (system toggle, top-leading), the tabs morph
+        // into the floating top bar — the exact Apple TV behaviour.
+        // Replaces the hand-rolled NavigationSplitView + custom
+        // sidebar list, which could never replicate that morph.
+        TabView(selection: $router.selectedTab) {
+            Tab(MainTab.home.title, systemImage: MainTab.home.symbolName, value: MainTab.home) {
+                LazyTabNavStack(tag: MainTab.home, activeTag: router.selectedTab, path: $router.homePath) {
+                    HomeView(repository: repository, heroNamespace: heroNamespace, iPadColumns: 3)
                         .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
                 }
-                    .transition(ScreenSwitchTransition.active)
-                    .id(MainTab.home)
-            case .dynamic:
-                NavigationStack(path: $router.dynamicPath) {
+            }
+            Tab(MainTab.dynamic.title, systemImage: MainTab.dynamic.symbolName, value: MainTab.dynamic) {
+                LazyTabNavStack(tag: MainTab.dynamic, activeTag: router.selectedTab, path: $router.dynamicPath) {
                     DynamicFeedView(repository: repository, heroNamespace: heroNamespace)
                         .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
                 }
-                    .transition(ScreenSwitchTransition.active)
-                    .id(MainTab.dynamic)
-            case .live:
-                NavigationStack(path: $router.livePath) {
+            }
+            Tab(MainTab.live.title, systemImage: MainTab.live.symbolName, value: MainTab.live) {
+                LazyTabNavStack(tag: MainTab.live, activeTag: router.selectedTab, path: $router.livePath) {
                     LiveRoomsView(repository: repository)
                         .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
                 }
-                    .transition(ScreenSwitchTransition.active)
-                    .id(MainTab.live)
-            case .profile:
-                NavigationStack(path: $router.profilePath) {
+            }
+            Tab(MainTab.profile.title, systemImage: MainTab.profile.symbolName, value: MainTab.profile) {
+                LazyTabNavStack(tag: MainTab.profile, activeTag: router.selectedTab, path: $router.profilePath) {
                     ProfileSettingsView(repository: repository)
                         .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
                 }
-                    .transition(ScreenSwitchTransition.active)
-                    .id(MainTab.profile)
             }
         }
-        .animation(ScreenSwitchTransition.animation, value: router.selectedTab)
+        .tabViewStyle(.sidebarAdaptable)
     }
 }
 
@@ -599,96 +554,6 @@ enum ScreenSwitchTransition {
     /// rather than mechanical, but tuned short enough (260 ms) that
     /// the user never waits for the chrome to settle.
     static let animation: Animation = .spring(response: 0.26, dampingFraction: 0.86)
-}
-
-/// Native iPad sidebar — a `.sidebar`-styled `List` so the rows
-/// get the system selection pill and the column renders the
-/// platform's translucent material (Liquid Glass on iPadOS 26).
-/// The custom pink/Street chrome is deleted.
-private struct PadSidebar: View {
-    let tabs: [MainTab]
-    @Binding var columnVisibility: NavigationSplitViewVisibility
-
-    @EnvironmentObject private var router: AppRouter
-    @EnvironmentObject private var authStore: AuthStore
-
-    private var selection: Binding<MainTab?> {
-        Binding(
-            get: { router.selectedTab },
-            set: { newValue in
-                if let tab = newValue { router.open(tab) }
-            }
-        )
-    }
-
-    var body: some View {
-        List(selection: selection) {
-            ForEach(tabs) { tab in
-                Label(tab.title, systemImage: tab.sidebarSymbolName)
-                    .tag(tab)
-            }
-            Section {
-                Label {
-                    HStack(spacing: 10) {
-                        sidebarAvatar
-                            .frame(width: 28, height: 28)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(usernameText)
-                                .lineLimit(1)
-                            Text("我的")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                } icon: {
-                    EmptyView()
-                }
-                .tag(MainTab.profile)
-            }
-            Section {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.22)) {
-                        columnVisibility = .detailOnly
-                    }
-                } label: {
-                    Label("收合", systemImage: "sidebar.leading")
-                }
-                .foregroundStyle(.secondary)
-            }
-        }
-        .listStyle(.sidebar)
-    }
-
-    private var usernameText: String {
-        authStore.activeAccount?.name ?? "未登入"
-    }
-
-    @ViewBuilder
-    private var sidebarAvatar: some View {
-        if let url = authStore.activeAccount?.faceURL {
-            ResilientImage(url: url)
-                .clipShape(Circle())
-        } else {
-            Image(systemName: "person.crop.circle.fill")
-                .font(.title2)
-                .foregroundStyle(.secondary)
-        }
-    }
-}
-
-private struct StreetSidebarSurface: ViewModifier {
-    let fill: Color
-
-    func body(content: Content) -> some View {
-        content
-            .background(
-                fill,
-                in: RoundedRectangle(
-                    cornerRadius: PaladalaTheme.cornerRadius,
-                    style: PaladalaTheme.cornerStyle
-                )
-            )
-    }
 }
 
 @MainActor
