@@ -21,7 +21,6 @@ struct HomeView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @StateObject private var model = HomeViewModel()
     @State private var feedRevealed = false
-    @State private var headerCollapseProgress: CGFloat = 0
     @State private var isShortVideoFeedPresented = false
     @AppStorage("paladala.materialDesign") private var materialDesign: MaterialDesign = .liquidGlass
     /// Observed so SwiftUI re-evaluates the toolbar's
@@ -64,22 +63,6 @@ struct HomeView: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            VStack(spacing: 0) {
-                if horizontalSizeClass == .compact {
-                    HomeCollapsibleHeader(
-                        query: $model.searchQuery,
-                        progress: headerCollapseProgress,
-                        suggestions: model.searchSuggestions.map(\.displayName),
-                        onSubmit: performSearch,
-                        onPickSuggestion: { picked in
-                            model.searchQuery = picked
-                            performSearch()
-                        }
-                    ) {
-                        nativeToolbarControls()
-                    }
-                    .zIndex(1)
-                }
             feedContent(scrollProxy: proxy)
                 .background(Color.clear)
                 .navigationTitle("首頁")
@@ -117,12 +100,6 @@ struct HomeView: View {
                         horizontalSizeClass: horizontalSizeClass
                     )
                 )
-                // Compact width uses a fully custom collapsing
-                // header instead of the system nav bar: the large
-                // title fades away on scroll while the search field
-                // shrinks into the controls row — an animation the
-                // system `.searchable` API does not offer.
-                .toolbar(horizontalSizeClass == .compact ? .hidden : .visible, for: .navigationBar)
                 .onChange(of: model.searchQuery) { _, query in
                     model.searchQueryChanged(query, repository: repository)
                 }
@@ -162,7 +139,104 @@ struct HomeView: View {
                 .toolbarBackground(.visible, for: .navigationBar)
                 .toolbar {
                     ToolbarItemGroup(placement: .topBarTrailing) {
-nativeToolbarControls()
+                        if PaladalaTheme.usesNativeLayout {
+                            // iOS Native: 2 icons (refresh + profile).
+                            // Downloads / short-video / notifications
+                            // live in a "..." Menu (or in the iOS Native
+                            // search suggestions).  Apple's recommended
+                            // top-level nav pattern is 1-2 toolbar icons
+                            // so the system Liquid Glass surface stays
+                            // uncluttered.
+                            Button {
+                                Haptics.tap()
+                                Task { await model.load(repository: repository, accountMid: accountMid) }
+                            } label: {
+                                Image(systemName: "arrow.clockwise")
+                            }
+                            .accessibilityLabel(L10n.home.refresh)
+                            Menu {
+                                Section("分類") {
+                                    ForEach(HomeCategory.androidTabs) { category in
+                                        Button {
+                                            Haptics.selection()
+                                            model.category = category
+                                        } label: {
+                                            if model.category == category {
+                                                Label(category.title, systemImage: "checkmark")
+                                            } else {
+                                                Text(category.title)
+                                            }
+                                        }
+                                    }
+                                }
+                                Divider()
+                                Button {
+                                    Haptics.tap()
+                                    router.open(.downloads)
+                                } label: {
+                                    Label("離線快取", systemImage: "arrow.down.circle")
+                                }
+                                .badge(downloadStore.records.count)
+                                Button {
+                                    Haptics.tap()
+                                    isShortVideoFeedPresented = true
+                                } label: {
+                                    Label("短影片", systemImage: "rectangle.portrait.on.rectangle.portrait")
+                                }
+                                Button {
+                                    Haptics.tap()
+                                    router.open(.dynamic)
+                                } label: {
+                                    Label("動態", systemImage: "bell")
+                                }
+                            } label: {
+                                HStack(spacing: 3) {
+                                    Text(model.category.title)
+                                    Image(systemName: "chevron.down")
+                                        .font(.caption2.weight(.semibold))
+                                }
+                            }
+                            .accessibilityLabel("分類同更多")
+                        } else {
+                            // Street Minimal: 5 icons on the right of
+                            // the nav bar.  The hard-edged toolbar chrome
+                            // is part of the brand and works well with
+                            // the rest of the Street components.
+                            Button {
+                                Haptics.tap()
+                                router.open(.downloads)
+                            } label: {
+                                Label("離線快取", systemImage: "arrow.down.circle")
+                            }
+                            .badge(downloadStore.records.count)
+                            Button {
+                                Haptics.tap()
+                                isShortVideoFeedPresented = true
+                            } label: {
+                                Label("短影片", systemImage: "rectangle.portrait.on.rectangle.portrait")
+                            }
+                            Button {
+                                Haptics.tap()
+                                Task { await model.load(repository: repository, accountMid: accountMid) }
+                            } label: {
+                                Image(systemName: "arrow.clockwise")
+                            }
+                            .accessibilityLabel(L10n.home.refresh)
+                            Button {
+                                Haptics.tap()
+                                router.open(.dynamic)
+                            } label: {
+                                Image(systemName: "bell")
+                            }
+                            .accessibilityLabel("動態")
+                            Button {
+                                Haptics.tap()
+                                router.open(.profile)
+                            } label: {
+                                Image(systemName: "person.crop.circle")
+                            }
+                            .accessibilityLabel("我的")
+                        }
                     }
                 }
                 .modifier(HomeToolbarGlassModifier(materialDesign: materialDesign))
@@ -216,73 +290,6 @@ nativeToolbarControls()
                 .fullScreenCover(isPresented: $isShortVideoFeedPresented) {
                     ShortVideoFeedView(repository: repository)
                 }
-            }
-        }
-    }
-
-    /// Shared trailing controls (refresh + category/more menu)
-    /// used by the regular-width toolbar and the compact-width
-    /// collapsible custom header.
-    @ViewBuilder
-    private func nativeToolbarControls() -> some View {
-        Button {
-            Haptics.tap()
-            Task { await model.load(repository: repository, accountMid: accountMid) }
-        } label: {
-            Image(systemName: "arrow.clockwise")
-        }
-        .accessibilityLabel(L10n.home.refresh)
-        Menu {
-            Section("分類") {
-                ForEach(HomeCategory.androidTabs) { category in
-                    Button {
-                        Haptics.selection()
-                        model.category = category
-                    } label: {
-                        if model.category == category {
-                            Label(category.title, systemImage: "checkmark")
-                        } else {
-                            Text(category.title)
-                        }
-                    }
-                }
-            }
-            Divider()
-            Button {
-                Haptics.tap()
-                router.open(.downloads)
-            } label: {
-                Label("離線快取", systemImage: "arrow.down.circle")
-            }
-            .badge(downloadStore.records.count)
-            Button {
-                Haptics.tap()
-                isShortVideoFeedPresented = true
-            } label: {
-                Label("短影片", systemImage: "rectangle.portrait.on.rectangle.portrait")
-            }
-            Button {
-                Haptics.tap()
-                router.open(.dynamic)
-            } label: {
-                Label("動態", systemImage: "bell")
-            }
-        } label: {
-            HStack(spacing: 3) {
-                Text(model.category.title)
-                Image(systemName: "chevron.down")
-                    .font(.caption2.weight(.semibold))
-            }
-        }
-        .accessibilityLabel("分類同更多")
-    }
-
-    private func performSearch() {
-        model.clearSuggestions()
-        model.category = .search
-        Task {
-            await model.load(repository: repository, accountMid: accountMid)
-            await model.runAllSearch(repository: repository)
         }
     }
 
@@ -414,8 +421,6 @@ nativeToolbarControls()
             .padding(PaladalaTheme.contentPadding)
         }
         .scrollIndicators(.hidden)
-        .scrollDismissesKeyboard(.interactively)
-        .modifier(HomeScrollCollapseTracker(progress: $headerCollapseProgress))
         .refreshable {
             Haptics.medium()
             // CRITICAL: preserve the current feed while refreshing.
@@ -1143,9 +1148,12 @@ private struct AdaptiveSearchModifier: ViewModifier {
                         prompt: "搜尋 Bilibili 影片和 UP 主"
                     )
             } else {
-                // Compact width: the custom collapsible header in
-                // `HomeView.body` owns the search UI entirely.
                 content
+                    .searchable(
+                        text: $searchQuery,
+                        prompt: "搜尋 Bilibili 影片和 UP 主"
+                    )
+                    .searchToolbarBehavior(.minimize)
             }
         } else {
             content
@@ -1163,153 +1171,5 @@ private struct AdaptiveSearchModifier: ViewModifier {
                 prompt: "搜尋 Bilibili 影片和 UP 主"
             )
         #endif
-    }
-}
-
-
-/// Drives `headerCollapseProgress` from the feed's scroll offset:
-/// 0 at rest, 1 once the user has scrolled 80pt. iOS 18+ only;
-/// older systems simply never collapse.
-private struct HomeScrollCollapseTracker: ViewModifier {
-    @Binding var progress: CGFloat
-
-    func body(content: Content) -> some View {
-        if #available(iOS 18.0, *) {
-            content
-                .onScrollGeometryChange(for: CGFloat.self) { geo in
-                    max(0, geo.contentOffset.y + geo.contentInsets.top)
-                } action: { _, offset in
-                    progress = min(1, max(0, offset / 80))
-                }
-        } else {
-            content
-        }
-    }
-}
-
-/// The compact-width custom header: at rest a large 「首頁」 title
-/// sits beside the controls with a full-width search field below;
-/// scrolling interpolates the header so the title fades away and
-/// the field shrinks into the controls row — the exact collapse
-/// Apple Music-style navigation performs, which the system
-/// `.searchable` API cannot reproduce.
-private struct HomeCollapsibleHeader<Controls: View>: View {
-    @Binding var query: String
-    var progress: CGFloat
-    var suggestions: [String]
-    var onSubmit: () -> Void
-    var onPickSuggestion: (String) -> Void
-    @ViewBuilder var controls: () -> Controls
-
-    @FocusState private var fieldFocused: Bool
-    @State private var controlsWidth: CGFloat = 116
-
-    private let expandedH: CGFloat = 108
-    private let collapsedH: CGFloat = 56
-    private let fieldH: CGFloat = 36
-
-    var body: some View {
-        let p = min(1, max(0, progress))
-        let h = expandedH + (collapsedH - expandedH) * p
-        GeometryReader { geo in
-            let innerW = geo.size.width - 32
-            let collapsedW = max(110, innerW - controlsWidth - 10)
-            let fieldW = innerW + (collapsedW - innerW) * p
-            let yExpanded: CGFloat = 8 + 40 + 8
-            let yCollapsed: CGFloat = (h - fieldH) / 2
-            let fieldY = yExpanded + (yCollapsed - yExpanded) * p
-            ZStack(alignment: .topLeading) {
-                Text("首頁")
-                    .font(.system(size: 34, weight: .bold))
-                    .opacity(max(0, 1 - p * 1.6))
-                    .offset(x: 16, y: 4)
-
-                HStack(spacing: 16) {
-                    controls()
-                }
-                    .fixedSize()
-                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { _, w in
-                        controlsWidth = w
-                    }
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .padding(.trailing, 16)
-                    .padding(.top, 10)
-
-                searchField
-                    .frame(width: fieldW, height: fieldH)
-                    .offset(x: 16, y: fieldY)
-
-                if fieldFocused && !suggestions.isEmpty && p < 0.4 {
-                    suggestionsList(width: fieldW)
-                        .offset(x: 16, y: fieldY + fieldH + 6)
-                        .zIndex(1)
-                }
-            }
-            .frame(width: geo.size.width, height: h, alignment: .topLeading)
-        }
-        .frame(height: h)
-        .background(Color(uiColor: .systemBackground))
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 15))
-                .foregroundStyle(.secondary)
-            TextField("搜尋 Bilibili 影片和 UP 主", text: $query)
-                .textFieldStyle(.plain)
-                .focused($fieldFocused)
-                .submitLabel(.search)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-                .onSubmit {
-                    fieldFocused = false
-                    onSubmit()
-                }
-            if !query.isEmpty {
-                Button {
-                    query = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-                .accessibilityLabel("清除搜尋")
-            }
-        }
-        .padding(.horizontal, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color(uiColor: .secondarySystemFill))
-        )
-    }
-
-    private func suggestionsList(width: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(suggestions.prefix(6), id: \.self) { suggestion in
-                Button {
-                    fieldFocused = false
-                    onPickSuggestion(suggestion)
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(suggestion)
-                            .font(.subheadline)
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                }
-            }
-        }
-        .frame(width: width)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(uiColor: .secondarySystemGroupedBackground))
-                .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
-        )
     }
 }
