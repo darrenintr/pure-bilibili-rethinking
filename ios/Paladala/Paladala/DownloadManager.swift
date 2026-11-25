@@ -726,8 +726,10 @@ final class DownloadManager: NSObject, ObservableObject {
     /// 500 MB on the heap.
     /// Internal (not private) so `DownloadStore` can run the
     /// same merge as a migration for downloads made before the
-    /// merge step was fixed.
-    static func mergeSegmentsIntoMp4(
+    /// merge step was fixed. `nonisolated`: the merge touches
+    /// only the filesystem, and the migration caller runs on the
+    /// store's background io queue.
+    nonisolated static func mergeSegmentsIntoMp4(
         staging: URL,
         hasAudio: Bool
     ) -> MergeResult {
@@ -812,7 +814,7 @@ final class DownloadManager: NSObject, ObservableObject {
     /// crash mid-merge leaves the staging directory with
     /// the original `video.init` / `video.media` pair, and
     /// the next download attempt re-runs the merge.
-    private static func concatInitAndMedia(
+    nonisolated private static func concatInitAndMedia(
         initURL: URL,
         mediaURL: URL,
         destURL: URL
