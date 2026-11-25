@@ -358,24 +358,6 @@ struct VideoDetailView: View {
             // system chrome. Hidden when `ownerMid == 0` so
             // synthesised `BiliVideo`s (history rows, search
             // hits) fall back to plain title text.
-            ToolbarItem(placement: .principal) {
-                if video.ownerMid > 0 {
-                    NavigationLink(value: UPProfileRoute.up(mid: video.ownerMid)) {
-                        HStack(spacing: 4) {
-                            Text(model.detail.ownerName)
-                                .font(.headline)
-                                .lineLimit(1)
-                            Image(systemName: "chevron.right")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                        }
-                        .foregroundStyle(.primary)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("檢視 UP 主 \(model.detail.ownerName) 的個人主頁")
-                    .accessibilityHint("開啟 UP 主個人主頁")
-                }
-            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     prepareLANShare()
@@ -798,7 +780,8 @@ struct VideoDetailView: View {
                     .modifier(CommentScrollGeometryModifier(
                         model: model,
                         repository: repository,
-                        playerScale: $playerScale
+                        playerScale: $playerScale,
+                        scalesPlayer: false
                     ))
                 }
             }
@@ -2271,6 +2254,12 @@ private struct CommentScrollGeometryModifier: ViewModifier {
     let model: VideoDetailViewModel
     let repository: PaladalaRepository
     @Binding var playerScale: CGFloat
+    /// The player-shrink binding exists for the single-column
+    /// phone layout, where the player sits above the scroll
+    /// content. In the iPad split layout the player lives in a
+    /// separate column, so scrolling the comments panel must not
+    /// resize it.
+    var scalesPlayer: Bool = true
 
     func body(content: Content) -> some View {
         if #available(iOS 18, *) {
@@ -2293,6 +2282,7 @@ private struct CommentScrollGeometryModifier: ViewModifier {
                     let normalized = min(1.0, max(0.0, geometry.contentOffset.y / 240))
                     return 1.0 - normalized * 0.5
                 } action: { _, newScale in
+                    guard scalesPlayer else { return }
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                         playerScale = newScale
                     }
