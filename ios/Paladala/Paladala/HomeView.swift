@@ -77,7 +77,7 @@ struct HomeView: View {
                 // Street stays on `.inline` because the hard-edged
                 // style works better with a permanently compact
                 // title.
-                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(.large)
                 // PR-fix-2026-07-10: replace `.searchable` with
                 // a hand-rolled `UISearchFieldBridge` so the
                 // search bar carries Street Minimal chrome
