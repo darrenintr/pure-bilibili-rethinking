@@ -46,6 +46,35 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # The app uses iOS 26 APIs (.glassEffect / Liquid Glass) behind
+      # compiler guards; building with an SDK older than 26 strips them
+      # out of the shipped IPA entirely. Select the newest Xcode >= 26
+      # available on the runner so the guards compile the real code.
+      - name: Select Xcode 26+
+        run: |
+          for app in /Applications/Xcode*.app; do
+            v=$(/usr/bin/xcrun xcodebuild -version 2>/dev/null | head -1)
+            dv=$(/usr/bin/defaults read "$app/Contents/Info.plist" CFBundleShortVersionString 2>/dev/null)
+            major=$(echo "$dv" | cut -d. -f1)
+            echo "found: $app (Xcode $dv)"
+          done
+          best=""
+          for app in /Applications/Xcode*.app; do
+            dv=$(/usr/bin/defaults read "$app/Contents/Info.plist" CFBundleShortVersionString 2>/dev/null)
+            major=$(echo "$dv" | cut -d. -f1)
+            if [ "$major" -ge 26 ] 2>/dev/null; then
+              if [ -z "$best" ] || [ "$(echo "$dv" | cut -d. -f1)" -ge "$(/usr/bin/defaults read "$best/Contents/Info.plist" CFBundleShortVersionString | cut -d. -f1)" ]; then
+                best="$app"
+              fi
+            fi
+          done
+          if [ -z "$best" ]; then
+            echo "ERROR: no Xcode >= 26 found on this runner" >&2
+            exit 1
+          fi
+          echo "selecting $best"
+          sudo xcode-select -s "$best/Contents/Developer"
+
       - name: Show Xcode toolchain
         run: |
           xcodebuild -version
