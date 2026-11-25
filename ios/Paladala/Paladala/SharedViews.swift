@@ -126,8 +126,13 @@ struct VideoCard: View {
                         Label(video.viewCount.compactCount, systemImage: "play.fill")
                         Text("·").foregroundStyle(.tertiary)
                         Label(video.danmakuCount.compactCount, systemImage: "text.bubble")
-                        Text("·").foregroundStyle(.tertiary)
-                        Label(video.replyCount.compactCount, systemImage: "text.bubble.fill")
+                        // 評論數只喺有數據時先顯示 — 推薦 feed API
+                        // (rcmd) 嘅 stat 根本冇 reply field，
+                        // 硬顯示會永久係 0，誤導用户以為條片冇留言。
+                        if video.replyCount > 0 {
+                            Text("·").foregroundStyle(.tertiary)
+                            Label(video.replyCount.compactCount, systemImage: "text.bubble.fill")
+                        }
                         if let date = video.publishDate {
                             Text("·").foregroundStyle(.tertiary)
                             Text(date.relativeDateLabel)

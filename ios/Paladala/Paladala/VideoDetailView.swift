@@ -218,6 +218,11 @@ struct VideoDetailView: View {
     @State private var isCountingDownToNext: Bool = false
     @State private var nextUpCountdown: Int = 5
     @State private var nextUpCountdownTask: Task<Void, Never>?
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// iPad split-view right panel: 0 = 推薦影片, 1 = 評論.
+    /// Segmented control at the top of the side column switches
+    /// between the two, YouTube/Apple TV+ style.
+    @State private var sidePanelSelection = 0
     /// PR-4 (M3): the saved-time-confirmation sheet.  Nil until
     /// the user has progress > 30 s for this bvid.  When set,
     /// a sheet offers "继续观看 MM:SS" or "重新播放".  Auto-dismisses
@@ -269,6 +274,13 @@ struct VideoDetailView: View {
             let playerHeight = maxPlayerHeight
                 + (minPlayerHeight - maxPlayerHeight) * (1.0 - playerScale)
 
+            if horizontalSizeClass == .regular && geo.size.width >= 900 {
+                // iPad / large-width split: player + metadata on the
+                // left, a fixed-width panel on the right combining
+                // 推薦影片 and 評論 behind a segmented switcher —
+                // the YouTube / Apple TV+ detail-page idiom.
+                iPadSplitBody(geo: geo, playerHeight: playerHeight)
+            } else {
             VStack(spacing: 0) {
                 playerSurface
                     .frame(height: playerHeight)
@@ -306,6 +318,7 @@ struct VideoDetailView: View {
                     }
 
                 commentsScrollView
+            }
             }
         }
         .background(Color.clear)
@@ -700,6 +713,97 @@ struct VideoDetailView: View {
         .buttonStyle(PaladalaPressBounceButtonStyle())
         .accessibilityElement(children: .combine)
         .accessibilityHint("開啟 UP 主個人主頁")
+    }
+
+    /// iPad regular-width layout: video + metadata scroll on the
+    /// left, fixed 380pt side panel on the right. The panel hosts
+    /// 推薦影片 / 評論 behind a segmented switcher at its top —
+    /// the combined rail the user asked for, mirroring the Apple
+    /// TV+ / YouTube detail page. Comment pagination keeps working
+    /// because the comments scroll view carries the same geometry
+    /// modifier as the single-column layout when it is visible.
+    @ViewBuilder
+    private func iPadSplitBody(geo: GeometryProxy, playerHeight: CGFloat) -> some View {
+        let panelWidth: CGFloat = 380
+        let leftWidth = geo.size.width - panelWidth
+        // Re-derive the player height from the *left column* width —
+        // the parent computed it against the full screen width,
+        // which would make the 16:9 surface far too tall here.
+        let columnPlayerHeight = leftWidth * 9 / 16 * playerScale
+        HStack(alignment: .top, spacing: 0) {
+            VStack(spacing: 0) {
+                playerSurface
+                    .frame(height: columnPlayerHeight)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+                    .onAppear { sleepTimer.setController(playerController) }
+                    .onDisappear { sleepTimer.setController(nil) }
+                    .onChange(of: playerController.map(ObjectIdentifier.init)) { _, _ in
+                        sleepTimer.setController(playerController)
+                    }
+                    .overlay {
+                        if isShowingNextUp {
+                            nextUpOverlay
+                        }
+                    }
+                ScrollView {
+                    VStack(alignment: .leading, spacing: PaladalaTheme.Spacing.xxl) {
+                        titleBlock
+                        if video.ownerMid > 0 {
+                            upEntryCard
+                        }
+                        controlPanel
+                        if aiSummaryShouldRender {
+                            aiSummarySection
+                        }
+                    }
+                    .padding(.horizontal, PaladalaTheme.Spacing.l)
+                    .padding(.vertical, PaladalaTheme.Spacing.xxl)
+                }
+            }
+            .frame(width: leftWidth)
+
+            VStack(spacing: 0) {
+                Picker("側欄內容", selection: $sidePanelSelection) {
+                    Text("推薦").tag(0)
+                    Text("評論").tag(1)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+
+                if sidePanelSelection == 0 {
+                    ScrollView {
+                        // Vertical compact cards — the horizontal
+                        // rail (`relatedVideosSection`) is sized for
+                        // the full-width single-column layout and
+                        // overflows a 380pt side panel.
+                        LazyVStack(alignment: .leading, spacing: 14) {
+                            ForEach(Array(model.relatedVideos.enumerated()), id: \.element.id) { index, related in
+                                NavigationLink(value: related) {
+                                    RelatedVideoCard(video: related, isNextUp: model.nextUpIndex == index)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, PaladalaTheme.Spacing.xxl)
+                    }
+                } else {
+                    ScrollView {
+                        commentPreview
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, PaladalaTheme.Spacing.xxl)
+                    }
+                    .modifier(CommentScrollGeometryModifier(
+                        model: model,
+                        repository: repository,
+                        playerScale: $playerScale
+                    ))
+                }
+            }
+            .frame(width: panelWidth)
+        }
     }
 
     private var commentsScrollView: some View {

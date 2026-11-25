@@ -230,7 +230,13 @@ final class AppRouter: ObservableObject {
     /// whose `BiliPlayback.localContext` is set from the
     /// record.
     func openLocalVideo(_ record: DownloadRecord) {
-        selectedTab = .home
+        // Push onto the *current* tab's stack. The previous version
+        // force-switched to the home tab first, which — now that each
+        // tab owns its NavigationStack — races the tab switch and the
+        // push can land nowhere visible, so tapped downloads appeared
+        // to "not open". Every tab registers the LocalVideoRoute
+        // destination, and staying put also gives a correct back
+        // button (returns to the downloads list the user came from).
         path.append(LocalVideoRoute.local(record))
     }
 
