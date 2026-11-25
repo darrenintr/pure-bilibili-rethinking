@@ -1221,7 +1221,7 @@ private struct HomeCollapsibleHeader<Controls: View>: View {
             ZStack(alignment: .topLeading) {
                 Text("首頁")
                     .font(.system(size: 34, weight: .bold))
-                    .opacity(max(0.0, 1.0 - Double(p) * 1.6))
+                    .opacity(max(0, 1 - p * 1.6))
                     .offset(x: 16, y: 4)
 
                 HStack(spacing: 16) {
