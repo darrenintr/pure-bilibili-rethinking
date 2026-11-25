@@ -392,9 +392,31 @@ struct HomeView: View {
         .scrollIndicators(.hidden)
         .refreshable {
             Haptics.medium()
-            await model.load(repository: repository, accountMid: accountMid)
-            withAnimation(.easeOut(duration: 0.2)) {
-                proxy.scrollTo("feedTop", anchor: .top)
+            // CRITICAL: preserve the current feed while refreshing.
+            // Clearing `videos` up-front switches the view to the
+            // empty-state branch, which destroys the ScrollView that
+            // owns this very refresh task — SwiftUI then cancels it
+            // mid-flight (NSURLError -999), every fallback aborts,
+            // and the feed is stuck empty until relaunch. Keeping
+            // the existing rows mounted is also the standard Apple
+            // behaviour (content stays, spinner overlays on top).
+            // Run the fetch detached from the refreshable operation
+            // task. On iOS 26 SwiftUI cancels that operation almost
+            // immediately when the scroll view hierarchy updates
+            // during the gesture, which used to propagate into the
+            // in-flight URLSession requests (NSURLError -999) and
+            // killed every fallback along with them. A detached
+            // task is immune: the refresh control ends its spinner
+            // right away while the network load completes on its
+            // own and swaps the new rows in when they arrive.
+            let model = model
+            let repository = repository
+            let accountMid = accountMid
+            Task { @MainActor in
+                await model.load(repository: repository, accountMid: accountMid, preservingExistingContent: true)
+                withAnimation(.easeOut(duration: 0.2)) {
+                    proxy.scrollTo("feedTop", anchor: .top)
+                }
             }
         }
     }

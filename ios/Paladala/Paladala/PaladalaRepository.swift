@@ -59,13 +59,16 @@ final class PaladalaRepository: ObservableObject, @unchecked Sendable {
             do {
                 let webRcmd = try await apiClient.recommendedVideos(freshIndex: recommendFreshIndex)
                 if !webRcmd.isEmpty { return webRcmd }
+                diagLog(.recommendation, "Web RCMD returned empty", details: ["freshIndex": recommendFreshIndex])
             } catch {
                 bpLog("Web API rcmd failed: \(error)")
+                diagLog(.recommendation, "Web RCMD failed", details: ["error": "\(error)", "freshIndex": recommendFreshIndex])
             }
 
             if let appRcmd = try? await apiClient.appRecommendedVideos(freshIndex: recommendFreshIndex, isRefresh: isRefresh), !appRcmd.isEmpty {
                 return appRcmd
             }
+            diagLog(.recommendation, "App RCMD unavailable or empty", details: ["freshIndex": recommendFreshIndex])
 
             if page == 1 {
                 if let popular = try? await apiClient.popularVideos(page: page), !popular.isEmpty {
