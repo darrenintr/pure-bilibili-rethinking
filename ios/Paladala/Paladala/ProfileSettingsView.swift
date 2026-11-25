@@ -165,12 +165,16 @@ struct ProfileSettingsView: View {
                     HStack {
                         Text("玻璃風格")
                         Spacer()
-                        Text(GlassStyle(level: Int(glassLevel)).title)
+                        Text(GlassStyle(level: Int(glassLevel.rounded())).title)
                             .foregroundStyle(.secondary)
                     }
-                    Slider(value: $glassLevel, in: 0...4, step: 1)
+                    // Continuous slider — no stepped snapping. The
+                    // effective glass level is the nearest of the 5
+                    // rungs (rounded), so dragging feels smooth while
+                    // the applied style still lands on a real tier.
+                    Slider(value: $glassLevel, in: 0...4)
                         .onChange(of: glassLevel) { _, newValue in
-                            let style = GlassStyle(level: Int(newValue))
+                            let style = GlassStyle(level: Int(newValue.rounded()))
                             glassStyleRaw = style.rawValue
                             ICloudSync.shared.mirror(
                                 key: "paladala.glassStyle",
