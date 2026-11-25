@@ -32,13 +32,15 @@ struct PaladalaPressBounceButtonStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
+        // Apple Music / Photos press feedback: a gentle scale dip
+        // with a slight opacity fade. Replaces the old Street
+        // hard-edge x/y offset, which read as a print artifact
+        // rather than a touch response.
         configuration.label
-            .offset(
-                x: configuration.isPressed ? PaladalaTheme.pressedOffset : 0,
-                y: configuration.isPressed ? PaladalaTheme.pressedOffset : 0
-            )
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .opacity(configuration.isPressed ? 0.85 : 1)
             .animation(
-                reduceMotion ? nil : .easeOut(duration: 0.08),
+                reduceMotion ? nil : .spring(response: 0.22, dampingFraction: 0.75),
                 value: configuration.isPressed
             )
     }

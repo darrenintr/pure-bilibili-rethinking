@@ -20,6 +20,7 @@ struct HomeView: View {
     @EnvironmentObject private var authStore: AuthStore
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @StateObject private var model = HomeViewModel()
+    @State private var feedRevealed = false
     @State private var isShortVideoFeedPresented = false
     @AppStorage("paladala.materialDesign") private var materialDesign: MaterialDesign = .liquidGlass
     /// Observed so SwiftUI re-evaluates the toolbar's
@@ -93,10 +94,11 @@ struct HomeView: View {
                 // inside the navigation bar itself (Apple Music /
                 // Podcasts pattern), so there is no custom inset
                 // bar and no dead space under the large title.
-                .searchable(
-                    text: $model.searchQuery,
-                    placement: .navigationBarDrawer(displayMode: .always),
-                    prompt: "搜尋 Bilibili 影片和 UP 主"
+                .modifier(
+                    AdaptiveSearchModifier(
+                        searchQuery: $model.searchQuery,
+                        horizontalSizeClass: horizontalSizeClass
+                    )
                 )
                 .onChange(of: model.searchQuery) { _, query in
                     model.searchQueryChanged(query, repository: repository)
@@ -382,6 +384,35 @@ struct HomeView: View {
                             .onAppear {
                                 triggerLoadMoreIfNeeded(currentIndex: index)
                             }
+                        }
+                    }
+                    .opacity(feedRevealed ? 1 : 0)
+                    .offset(y: feedRevealed ? 0 : 14)
+                    .onChange(of: model.videos.isEmpty) { _, isEmpty in
+                        // Entrance: the first time content lands the
+                        // grid fades in and rises slightly — the same
+                        // content-first reveal Apple Music uses when a
+                        // page populates. One-shot per feed load;
+                        // subsequent pagination appends render
+                        // immediately (opacity already 1).
+                        if !isEmpty && !feedRevealed {
+                            withAnimation(.easeOut(duration: 0.35)) {
+                                feedRevealed = true
+                            }
+                        }
+                    }
+                    .onChange(of: model.category) { _, _ in
+                        // Re-arm the reveal for category switches so
+                        // the new feed doesn't pop in abruptly.
+                        feedRevealed = model.videos.isEmpty == false
+                    }
+                    .onAppear {
+                        // `onChange` only fires on transitions — if
+                        // the feed was already populated when this
+                        // view first renders (fast cache hit), the
+                        // grid would stay invisible forever.
+                        if !model.videos.isEmpty {
+                            feedRevealed = true
                         }
                     }
                     paginationFooter
@@ -1087,3 +1118,58 @@ private struct SuggestionList: View {
     }
 }
 
+
+/// iOS 26+: collapse the search field into a magnifier icon in
+/// the toolbar on regular-width layouts (iPad), where the
+/// always-visible drawer row wastes a full strip of vertical
+/// space. Tapping the icon expands the field with the system's
+/// own liquid animation. Compact widths (iPhone) keep the
+/// visible drawer — one-handed reachability matters more there.
+/// Adaptive search chrome. Compact width (iPhone): the field is
+/// always visible in the navigation bar drawer. Regular width
+/// (iPad): no forced drawer placement — the system default —
+/// plus `.minimize` on iOS 26, which collapses the field into a
+/// magnifier icon in the toolbar and expands it with the system's
+/// liquid animation on tap. `.minimize` cannot collapse a forced
+/// drawer placement, which is why the placement itself has to
+/// change with size class.
+private struct AdaptiveSearchModifier: ViewModifier {
+    @Binding var searchQuery: String
+    let horizontalSizeClass: UserInterfaceSizeClass?
+
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26, *) {
+            if horizontalSizeClass == .regular {
+                content
+                    .searchable(
+                        text: $searchQuery,
+                        prompt: "搜尋 Bilibili 影片和 UP 主"
+                    )
+                    .searchToolbarBehavior(.minimize)
+            } else {
+                content
+                    .searchable(
+                        text: $searchQuery,
+                        placement: .navigationBarDrawer(displayMode: .always),
+                        prompt: "搜尋 Bilibili 影片和 UP 主"
+                    )
+            }
+        } else {
+            content
+                .searchable(
+                    text: $searchQuery,
+                    placement: .navigationBarDrawer(displayMode: .always),
+                    prompt: "搜尋 Bilibili 影片和 UP 主"
+                )
+        }
+        #else
+        content
+            .searchable(
+                text: $searchQuery,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "搜尋 Bilibili 影片和 UP 主"
+            )
+        #endif
+    }
+}
