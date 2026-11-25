@@ -60,52 +60,6 @@ struct HomeView: View {
                      count: PaladalaTheme.activeVariant == .expressive ? 2 : 1)
     }
 
-    /// Search field rendered as a plain rounded system-style
-    /// row pinned under the nav bar. `.searchable` cannot be
-    /// used: navigation modifiers inside TabView children never
-    /// reach the outer NavigationStack on iOS 26, so the system
-    /// search field would be invisible. The large title lives on
-    /// the TabView itself in RootView for the same reason.
-    private var searchBar: some View {
-        UISearchFieldBridge(
-            text: $model.searchQuery,
-            prompt: "搜尋 Bilibili 影片和 UP 主",
-            onSubmit: {
-                model.clearSuggestions()
-                model.category = .search
-                Task {
-                    await model.load(repository: repository, accountMid: accountMid)
-                    await model.runAllSearch(repository: repository)
-                }
-            },
-            onQueryChanged: { query in
-                model.searchQueryChanged(query, repository: repository)
-            }
-        )
-        .padding(.horizontal, PaladalaTheme.Spacing.l)
-        .padding(.vertical, PaladalaTheme.Spacing.s)
-    }
-
-    private var searchBarSection: some View {
-        VStack(spacing: 0) {
-            searchBar
-            if !model.searchQuery.isEmpty && !model.searchSuggestions.isEmpty {
-                SuggestionList(
-                    suggestions: model.searchSuggestions,
-                    onSelect: { suggestion in
-                        model.searchQuery = suggestion.displayName
-                        model.clearSuggestions()
-                        model.category = .search
-                        Task {
-                            await model.load(repository: repository, accountMid: accountMid)
-                            await model.runAllSearch(repository: repository)
-                        }
-                    }
-                )
-            }
-        }
-    }
-
     var body: some View {
         ScrollViewReader { proxy in
             feedContent(scrollProxy: proxy)
@@ -139,7 +93,28 @@ struct HomeView: View {
                 // inside the navigation bar itself (Apple Music /
                 // Podcasts pattern), so there is no custom inset
                 // bar and no dead space under the large title.
-                .safeAreaInset(edge: .top, spacing: 0) { searchBarSection }
+                .searchable(
+                    text: $model.searchQuery,
+                    placement: .navigationBarDrawer(displayMode: .always),
+                    prompt: "搜尋 Bilibili 影片和 UP 主"
+                )
+                .onChange(of: model.searchQuery) { _, query in
+                    model.searchQueryChanged(query, repository: repository)
+                }
+                .onSubmit(of: .search) {
+                    model.clearSuggestions()
+                    model.category = .search
+                    Task {
+                        await model.load(repository: repository, accountMid: accountMid)
+                        await model.runAllSearch(repository: repository)
+                    }
+                }
+                .searchSuggestions {
+                    ForEach(model.searchSuggestions, id: \.displayName) { suggestion in
+                        Text(suggestion.displayName)
+                            .searchCompletion(suggestion.displayName)
+                    }
+                }
                 // PR-fix-2026-07-10: the trailing toolbar
                 // column (5 icons on the right of the nav
                 // bar) was rendering with the iOS 26 Liquid
@@ -213,16 +188,13 @@ struct HomeView: View {
                                     Label("動態", systemImage: "bell")
                                 }
                             } label: {
-                                Image(systemName: "ellipsis.circle")
+                                HStack(spacing: 3) {
+                                    Text(model.category.title)
+                                    Image(systemName: "chevron.down")
+                                        .font(.caption2.weight(.semibold))
+                                }
                             }
-                            .accessibilityLabel("更多")
-                            Button {
-                                Haptics.tap()
-                                router.open(.profile)
-                            } label: {
-                                Image(systemName: "person.crop.circle")
-                            }
-                            .accessibilityLabel("我的")
+                            .accessibilityLabel("分類同更多")
                         } else {
                             // Street Minimal: 5 icons on the right of
                             // the nav bar.  The hard-edged toolbar chrome
