@@ -790,24 +790,14 @@ private struct LazyTabNavStack<Tag: Hashable, V: View>: View {
     @State private var armed: Bool = false
 
     var body: some View {
-        Group {
-            if armed || activeTag == tag {
-                NavigationStack(path: $path) {
-                    content()
-                }
-            } else {
-                EmptyView()
-            }
-        }
-        .onChange(of: activeTag, initial: true) { _, new in
-            if let unwrapped = new, unwrapped == tag, !armed {
-                armed = true
-            }
-        }
-        .onAppear {
-            if !armed, activeTag == nil || activeTag == tag {
-                armed = true
-            }
+        // Always render the stack — gating the content behind the
+        // armed/EmptyView conditional made iOS 26's TabView hide the
+        // tab *items* of unvisited tabs entirely (the bar collapsed to
+        // showing only the tabs the user had already opened). The
+        // lazy-init cost of four tabs is negligible next to a broken
+        // tab bar.
+        NavigationStack(path: $path) {
+            content()
         }
     }
 }

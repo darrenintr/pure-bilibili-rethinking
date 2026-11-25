@@ -364,9 +364,12 @@ extension View {
 
     @ViewBuilder
     func paladalaTabBarBehavior() -> some View {
+        // Force `.never` — iOS 26's automatic minimize collapses the
+        // bar to a single capsule (only the active tab), which hid the
+        // other three tabs and read as "the tab bar is broken/empty".
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
-            self.tabBarMinimizeBehavior(.onScrollDown)
+            self.tabBarMinimizeBehavior(.never)
         } else {
             self
         }
