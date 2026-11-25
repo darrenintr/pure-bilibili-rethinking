@@ -21,6 +21,7 @@ struct HomeView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @StateObject private var model = HomeViewModel()
     @State private var feedRevealed = false
+    @State private var searchDropPresented = false
     @State private var isShortVideoFeedPresented = false
     @AppStorage("paladala.materialDesign") private var materialDesign: MaterialDesign = .liquidGlass
     /// Observed so SwiftUI re-evaluates the toolbar's
@@ -147,6 +148,17 @@ struct HomeView: View {
                             // top-level nav pattern is 1-2 toolbar icons
                             // so the system Liquid Glass surface stays
                             // uncluttered.
+                            if horizontalSizeClass == .compact {
+                                Button {
+                                    Haptics.tap()
+                                    withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                                        searchDropPresented.toggle()
+                                    }
+                                } label: {
+                                    Image(systemName: "magnifyingglass")
+                                }
+                                .accessibilityLabel("搜尋")
+                            }
                             Button {
                                 Haptics.tap()
                                 Task { await model.load(repository: repository, accountMid: accountMid) }
@@ -239,6 +251,34 @@ struct HomeView: View {
                         }
                     }
                 }
+                .overlay(alignment: .top) {
+                    if horizontalSizeClass == .compact && searchDropPresented {
+                        HomeSearchDropdown(
+                            query: $model.searchQuery,
+                            suggestions: model.searchSuggestions.map(\.displayName),
+                            onSubmit: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                    searchDropPresented = false
+                                }
+                                performSearch()
+                            },
+                            onPickSuggestion: { picked in
+                                model.searchQuery = picked
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                    searchDropPresented = false
+                                }
+                                performSearch()
+                            },
+                            onCancel: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                    searchDropPresented = false
+                                }
+                            }
+                        )
+                        .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)).combined(with: .offset(y: -10)))
+                        .zIndex(2)
+                    }
+                }
                 .modifier(HomeToolbarGlassModifier(materialDesign: materialDesign))
                 .task {
                     // PR-A Task 9: bootstrap once per view-model
@@ -290,6 +330,15 @@ struct HomeView: View {
                 .fullScreenCover(isPresented: $isShortVideoFeedPresented) {
                     ShortVideoFeedView(repository: repository)
                 }
+        }
+    }
+
+    private func performSearch() {
+        model.clearSuggestions()
+        model.category = .search
+        Task {
+            await model.load(repository: repository, accountMid: accountMid)
+            await model.runAllSearch(repository: repository)
         }
     }
 
@@ -1148,12 +1197,10 @@ private struct AdaptiveSearchModifier: ViewModifier {
                         prompt: "搜尋 Bilibili 影片和 UP 主"
                     )
             } else {
+                // Compact width uses the custom liquid-glass
+                // dropdown search owned by HomeView — no system
+                // full-screen searchable chrome.
                 content
-                    .searchable(
-                        text: $searchQuery,
-                        prompt: "搜尋 Bilibili 影片和 UP 主"
-                    )
-                    .searchToolbarBehavior(.minimize)
             }
         } else {
             content
@@ -1171,5 +1218,111 @@ private struct AdaptiveSearchModifier: ViewModifier {
                 prompt: "搜尋 Bilibili 影片和 UP 主"
             )
         #endif
+    }
+}
+
+
+/// Compact-width search presented as a floating liquid-glass
+/// dropdown under the top bar — a rounded half-panel with a
+/// native-styled field and live suggestions, replacing the
+/// system searchable's full-screen plain-white takeover.
+private struct HomeSearchDropdown: View {
+    @Binding var query: String
+    var suggestions: [String]
+    var onSubmit: () -> Void
+    var onPickSuggestion: (String) -> Void
+    var onCancel: () -> Void
+
+    @FocusState private var fieldFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 15))
+                        .foregroundStyle(.secondary)
+                    TextField("搜尋 Bilibili 影片和 UP 主", text: $query)
+                        .textFieldStyle(.plain)
+                        .focused($fieldFocused)
+                        .submitLabel(.search)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .onSubmit {
+                            fieldFocused = false
+                            onSubmit()
+                        }
+                    if !query.isEmpty {
+                        Button {
+                            query = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .accessibilityLabel("清除搜尋")
+                    }
+                }
+                .padding(.horizontal, 10)
+                .frame(height: 36)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color(uiColor: .tertiarySystemFill))
+                )
+                Button("取消") {
+                    fieldFocused = false
+                    onCancel()
+                }
+                .font(.body)
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 10)
+
+            if fieldFocused && !suggestions.isEmpty {
+                Divider()
+                    .padding(.horizontal, 14)
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(suggestions.prefix(7), id: \.self) { suggestion in
+                        Button {
+                            fieldFocused = false
+                            onPickSuggestion(suggestion)
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text(suggestion)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(1)
+                                Spacer()
+                                Image(systemName: "arrow.up.left")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.bottom, 8)
+            } else {
+                Spacer().frame(height: 4)
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.18), radius: 24, y: 10)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(.white.opacity(0.25), lineWidth: 0.5)
+        )
+        .padding(.horizontal, 12)
+        .padding(.top, 4)
+        .onAppear { fieldFocused = true }
     }
 }
