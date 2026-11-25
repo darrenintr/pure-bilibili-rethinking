@@ -1151,9 +1151,9 @@ private struct AdaptiveSearchModifier: ViewModifier {
                 content
                     .searchable(
                         text: $searchQuery,
-                        placement: .navigationBarDrawer(displayMode: .automatic),
                         prompt: "搜尋 Bilibili 影片和 UP 主"
                     )
+                    .searchToolbarBehavior(.minimize)
             }
         } else {
             content
