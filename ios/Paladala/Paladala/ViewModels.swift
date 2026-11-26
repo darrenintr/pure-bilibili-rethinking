@@ -912,6 +912,21 @@ final class VideoDetailViewModel: ObservableObject {
             isLoading = false
             return
         }
+        // `.task` on the detail view re-fires when a
+        // `.fullScreenCover` (fullscreen playback) dismisses,
+        // because SwiftUI removes the covered view from the
+        // hierarchy and re-inserts it.  Without this guard the
+        // re-fire refetches playurl, tears the controller down
+        // and rebuilds the whole proxy pipeline — the user sees
+        // the video "restart" every time they leave fullscreen.
+        // Quality switches go through `setQuality`/`setAudioQuality`
+        // and never need this path, and the error-retry button
+        // only exists when playback is nil, so skipping here is
+        // safe.
+        if playback != nil {
+            isLoading = false
+            return
+        }
         // Offline-first fallback for non-Downloads entry
         // points.  The Downloads tab is the only navigation
         // route that constructs this VM with a
