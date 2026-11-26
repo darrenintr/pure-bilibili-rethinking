@@ -3705,57 +3705,119 @@ fileprivate func proxySegmentRange(
             cursor += size
         }
         let startedAt = Date()
+        // Streaming assembly: send the response headers up-front
+        // (the total length is known), then write each chunk body
+        // in order as soon as it lands. AVPlayer sees first bytes
+        // after only chunk 0 completes instead of waiting for the
+        // slowest chunk of the set — under per-connection CDN
+        // throttling this is the difference between a 1-2s start
+        // and the 5s+ stall that tripped CoreMediaErrorDomain
+        // -12889 timeouts.
+        let sendGroup = DispatchGroup()
+        sendHeader(
+            connection: connection,
+            sendGroup: sendGroup,
+            status: 200,
+            contentType: "video/mp4",
+            contentLength: total,
+            connID: connID
+        )
         Task { [weak self] in
             guard let self else { return }
+            var failed: Error?
+            var sentBytes = 0
+            // The connection is owned by this handler end-to-end —
+            // the loopback client either reads everything or drops,
+            // and cancellation is serialized through the same
+            // closure chain — so the cross-task capture is race-free
+            // in practice even though NWConnection isn't Sendable.
+            nonisolated(unsafe) let downstream = connection
+            nonisolated(unsafe) let group_ = sendGroup
             do {
-                let body = try await self.btrFetchChunks(
-                    chunks: chunks,
-                    candidates: candidates,
-                    referer: referer,
-                    purpose: "segment[\(idx)] \(kind)"
-                )
-                if Self.requestMetadataLogEnabled {
-                    diagLog(.playback,
-                            "LocalHLSProxyServer /segment served via BTR",
-                            details: [
-                                "conn": connID,
-                                "kind": kind,
-                                "n": idx,
-                                "chunks": chunkCount,
-                                "mirrors": candidates.count,
-                                "bytes": body.count,
-                                "elapsedMs":
-                                    elapsedMilliseconds(since: startedAt)
-                            ])
+                // swiftlint:disable:next redundant_sendable_silencing
+                nonisolated(unsafe) let chunks_ = chunks
+                nonisolated(unsafe) let candidates_ = candidates
+                nonisolated(unsafe) let referer_ = referer
+                sentBytes = try await withThrowingTaskGroup(of: (Int, Data).self, returning: Int.self) { group in
+                    for (index, chunk) in chunks_.enumerated() {
+                        group.addTask { [self] in
+                            var lastError: Error = RangeFetchError.timedOut
+                            for attempt in 0..<candidates_.count {
+                                let url = candidates_[(index + attempt) % candidates_.count]
+                                do {
+                                    let outcome = try await self.fetchExactRange(
+                                        url: url,
+                                        range: chunk,
+                                        referer: referer_,
+                                        purpose: "segment[\(idx)] \(kind) chunk \(index)"
+                                    )
+                                    return (index, outcome.data)
+                                } catch {
+                                    lastError = error
+                                }
+                            }
+                            throw lastError
+                        }
+                    }
+                    // Write in index order: out-of-order completions
+                    // wait in the buffer until every earlier chunk
+                    // has hit the wire, so the body stays contiguous.
+                    var buffer: [Int: Data] = [:]
+                    var nextIndex = 0
+                    var bytesWritten = 0
+                    while let (index, data) = try await group.next() {
+                        buffer[index] = data
+                        while let ordered = buffer.removeValue(forKey: nextIndex) {
+                            group_.enter()
+                            bytesWritten += ordered.count
+                            downstream.send(
+                                content: ordered,
+                                completion: .contentProcessed { _ in
+                                    group_.leave()
+                                }
+                            )
+                            nextIndex += 1
+                        }
+                    }
+                    return bytesWritten
                 }
-                self.respondBytes(
-                    connection: connection,
-                    status: 200,
-                    contentType: "video/mp4",
-                    body: body,
-                    extraHeaders: ["Content-Length": "\(body.count)"],
-                    connID: connID,
-                    label: "BTR segment[\(idx)] \(byteRange.lowerBound)"
-                        + "-\(byteRange.upperBound - 1)"
-                )
             } catch {
+                failed = error
+            }
+            if let failed {
                 diagLog(.playback,
-                        "LocalHLSProxyServer BTR fetch failed, single-stream fallback",
+                        "LocalHLSProxyServer BTR streaming fetch failed mid-response",
                         details: [
                             "conn": connID,
                             "kind": kind,
                             "n": idx,
-                            "error": "\(error)"
+                            "sentBytes": sentBytes,
+                            "error": "\(failed)"
                         ])
-                self.serveSegmentSingleStream(
-                    track: track,
-                    byteRange: byteRange,
-                    idx: idx,
-                    kind: kind,
-                    referer: referer,
-                    connection: connection,
-                    connID: connID
-                )
+                // Headers are already on the wire, so we can't
+                // re-issue a clean single-stream fallback — the
+                // connection simply drops, AVPlayer retries the
+                // segment, and the next request can take the
+                // single-stream path if BTR keeps failing.
+                connection.cancel()
+                return
+            }
+            sendGroup.notify(queue: .global()) { [weak self] in
+                guard let self else { return }
+                if Self.requestMetadataLogEnabled {
+                    diagLog(.playback,
+                            "LocalHLSProxyServer /segment streamed via BTR",
+                            details: [
+                                "conn": connID,
+                                "kind": kind,
+                                "n": idx,
+                                "chunks": chunks.count,
+                                "mirrors": candidates.count,
+                                "bytes": sentBytes,
+                                "elapsedMs": self.elapsedMilliseconds(since: startedAt)
+                            ])
+                }
+                connection.cancel()
             }
         }
     }

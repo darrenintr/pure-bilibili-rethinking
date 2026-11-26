@@ -159,6 +159,7 @@ struct VideoDetailView: View {
     /// scrolling down shrinks the player, scrolling back up
     /// grows it.
     @State private var playerScale: CGFloat = 1.0
+    @AppStorage("paladala.playbackRate") private var playbackRate: Double = 1.0
     /// User-controlled player size multiplier, dragged in via the
     /// bottom-right resize grip and remembered across launches.
     @AppStorage("paladala.playerSizeBias") private var playerSizeBias: Double = 1.0
@@ -948,12 +949,15 @@ struct VideoDetailView: View {
     /// bottom-trailing, and only intercepts touches in its own
     /// 44x44 hit area.
     private var playerResizeGrip: some View {
-        Image(systemName: "arrow.up.left.and.arrow.down.right")
-            .font(.system(size: 11, weight: .bold))
-            .foregroundStyle(.white.opacity(0.85))
+        // Apple-style corner affordance: a thin curve hugging the
+        // player's rounded corner (the macOS resize-corner idiom)
+        // instead of a button glyph — it reads as part of the
+        // surface itself.
+        CornerResizeAffordance()
+            .stroke(Color.white.opacity(0.75), lineWidth: 2)
+            .frame(width: 26, height: 26)
+            .shadow(color: .black.opacity(0.5), radius: 1.5)
             .padding(8)
-            .background(.black.opacity(0.45), in: Circle())
-            .padding(6)
             .contentShape(Rectangle().size(width: 44, height: 44))
             .gesture(
                 DragGesture(minimumDistance: 0)
@@ -1059,6 +1063,7 @@ struct VideoDetailView: View {
             controlCell { danmakuChip }
             controlCell { qualityMenu }
             controlCell { audioQualityMenu }
+            controlCell { speedChip }
             controlCell { downloadButton }
             controlCell { sleepTimerChip }
             controlCell(showsDivider: false) { coinButton }
@@ -1098,6 +1103,48 @@ struct VideoDetailView: View {
                         .padding(.vertical, 18)
                 }
             }
+    }
+
+    /// Playback-rate menu — 0.5x through 5x. Persisted via
+    /// `paladala.playbackRate` so the choice survives across
+    /// videos and launches; re-applied whenever a new
+    /// controller/session spins up (the AVKit transport's own
+    /// speed picker caps out at 2x, which is why this menu
+    /// exists despite the system surface).
+    private var speedChip: some View {
+        Menu {
+            ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0, 5.0], id: \.self) { rate in
+                Button {
+                    Haptics.selection()
+                    playbackRate = rate
+                    playerController?.setRate(Float(rate))
+                } label: {
+                    if playbackRate == rate {
+                        Label(rateLabel(rate), systemImage: "checkmark")
+                    } else {
+                        Text(rateLabel(rate))
+                    }
+                }
+            }
+        } label: {
+            VStack(spacing: 6) {
+                Image(systemName: playbackRate == 1.0 ? "gauge" : "gauge.with.needle")
+                    .font(.body.weight(.black))
+                    .contentTransition(.symbolEffect(.replace.downUp))
+                Text(rateLabel(playbackRate))
+                    .font(PaladalaTheme.FontRole.labelMono)
+            }
+        }
+        .paladalaActionPill()
+        .onAppear {
+            if playbackRate != 1.0 {
+                playerController?.setRate(Float(playbackRate))
+            }
+        }
+    }
+
+    private func rateLabel(_ rate: Double) -> String {
+        rate == floor(rate) ? "\(Int(rate))x" : String(format: "%.2gx", rate)
     }
 
     /// Subtitle toggle.  Disabled when the upstream didn't
@@ -2545,5 +2592,24 @@ private struct ResumePromptSheetModifier: ViewModifier {
             .presentationDragIndicator(.visible)
             .paladalaSheetGlass()
         }
+    }
+}
+
+
+/// Curved corner line for the player resize grip — mirrors the
+/// rounded corner of the video surface, like the resize
+/// affordance curve on macOS window corners.
+private struct CornerResizeAffordance: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        // Arc hugging the bottom-right corner radius.
+        path.addArc(
+            center: CGPoint(x: rect.minX, y: rect.minY),
+            radius: rect.width,
+            startAngle: .degrees(0),
+            endAngle: .degrees(90),
+            clockwise: false
+        )
+        return path
     }
 }
