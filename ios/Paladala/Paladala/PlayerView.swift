@@ -78,15 +78,25 @@ struct PlayerView: View {
             // PlayerTimedTextOverlay is now hosted inside
             // contentOverlayView so it persists into native fullscreen.
             ZStack {
-                if (controller.isBuffering || controller.playbackState == .preparing) && controller.playerError == nil {
+                if (controller.isBuffering || controller.playbackState == .preparing
+                || (controller.playerError != nil && controller.playerError?.recoveryAction != .signInAgain))
+                && !(controller.playerError?.recoveryAction == .signInAgain) {
                     loadingOverlay
                         .transition(.opacity)
                         .allowsHitTesting(false)
                 }
 
                 if let error = controller.playerError {
-                    playbackErrorOverlay(error: error, controller: controller)
-                        .transition(.opacity)
+                    if error.recoveryAction == .signInAgain {
+                        playbackErrorOverlay(error: error, controller: controller)
+                            .transition(.opacity)
+                    } else {
+                        // Retryable errors are auto-retried by the
+                        // controller — the user sees a reconnecting
+                        // spinner, never a dead-end error panel.
+                        reconnectingOverlay
+                            .transition(.opacity)
+                    }
                 }
 
                 SponsorSkipToast()
@@ -135,6 +145,29 @@ struct PlayerView: View {
         }
     }
 
+    /// Shown while the controller auto-retries a retryable
+    /// playback failure — same visual language as the loading
+    /// overlay so the user reads it as "still working", never
+    /// as a dead end requiring a button press.
+    private var reconnectingOverlay: some View {
+        VStack(spacing: 6) {
+            ProgressView().tint(.white).controlSize(.regular)
+            Text("重新連接中…")
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.9))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            .black.opacity(0.55),
+            in: RoundedRectangle(
+                cornerRadius: PaladalaTheme.cornerRadius,
+                style: PaladalaTheme.cornerStyle
+            )
+        )
+        .accessibilityLabel("Reconnecting")
+    }
+
     /// Spinner + KB/s readout shown during stalls.
     private var loadingOverlay: some View {
         VStack(spacing: 6) {
@@ -161,7 +194,7 @@ struct PlayerView: View {
     }
 
     private func formatNetworkSpeed(_ bytesPerSecond: Double) -> String {
-        guard bytesPerSecond > 0 else { return "—" }
+        guard bytesPerSecond > 0 else { return "0 B/s" }
         if bytesPerSecond >= 1_000_000 {
             return String(format: "%.1f MB/s", bytesPerSecond / 1_000_000)
         }
@@ -643,7 +676,10 @@ private struct FullscreenPlayerOverlay: View {
 
             SponsorSkipToast()
 
-            if controller.isBuffering {
+            // Buffering *and* initial preparation both need a
+            // visible indicator — without `.preparing` the user
+            // can't tell a still-loading stream from a dead one.
+            if (controller.isBuffering || controller.playbackState == .preparing) && controller.playerError == nil {
                 VStack(spacing: 10) {
                     ProgressView()
                         .tint(.white)
@@ -663,12 +699,57 @@ private struct FullscreenPlayerOverlay: View {
                 )
                 .transition(.opacity)
             }
+
+            // A failed stream in fullscreen used to be a silent
+            // black frame — surface the error + recovery action
+            // exactly like the inline surface does.
+            if let error = controller.playerError, error.recoveryAction == .signInAgain {
+                VStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.title)
+                        .foregroundStyle(.yellow)
+                    Text(error.title)
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                    Text(error.message)
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.85))
+                        .multilineTextAlignment(.center)
+                    Button {
+                        Haptics.tap()
+                        switch error.recoveryAction {
+                        case .signInAgain:
+                            AppRouter.postOpenLoginRequest()
+                        case .retryPlayback, .retrySeek:
+                            controller.retryPlayback()
+                        }
+                    } label: {
+                        Label(error.recoveryAction.buttonLabel, systemImage: "arrow.clockwise")
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .padding(20)
+                .background(
+                    .black.opacity(0.7),
+                    in: RoundedRectangle(
+                        cornerRadius: PaladalaTheme.cornerRadius,
+                        style: PaladalaTheme.cornerStyle
+                    )
+                )
+                .transition(.opacity)
+            }
         }
         .animation(.default, value: controller.isBuffering)
+        .animation(.default, value: controller.playbackState)
+        .animation(.default, value: controller.playerError != nil)
     }
 
     private func formatNetworkSpeed(_ bytesPerSecond: Double) -> String {
-        guard bytesPerSecond > 0 else { return "—" }
+        guard bytesPerSecond > 0 else { return "0 B/s" }
         if bytesPerSecond >= 1_000_000 {
             return String(format: "%.1f MB/s", bytesPerSecond / 1_000_000)
         }

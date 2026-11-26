@@ -215,7 +215,7 @@ struct ShortcutInstallPromptView: View {
             .background(PaladalaTheme.paper)
             .overlay {
                 Rectangle()
-                    .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
+                    .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
             }
             .background {
                 Rectangle()
@@ -241,7 +241,7 @@ struct ShortcutInstallPromptView: View {
                 .background(PaladalaTheme.biliPink)
                 .overlay {
                     Rectangle()
-                        .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
+                        .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
                 }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -274,7 +274,7 @@ struct ShortcutInstallPromptView: View {
                 .background(PaladalaTheme.biliPink)
                 .overlay {
                     Rectangle()
-                        .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
+                        .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
                 }
                 .background {
                     Rectangle()
@@ -301,7 +301,7 @@ struct ShortcutInstallPromptView: View {
                 .background(PaladalaTheme.paper)
                 .overlay {
                     Rectangle()
-                        .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
+                        .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
                 }
             }
             .buttonStyle(.plain)

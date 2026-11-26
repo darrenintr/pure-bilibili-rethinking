@@ -159,6 +159,20 @@ struct VideoDetailView: View {
     /// scrolling down shrinks the player, scrolling back up
     /// grows it.
     @State private var playerScale: CGFloat = 1.0
+    @AppStorage("paladala.playbackRate") private var playbackRate: Double = 1.0
+    /// User-controlled player size multiplier, dragged in via the
+    /// bottom-right resize grip and remembered across launches.
+    @AppStorage("paladala.playerSizeBias") private var playerSizeBias: Double = 1.0
+    @State private var playerSizeBiasDragStart: Double? = nil
+    // Transient bias while the corner grip is being dragged.
+    // Writing `@AppStorage` (UserDefaults) on every gesture event
+    // broadcast a change notification app-wide each frame and
+    // re-rendered the whole detail page mid-drag — the visible
+    // stutter the user reported. During the drag we mutate this
+    // plain `@State` instead (cheap, localised invalidation) and
+    // commit to storage once, on release.
+    @State private var playerSizeBiasLive: Double? = nil
+    private var effectivePlayerSizeBias: Double { playerSizeBiasLive ?? playerSizeBias }
     /// User's preferred comment sort, persisted across launches. The
     /// view writes through to the model and to the underlying fetch
     /// whenever the user toggles the picker.
@@ -218,11 +232,21 @@ struct VideoDetailView: View {
     @State private var isCountingDownToNext: Bool = false
     @State private var nextUpCountdown: Int = 5
     @State private var nextUpCountdownTask: Task<Void, Never>?
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// iPad split-view right panel: 0 = 推薦影片, 1 = 評論.
+    /// Segmented control at the top of the side column switches
+    /// between the two, YouTube/Apple TV+ style.
+    @State private var sidePanelSelection = 0
     /// PR-4 (M3): the saved-time-confirmation sheet.  Nil until
     /// the user has progress > 30 s for this bvid.  When set,
     /// a sheet offers "继续观看 MM:SS" or "重新播放".  Auto-dismisses
     /// to nil after the user picks (or taps outside).
     @State private var resumePromptSeconds: Double?
+    /// Set once we've shown the resume sheet for this detail
+    /// view — without it `.task` re-runs on every re-appear
+    /// (e.g. dismissing fullscreen playback) and the sheet
+    /// pops again even though the user already chose.
+    @State private var didPromptResume = false
     /// Default countdown duration. YouTube uses 5 s; matches
     /// the HIG-recommended transition window for video
     /// chrome.
@@ -261,9 +285,17 @@ struct VideoDetailView: View {
             let minPlayerHeight = isImmersiveMode
                 ? totalH * 0.9
                 : max(150, mediaHeight * 0.82)
-            let playerHeight = maxPlayerHeight
-                + (minPlayerHeight - maxPlayerHeight) * (1.0 - playerScale)
+            let playerHeight = (maxPlayerHeight
+                + (minPlayerHeight - maxPlayerHeight) * (1.0 - playerScale))
+                * effectivePlayerSizeBias
 
+            if horizontalSizeClass == .regular && geo.size.width >= 900 {
+                // iPad / large-width split: player + metadata on the
+                // left, a fixed-width panel on the right combining
+                // 推薦影片 and 評論 behind a segmented switcher —
+                // the YouTube / Apple TV+ detail-page idiom.
+                iPadSplitBody(geo: geo, playerHeight: playerHeight)
+            } else {
             VStack(spacing: 0) {
                 playerSurface
                     .frame(height: playerHeight)
@@ -301,6 +333,7 @@ struct VideoDetailView: View {
                     }
 
                 commentsScrollView
+            }
             }
         }
         .background(Color.clear)
@@ -340,24 +373,6 @@ struct VideoDetailView: View {
             // system chrome. Hidden when `ownerMid == 0` so
             // synthesised `BiliVideo`s (history rows, search
             // hits) fall back to plain title text.
-            ToolbarItem(placement: .principal) {
-                if video.ownerMid > 0 {
-                    NavigationLink(value: UPProfileRoute.up(mid: video.ownerMid)) {
-                        HStack(spacing: 4) {
-                            Text(model.detail.ownerName)
-                                .font(.headline)
-                                .lineLimit(1)
-                            Image(systemName: "chevron.right")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                        }
-                        .foregroundStyle(.primary)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("檢視 UP 主 \(model.detail.ownerName) 的個人主頁")
-                    .accessibilityHint("開啟 UP 主個人主頁")
-                }
-            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     prepareLANShare()
@@ -492,11 +507,14 @@ struct VideoDetailView: View {
             // from where they left off or restart.  Gated > 30 s
             // of progress so trivial re-opens (skipped a tab,
             // came back) don't pepper the user.
-            if let saved = PlayProgressStore.shared.lastProgress(for: model.detail.bvid),
-               saved.currentTime > 30,
-               let duration = playerController?.duration, duration > 0,
-               saved.currentTime < duration - 30 {
-                resumePromptSeconds = saved.currentTime
+            if !didPromptResume {
+                didPromptResume = true
+                if let saved = PlayProgressStore.shared.lastProgress(for: model.detail.bvid),
+                   saved.currentTime > 30,
+                   let duration = playerController?.duration, duration > 0,
+                   saved.currentTime < duration - 30 {
+                    resumePromptSeconds = saved.currentTime
+                }
             }
         }
         .modifier(ResumePromptSheetModifier(
@@ -666,42 +684,23 @@ struct VideoDetailView: View {
     private var upEntryCard: some View {
         NavigationLink(value: UPProfileRoute.up(mid: video.ownerMid)) {
             HStack(spacing: 12) {
-                Image(systemName: "person.crop.square.fill")
-                    .font(.title2.weight(.black))
-                    .foregroundStyle(PaladalaTheme.ink)
-                    .frame(width: 44, height: 44)
-                    .background(PaladalaTheme.coolGray)
-                    .overlay {
-                        Rectangle()
-                            .strokeBorder(
-                                PaladalaTheme.ink,
-                                lineWidth: PaladalaTheme.borderWidth
-                            )
-                    }
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.system(size: 38))
+                    .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(model.detail.ownerName)
-                        .font(PaladalaTheme.FontRole.cardTitle)
-                        .foregroundStyle(PaladalaTheme.ink)
-                        .textCase(.uppercase)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
                         .lineLimit(1)
                     Text("檢視 UP 主個人主頁")
-                        .font(PaladalaTheme.FontRole.labelMono)
-                        .foregroundStyle(PaladalaTheme.mutedInk)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "arrow.up.right")
-                    .font(.body.weight(.black))
-                    .foregroundStyle(PaladalaTheme.ink)
-                    .frame(width: 38, height: 38)
-                    .background(PaladalaTheme.biliPink)
-                    .overlay {
-                        Rectangle()
-                            .strokeBorder(
-                                PaladalaTheme.ink,
-                                lineWidth: PaladalaTheme.borderWidth
-                            )
-                    }
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
             }
             .padding(PaladalaTheme.Spacing.m)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -711,6 +710,98 @@ struct VideoDetailView: View {
         .buttonStyle(PaladalaPressBounceButtonStyle())
         .accessibilityElement(children: .combine)
         .accessibilityHint("開啟 UP 主個人主頁")
+    }
+
+    /// iPad regular-width layout: video + metadata scroll on the
+    /// left, fixed 380pt side panel on the right. The panel hosts
+    /// 推薦影片 / 評論 behind a segmented switcher at its top —
+    /// the combined rail the user asked for, mirroring the Apple
+    /// TV+ / YouTube detail page. Comment pagination keeps working
+    /// because the comments scroll view carries the same geometry
+    /// modifier as the single-column layout when it is visible.
+    @ViewBuilder
+    private func iPadSplitBody(geo: GeometryProxy, playerHeight: CGFloat) -> some View {
+        let panelWidth: CGFloat = 380
+        let leftWidth = geo.size.width - panelWidth
+        // Re-derive the player height from the *left column* width —
+        // the parent computed it against the full screen width,
+        // which would make the 16:9 surface far too tall here.
+        let columnPlayerHeight = leftWidth * 9 / 16 * playerScale * effectivePlayerSizeBias
+        HStack(alignment: .top, spacing: 0) {
+            VStack(spacing: 0) {
+                playerSurface
+                    .frame(height: columnPlayerHeight)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+                    .onAppear { sleepTimer.setController(playerController) }
+                    .onDisappear { sleepTimer.setController(nil) }
+                    .onChange(of: playerController.map(ObjectIdentifier.init)) { _, _ in
+                        sleepTimer.setController(playerController)
+                    }
+                    .overlay {
+                        if isShowingNextUp {
+                            nextUpOverlay
+                        }
+                    }
+                ScrollView {
+                    VStack(alignment: .leading, spacing: PaladalaTheme.Spacing.xxl) {
+                        titleBlock
+                        if video.ownerMid > 0 {
+                            upEntryCard
+                        }
+                        controlPanel
+                        if aiSummaryShouldRender {
+                            aiSummarySection
+                        }
+                    }
+                    .padding(.horizontal, PaladalaTheme.Spacing.l)
+                    .padding(.vertical, PaladalaTheme.Spacing.xxl)
+                }
+            }
+            .frame(width: leftWidth)
+
+            VStack(spacing: 0) {
+                Picker("側欄內容", selection: $sidePanelSelection) {
+                    Text("推薦").tag(0)
+                    Text("評論").tag(1)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+
+                if sidePanelSelection == 0 {
+                    ScrollView {
+                        // Vertical compact cards — the horizontal
+                        // rail (`relatedVideosSection`) is sized for
+                        // the full-width single-column layout and
+                        // overflows a 380pt side panel.
+                        LazyVStack(alignment: .leading, spacing: 14) {
+                            ForEach(Array(model.relatedVideos.enumerated()), id: \.element.id) { index, related in
+                                NavigationLink(value: related) {
+                                    RelatedVideoCard(video: related, isNextUp: model.nextUpIndex == index)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, PaladalaTheme.Spacing.xxl)
+                    }
+                } else {
+                    ScrollView {
+                        commentPreview
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, PaladalaTheme.Spacing.xxl)
+                    }
+                    .modifier(CommentScrollGeometryModifier(
+                        model: model,
+                        repository: repository,
+                        playerScale: $playerScale,
+                        scalesPlayer: false
+                    ))
+                }
+            }
+            .frame(width: panelWidth)
+        }
     }
 
     private var commentsScrollView: some View {
@@ -855,20 +946,63 @@ struct VideoDetailView: View {
         // (play/pause, skip) sit in the centre of the view and
         // are not clipped by the rounded rectangle.
         .clipShape(RoundedRectangle(cornerRadius: PaladalaTheme.cardRadius, style: PaladalaTheme.cornerStyle))
-        .overlay {
-            Rectangle()
-                .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
+        .overlay(alignment: .bottomTrailing) {
+            playerResizeGrip
         }
+    }
+
+    /// Bottom-right corner grip that drag-resizes the player
+    /// surface vertically ( pinch-style affordance) and persists
+    /// the multiplier via `playerSizeBias`. The grip stays out of
+    /// the way of AVKit's transport controls: it is small,
+    /// bottom-trailing, and only intercepts touches in its own
+    /// 44x44 hit area.
+    private var playerResizeGrip: some View {
+        // Apple-style corner affordance: a thin curve hugging the
+        // player's rounded corner (the macOS resize-corner idiom)
+        // instead of a button glyph — it reads as part of the
+        // surface itself.
+        CornerResizeAffordance()
+            .stroke(Color.white.opacity(0.75), lineWidth: 2)
+            .frame(width: 26, height: 26)
+            .shadow(color: .black.opacity(0.5), radius: 1.5)
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        if playerSizeBiasDragStart == nil {
+                            playerSizeBiasDragStart = playerSizeBias
+                        }
+                        let start = playerSizeBiasDragStart ?? 1.0
+                        // Dragging down-right enlarges; up-left shrinks.
+                        // ~240pt of travel maps to the full 0.6…1.6 range.
+                        let delta = (value.translation.height + value.translation.width) / 480
+                        playerSizeBiasLive = min(1.6, max(0.6, start + delta))
+                    }
+                    .onEnded { _ in
+                        if let live = playerSizeBiasLive {
+                            playerSizeBias = live
+                        }
+                        playerSizeBiasLive = nil
+                        playerSizeBiasDragStart = nil
+                        Haptics.selection()
+                    }
+            )
+            .accessibilityLabel("調整播放器大小")
+    }
+
+    @ViewBuilder
+    private var titleText: some View {
+        Text(model.detail.title)
+            .font(.title3.weight(.semibold))
+            .foregroundStyle(.primary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var titleBlock: some View {
         VStack(alignment: .leading, spacing: PaladalaTheme.Spacing.m) {
-            Text(model.detail.title)
-                .font(PaladalaTheme.FontRole.displayMedium)
-                .foregroundStyle(PaladalaTheme.ink)
-                .textCase(.uppercase)
-                .tracking(-0.6)
-                .fixedSize(horizontal: false, vertical: true)
+            titleText
             // Consumption metrics: 播放 / 彈幕 / 評論 / 時長.
             // 評論 is the *comment* count (`replyCount`), distinct
             // from 彈幕 (danmaku).  Previously the second pill was
@@ -942,6 +1076,7 @@ struct VideoDetailView: View {
             controlCell { danmakuChip }
             controlCell { qualityMenu }
             controlCell { audioQualityMenu }
+            controlCell { speedChip }
             controlCell { downloadButton }
             controlCell { sleepTimerChip }
             controlCell(showsDivider: false) { coinButton }
@@ -976,10 +1111,53 @@ struct VideoDetailView: View {
             .overlay(alignment: .trailing) {
                 if showsDivider {
                     Rectangle()
-                        .fill(PaladalaTheme.ink)
-                        .frame(width: PaladalaTheme.borderWidth)
+                        .fill(PaladalaTheme.glassStroke)
+                        .frame(width: 0.5)
+                        .padding(.vertical, 18)
                 }
             }
+    }
+
+    /// Playback-rate menu — 0.5x through 5x. Persisted via
+    /// `paladala.playbackRate` so the choice survives across
+    /// videos and launches; re-applied whenever a new
+    /// controller/session spins up (the AVKit transport's own
+    /// speed picker caps out at 2x, which is why this menu
+    /// exists despite the system surface).
+    private var speedChip: some View {
+        Menu {
+            ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0, 5.0], id: \.self) { rate in
+                Button {
+                    Haptics.selection()
+                    playbackRate = rate
+                    playerController?.setRate(Float(rate))
+                } label: {
+                    if playbackRate == rate {
+                        Label(rateLabel(rate), systemImage: "checkmark")
+                    } else {
+                        Text(rateLabel(rate))
+                    }
+                }
+            }
+        } label: {
+            VStack(spacing: 6) {
+                Image(systemName: playbackRate == 1.0 ? "gauge" : "gauge.with.needle")
+                    .font(.body.weight(.black))
+                    .contentTransition(.symbolEffect(.replace.downUp))
+                Text(rateLabel(playbackRate))
+                    .font(PaladalaTheme.FontRole.labelMono)
+            }
+        }
+        .paladalaActionPill()
+        .onAppear {
+            if playbackRate != 1.0 {
+                playerController?.setRate(Float(playbackRate))
+            }
+        }
+    }
+
+    private func rateLabel(_ rate: Double) -> String {
+        rate == floor(rate) ? "\(Int(rate))x" : String(format: "%gx", rate)
     }
 
     /// Subtitle toggle.  Disabled when the upstream didn't
@@ -1769,18 +1947,8 @@ struct VideoDetailView: View {
     private var commentInputField: some View {
         HStack(spacing: 12) {
             TextField("說點什麼…", text: $newCommentText)
-                .font(PaladalaTheme.FontRole.bodySmall)
-                .textFieldStyle(.plain)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 44)
-                .background(PaladalaTheme.paper)
-                .overlay {
-                    Rectangle()
-                        .strokeBorder(
-                            PaladalaTheme.ink,
-                            lineWidth: PaladalaTheme.borderWidth
-                        )
-                }
+                .textFieldStyle(.roundedBorder)
+                .frame(minHeight: 36)
                 .disabled(isSubmittingComment)
 
             Button {
@@ -1797,26 +1965,14 @@ struct VideoDetailView: View {
             } label: {
                 if isSubmittingComment {
                     ProgressView().controlSize(.small)
+                        .frame(minWidth: 52)
                 } else {
-                    // Mixed-script bug fix from A11y honourable
-                    // mentions — the rest of the app is 简体 so
-                    // the comment-publish button was reading
-                    // 繁體 against the rest.  Use the localized key.
                     Text(L10n.video.publish)
-                        .font(PaladalaTheme.FontRole.labelMono)
-                        .foregroundStyle(PaladalaTheme.ink)
-                        .frame(minWidth: 52, minHeight: 44)
-                        .background(PaladalaTheme.biliPink)
-                        .overlay {
-                            Rectangle()
-                                .strokeBorder(
-                                    PaladalaTheme.ink,
-                                    lineWidth: PaladalaTheme.borderWidth
-                                )
-                        }
+                        .frame(minWidth: 52, minHeight: 32)
                 }
             }
-            .buttonStyle(PaladalaPressBounceButtonStyle())
+            .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.capsule)
             .disabled(newCommentText.isEmpty || isSubmittingComment)
         }
     }
@@ -2139,7 +2295,7 @@ private struct NestedReplyRow: View {
         .background(PaladalaTheme.coolGray)
         .overlay {
             Rectangle()
-                .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.hairlineWidth)
+                .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
         }
     }
 }
@@ -2200,6 +2356,12 @@ private struct CommentScrollGeometryModifier: ViewModifier {
     let model: VideoDetailViewModel
     let repository: PaladalaRepository
     @Binding var playerScale: CGFloat
+    /// The player-shrink binding exists for the single-column
+    /// phone layout, where the player sits above the scroll
+    /// content. In the iPad split layout the player lives in a
+    /// separate column, so scrolling the comments panel must not
+    /// resize it.
+    var scalesPlayer: Bool = true
 
     func body(content: Content) -> some View {
         if #available(iOS 18, *) {
@@ -2222,6 +2384,7 @@ private struct CommentScrollGeometryModifier: ViewModifier {
                     let normalized = min(1.0, max(0.0, geometry.contentOffset.y / 240))
                     return 1.0 - normalized * 0.5
                 } action: { _, newScale in
+                    guard scalesPlayer else { return }
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                         playerScale = newScale
                     }
@@ -2334,7 +2497,7 @@ private struct CoinToastBanner: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "bitcoinsign.circle.fill")
-                .foregroundStyle(PaladalaTheme.biliPink)
+                .foregroundStyle(.white)
             Text(text)
                 .font(.footnote.weight(.semibold))
                 .lineLimit(2)
@@ -2343,19 +2506,8 @@ private struct CoinToastBanner: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PaladalaTheme.biliPink)
-        .overlay {
-            Rectangle()
-                .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
-        }
-        .background {
-            Rectangle()
-                .fill(PaladalaTheme.ink)
-                .offset(
-                    x: PaladalaTheme.hardShadowOffset,
-                    y: PaladalaTheme.hardShadowOffset
-                )
-        }
+        .background(.tint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .foregroundStyle(.white)
     }
 }
 
@@ -2390,8 +2542,8 @@ private struct ResumePromptSheet: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Rectangle()
-                .fill(PaladalaTheme.ink)
+            Capsule()
+                .fill(Color.secondary.opacity(0.35))
                 .frame(width: 36, height: 5)
                 .padding(.top, 8)
             Text("繼續觀看 \(mmss)？")
@@ -2418,7 +2570,6 @@ private struct ResumePromptSheet: View {
                         .fontWeight(.semibold)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(PaladalaTheme.biliPink)
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 16)
@@ -2454,5 +2605,24 @@ private struct ResumePromptSheetModifier: ViewModifier {
             .presentationDragIndicator(.visible)
             .paladalaSheetGlass()
         }
+    }
+}
+
+
+/// Curved corner line for the player resize grip — mirrors the
+/// rounded corner of the video surface, like the resize
+/// affordance curve on macOS window corners.
+private struct CornerResizeAffordance: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        // Arc hugging the bottom-right corner radius.
+        path.addArc(
+            center: CGPoint(x: rect.minX, y: rect.minY),
+            radius: rect.width,
+            startAngle: .degrees(0),
+            endAngle: .degrees(90),
+            clockwise: false
+        )
+        return path
     }
 }

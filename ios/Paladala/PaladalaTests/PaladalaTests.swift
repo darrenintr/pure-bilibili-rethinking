@@ -479,7 +479,7 @@ private final class StubURLProtocol: URLProtocol, @unchecked Sendable {
         let configuration = Self.lock.withLock {
             Self.state.lastPath = request.url?.path
             Self.state.lastCookie = request.value(forHTTPHeaderField: "Cookie")
-            Self.state.lastBody = request.httpBody.flatMap { String(data: $0, encoding: .utf8) }
+            Self.state.lastBody = Self.bodyString(of: request)
             Self.state.started += 1
             return (Self.state.delay, Self.state.handler)
         }
@@ -505,5 +505,26 @@ private final class StubURLProtocol: URLProtocol, @unchecked Sendable {
         guard let workItem, !workItem.isCancelled else { return }
         workItem.cancel()
         Self.lock.withLock { Self.state.cancelled += 1 }
+    }
+
+    /// URLSession hands the request body to the protocol as
+    /// `httpBodyStream` on newer SDKs (`httpBody` is nil), so read
+    /// whichever one is populated.
+    private static func bodyString(of request: URLRequest) -> String? {
+        if let data = request.httpBody {
+            return String(data: data, encoding: .utf8)
+        }
+        guard let stream = request.httpBodyStream else { return nil }
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: 4096)
+        defer { buffer.deallocate() }
+        while stream.hasBytesAvailable {
+            let read = stream.read(buffer, maxLength: 4096)
+            if read <= 0 { break }
+            data.append(buffer, count: read)
+        }
+        return String(data: data, encoding: .utf8)
     }
 }

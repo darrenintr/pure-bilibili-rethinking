@@ -95,10 +95,11 @@ final class DownloadManager: NSObject, ObservableObject {
     /// segment fails once (transient CDN error, dropped
     /// socket, …) we re-schedule it; on the second failure
     /// we fall through to the existing whole-download
-    /// `failed(message:)` state.  Keyed by the system
-    /// `taskIdentifier` so the retry survives the delegate
-    /// callback boundary.
-    private var retryCountByTaskId: [Int: Int] = [:]
+    /// `failed(message:)` state.  Keyed by the stable segment
+    /// identity (the task description), because the retry task
+    /// gets a fresh system `taskIdentifier` — keying by that
+    /// would reset the budget on every attempt.
+    private var retryCountBySegment: [String: Int] = [:]
 
     private override init() {
         super.init()
@@ -111,19 +112,20 @@ final class DownloadManager: NSObject, ObservableObject {
     /// delegate.
     func bootstrap() {
         if session != nil { return }
-        let configuration = URLSessionConfiguration.background(
-            withIdentifier: Self.sessionIdentifier
-        )
-        // Background sessions cannot carry custom headers
-        // (`Referer` etc.) in their config — those have to
-        // go on the per-request `URLRequest`.  We do still
-        // want the system to be willing to issue the
-        // requests when the user is on cellular, so we
-        // leave `discretionary` and `sessionSendsLaunchEvents`
-        // at their defaults.
+        // Foreground session, deliberately. The download tasks
+        // carry byte-range headers (DASH init/media sections),
+        // and the iOS background-session daemon rejects such
+        // tasks instantly with `NSURLErrorDomain -1 "unknown
+        // error"` — on both device and simulator — so a
+        // `URLSessionConfiguration.background` session can never
+        // move a single byte here. A default session performs
+        // the same ranged requests reliably (the playback proxy
+        // proves the CDN serves them). Trade-off: in-flight
+        // downloads pause when the app is suspended; the user
+        // keeps the app in the foreground for the ~1 minute a
+        // download takes.
+        let configuration = URLSessionConfiguration.default
         configuration.allowsCellularAccess = true
-        configuration.isDiscretionary = false
-        configuration.sessionSendsLaunchEvents = true
         let queue = OperationQueue()
         queue.maxConcurrentOperationCount = 1
         queue.name = "Paladala.DownloadManager.delegate"
@@ -273,14 +275,11 @@ final class DownloadManager: NSObject, ObservableObject {
                 self.progress[bvid] = nil
                 self.pendingByBvid[bvid] = nil
                 self.taskToBvid = self.taskToBvid.filter { $0.value != bvid }
-                // Drop any retry counters for tasks of this
+                // Drop any retry counters for segments of this
                 // bvid so a future re-download starts fresh.
-                let taskIdsToDrop = self.taskToBvid
-                    .filter { $0.value == bvid }
-                    .map { $0.key }
-                for id in taskIdsToDrop {
-                    self.retryCountByTaskId[id] = nil
-                }
+                // Segment keys are "{bvid}|{media}|{kind}".
+                self.retryCountBySegment = self.retryCountBySegment
+                    .filter { !$0.key.hasPrefix(bvid + "|") }
                 let staging = DownloadStore.shared.inProgressDirectory(
                     for: bvid
                 )
@@ -381,7 +380,7 @@ final class DownloadManager: NSObject, ObservableObject {
 
     /// Re-schedule one segment download after a transient
     /// failure.  Used by `urlSession(_:task:didCompleteWithError:)`
-    /// when `retryCountByTaskId[id]` is below `maxRetries`.
+    /// when its retry budget is not yet exhausted.
     /// The original task is already cancelled (the URLSession
     /// hands us an error on its delegate), so we just queue
     /// a fresh `downloadTask` against the same target.
@@ -389,10 +388,34 @@ final class DownloadManager: NSObject, ObservableObject {
         task: URLSessionTask,
         bvid: String
     ) {
-        guard let description = task.originalRequest?.url else { return }
+        guard var targetURL = task.originalRequest?.url else { return }
+        // CDN failover: the playurl response ships `backupURLs`
+        // per track precisely because individual edge hosts
+        // rate-limit or reject clients ("Access Denied"). On
+        // retry, swap the host to the first backup that differs
+        // from the one that just failed.
+        if let dash = pendingByBvid[bvid]?.playback.dash {
+            let parts = task.taskDescription?.split(separator: "|")
+            let mediaLabel = parts?.count == 3 ? String(parts![1]) : "video"
+            let track = mediaLabel == "audio" ? dash.audio : dash.video
+            if let track {
+                let candidates = [track.baseURL] + track.backupURLs
+                if let next = candidates.first(where: {
+                    $0.host != targetURL.host
+                }) {
+                    diagLog(.download, "failover to backup CDN host",
+                            details: [
+                                "bvid": bvid,
+                                "from": targetURL.host ?? "?",
+                                "to": next.host ?? "?"
+                            ])
+                    targetURL = next
+                }
+            }
+        }
         // Reconstruct the request — `originalRequest` carries
         // the URL + headers we set in `scheduleSegment`.
-        var retryRequest = URLRequest(url: description)
+        var retryRequest = URLRequest(url: targetURL)
         task.originalRequest?.allHTTPHeaderFields?.forEach { k, v in
             retryRequest.setValue(v, forHTTPHeaderField: k)
         }
@@ -422,6 +445,22 @@ final class DownloadManager: NSObject, ObservableObject {
         task: URLSessionDownloadTask,
         tempURL: URL
     ) {
+        // Reject error-status responses before their bytes ever
+        // reach the staging directory. The status validation in
+        // `didCompleteWithError` fires *after* this callback, so
+        // without this guard the HTML error page would land on
+        // disk (and, worse, the completed-segment counter would
+        // increment). We still move nothing and let
+        // `didCompleteWithError` drive the retry.
+        if let http = task.response as? HTTPURLResponse,
+           !(200...299).contains(http.statusCode) {
+            diagLog(.download, "rejected error-status segment",
+                    details: [
+                        "status": http.statusCode,
+                        "url": task.originalRequest?.url?.absoluteString ?? ""
+                    ])
+            return
+        }
         guard let description = task.taskDescription else { return }
         let parts = description.split(separator: "|")
         guard parts.count == 3 else { return }
@@ -470,7 +509,7 @@ final class DownloadManager: NSObject, ObservableObject {
             // A retry counter for this task is irrelevant
             // once it has actually delivered bytes — drop
             // it so the dict does not grow unbounded.
-            self.retryCountByTaskId[taskId] = nil
+            self.retryCountBySegment[description] = nil
             // Bump the completed-segment count for this
             // bvid.  If we hit the expected total this is
             // the last segment — promote to "downloaded".
@@ -659,7 +698,7 @@ final class DownloadManager: NSObject, ObservableObject {
     /// cannot write its output.  `videoBytes` / `audioBytes`
     /// are the on-disk sizes after the merge, used by the
     /// diagnostic log and the manifest's `sizeBytes`.
-    private struct MergeResult {
+    struct MergeResult {
         let ok: Bool
         let videoBytes: Int64
         let audioBytes: Int64
@@ -685,7 +724,12 @@ final class DownloadManager: NSObject, ObservableObject {
     /// occasionally downloads — without that, loading
     /// `video.media` into a `Data` would briefly allocate
     /// 500 MB on the heap.
-    private static func mergeSegmentsIntoMp4(
+    /// Internal (not private) so `DownloadStore` can run the
+    /// same merge as a migration for downloads made before the
+    /// merge step was fixed. `nonisolated`: the merge touches
+    /// only the filesystem, and the migration caller runs on the
+    /// store's background io queue.
+    nonisolated static func mergeSegmentsIntoMp4(
         staging: URL,
         hasAudio: Bool
     ) -> MergeResult {
@@ -770,7 +814,7 @@ final class DownloadManager: NSObject, ObservableObject {
     /// crash mid-merge leaves the staging directory with
     /// the original `video.init` / `video.media` pair, and
     /// the next download attempt re-runs the merge.
-    private static func concatInitAndMedia(
+    nonisolated private static func concatInitAndMedia(
         initURL: URL,
         mediaURL: URL,
         destURL: URL
@@ -783,12 +827,14 @@ final class DownloadManager: NSObject, ObservableObject {
         // don't trample a real `video.mp4` if the dest
         // already exists.
         try? fm.removeItem(at: tmp)
-        // `FileHandle(forWritingTo:)` / `FileHandle(forReadingFrom:)`
-        // on iOS are `throws`-returning-non-Optional, not
-        // `Optional`-returning.  The thrown error already carries the
-        // underlying `NSError` (errno + path), so we just propagate
-        // it — no need for a manual `guard let … else { throw … }`
-        // bridge like on the macOS variant.
+        // `FileHandle(forWritingTo:)` does not create the
+        // destination — it throws "file does not exist" when the
+        // path is missing. Create an empty file first; without
+        // this every merge failed at the open call and downloads
+        // were stored unmerged (unplayable).
+        guard fm.createFile(atPath: tmp.path, contents: nil) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
         let writer = try FileHandle(forWritingTo: tmp)
         var total: Int64 = 0
         let chunk = 1 << 20  // 1 MiB
@@ -886,6 +932,28 @@ extension DownloadManager: URLSessionDownloadDelegate {
         task: URLSessionTask,
         didCompleteWithError error: Error?
     ) {
+        // HTTP-level failures arrive with `error == nil` — the
+        // transport succeeded, the server just said no. B站's
+        // CDN edge sometimes answers a segment request with a
+        // 403 HTML "Access Denied" page (rate limiting, host
+        // grading); treating that as success wrote the error
+        // page into `video.media` and produced an unplayable
+        // download. Validate the status here and synthesize a
+        // transport-style error so the same retry/failover
+        // path handles it.
+        var error = error
+        if error == nil,
+           let http = task.response as? HTTPURLResponse,
+           !(200...299).contains(http.statusCode) {
+            error = NSError(
+                domain: NSURLErrorDomain,
+                code: NSURLErrorBadServerResponse,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "CDN returned HTTP \(http.statusCode)"
+                ]
+            )
+        }
         // No error → the task succeeded.  The corresponding
         // `consumeDownloaded(...)` already moved the bytes
         // and may have promoted the download to `.downloaded`
@@ -920,17 +988,24 @@ extension DownloadManager: URLSessionDownloadDelegate {
             // at "75%" forever.  The retry reschedules the
             // exact same byte-range request; if it also
             // fails we fall through to `failed(message:)`.
-            let retriesSoFar = self.retryCountByTaskId[taskId, default: 0]
+            // Retry budget is keyed by the segment identity
+            // ("{bvid}|{media}|{kind}") — NOT the task identifier.
+            // The retry task gets a *fresh* identifier, so keying
+            // by `taskIdentifier` reset the budget to zero on every
+            // attempt and looped forever (67k retries in two
+            // minutes in the field).
+            let segmentKey = task.taskDescription ?? "\(bvid)|?"
+            let retriesSoFar = self.retryCountBySegment[segmentKey, default: 0]
             if retriesSoFar == 0,
                task.originalRequest != nil {
-                self.retryCountByTaskId[taskId] = retriesSoFar + 1
+                self.retryCountBySegment[segmentKey] = retriesSoFar + 1
                 diagLog(.download, "retrying segment",
                         details: ["bvid": bvid, "task_id": taskId,
                                   "retry": retriesSoFar + 1])
                 self.retrySegment(task: task, bvid: bvid)
                 return
             }
-            self.retryCountByTaskId[taskId] = nil
+            self.retryCountBySegment[segmentKey] = nil
             self.stateByBvid[bvid] = .failed(
                 message: nsError.localizedDescription
             )

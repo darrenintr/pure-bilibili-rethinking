@@ -114,7 +114,7 @@ struct OnboardingView: View {
         .background(PaladalaTheme.paper)
         .overlay {
             Rectangle()
-                .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
+                .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
         }
     }
 }
@@ -708,13 +708,14 @@ private struct OnboardingNativePageView: View {
 }
 
 private struct OnboardingNativePreferencesView: View {
-    @AppStorage("paladala.designVariant") private var designVariantRaw: String = DesignVariant.expressive.rawValue
+    @AppStorage("paladala.glassStyle") private var glassStyleRaw = GlassStyle.liquid.rawValue
     @AppStorage("paladala.danmakuEnabled") private var danmakuEnabled = true
     @AppStorage("paladala.backgroundAudio") private var backgroundAudio = false
     @AppStorage("paladala.iCloudSync") private var iCloudSync = false
+    @State private var glassLevel = Double(GlassStyle.liquid.level)
 
-    private var designVariant: DesignVariant {
-        DesignVariant(rawValue: designVariantRaw) ?? .expressive
+    private var glassStyle: GlassStyle {
+        GlassStyle(level: Int(glassLevel))
     }
 
     var body: some View {
@@ -729,16 +730,39 @@ private struct OnboardingNativePreferencesView: View {
             }
             .padding(.horizontal, 24)
 
-            sectionHeader("設計風格")
-            VStack(spacing: 8) {
-                // Use the filtered user-facing list (excludes
-                // `.classic`, which only exists for legacy
-                // UserDefaults migration — see
-                // `DesignVariant.userFacingCases`).
-                ForEach(DesignVariant.userFacingCases) { variant in
-                    designCard(variant)
+            sectionHeader("玻璃風格")
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("介面玻璃效果")
+                        .font(.body.weight(.semibold))
+                    Spacer()
+                    Text(glassStyle.title)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
+                Slider(value: $glassLevel, in: 0...4, step: 1)
+                    .onChange(of: glassLevel) { _, newValue in
+                        glassStyleRaw = GlassStyle(level: Int(newValue)).rawValue
+                        Haptics.selection()
+                    }
+                    .onAppear {
+                        glassLevel = Double(
+                            (GlassStyle(rawValue: glassStyleRaw) ?? .liquid).level
+                        )
+                    }
+                HStack {
+                    Text("無")
+                    Spacer()
+                    Text("液體玻璃")
+                }
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
             }
+            .padding(16)
+            .background(
+                Color(uiColor: .secondarySystemGroupedBackground),
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
             .padding(.horizontal, 20)
 
             sectionHeader("功能開關")
@@ -769,84 +793,6 @@ private struct OnboardingNativePreferencesView: View {
             .textCase(.uppercase)
             .tracking(0.4)
             .padding(.leading, 24)
-    }
-
-    private func designCard(_ variant: DesignVariant) -> some View {
-        let isSelected = (variant == designVariant)
-        return Button {
-            designVariantRaw = variant.rawValue
-            // AppStorage update is enough for the picker to
-            // re-render, but other views in the app read
-            // `PaladalaTheme.activeVariant` directly.  Calling
-            // `apply(_:)` keeps the in-memory singleton in sync
-            // so the next render of any view sees the new value.
-            PaladalaTheme.apply(variant)
-            Haptics.selection()
-        } label: {
-            HStack(spacing: 14) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(cardIconColor(variant))
-                        .frame(width: 44, height: 44)
-                    Image(systemName: cardIconSymbol(variant))
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(variant.title)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Text(variant.blurb)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-                Spacer(minLength: 8)
-                ZStack {
-                    Circle()
-                        .strokeBorder(
-                            isSelected ? Color.accentColor : Color(uiColor: .separator),
-                            lineWidth: 1.5
-                        )
-                        .frame(width: 22, height: 22)
-                    if isSelected {
-                        Circle()
-                            .fill(Color.accentColor)
-                            .frame(width: 14, height: 14)
-                    }
-                }
-            }
-            .padding(14)
-            .background(
-                Color(uiColor: .secondarySystemGroupedBackground),
-                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(
-                        isSelected ? Color.accentColor : .clear,
-                        lineWidth: 2
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func cardIconColor(_ variant: DesignVariant) -> Color {
-        switch variant {
-        case .streetRedesign: return .black
-        case .iosNative, .expressive: return Color.accentColor
-        case .classic: return Color(uiColor: .systemGray)
-        }
-    }
-
-    private func cardIconSymbol(_ variant: DesignVariant) -> String {
-        switch variant {
-        case .streetRedesign: return "rectangle"
-        case .iosNative: return "globe"
-        case .expressive: return "sparkles"
-        case .classic: return "circle.grid.cross"
-        }
     }
 
     private func toggleRow(

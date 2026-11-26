@@ -69,9 +69,28 @@ public struct DSNavBar<Tab: Hashable>: View {
             }
         }
         .frame(height: DSSize.navBar)
-        .background(c.surfaceHigh, in: RoundedRectangle.ds(DSRadius.sheet))
+        .background { navBarBackground }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("主要導覽")
+    }
+
+    /// Liquid Glass capsule on iOS 26+; tonal surface below. The
+    /// `#if compiler(>=6.2)` guard keeps this building on pre-26
+    /// SDKs where `glassEffect` doesn't exist at all.
+    @ViewBuilder
+    private var navBarBackground: some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            Color.clear
+                .glassEffect(.regular.interactive(), in: Capsule())
+        } else {
+            RoundedRectangle.ds(DSRadius.sheet)
+                .fill(c.surfaceHigh)
+        }
+        #else
+        RoundedRectangle.ds(DSRadius.sheet)
+            .fill(c.surfaceHigh)
+        #endif
     }
 
     private func tab(_ item: DSNavItem<Tab>) -> some View {

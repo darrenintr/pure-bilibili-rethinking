@@ -43,8 +43,12 @@ struct ProfileSettingsView: View {
     @StateObject private var profileModel = ProfileViewModel()
     @AppStorage("paladala.themeMode") private var themeMode: ThemeMode = .system
     @AppStorage("paladala.materialDesign") private var materialDesign: MaterialDesign = .liquidGlass
-    @AppStorage("paladala.expressiveSeed") private var expressiveSeed = "#FF6194"
-    @AppStorage("paladala.designVariant") private var designVariant: DesignVariant = .expressive
+    @AppStorage("paladala.designVariant") private var designVariant: DesignVariant = .iosNative
+    /// 5-level glass intensity: 無玻璃 / 超薄玻璃 / 毛玻璃 /
+    /// 厚玻璃 / 液體玻璃 (iOS 26+). Stored as the raw case name;
+    /// `GlassStyle` maps it onto the material ladder.
+    @AppStorage("paladala.glassStyle") private var glassStyleRaw = GlassStyle.liquid.rawValue
+    @State private var glassLevel = Double(GlassStyle.liquid.level)
     @AppStorage("paladala.danmakuEnabled") private var danmakuEnabled = true
     @AppStorage("paladala.backgroundAudio") private var backgroundAudio = false
     /// When `true` (default), navigating away from a playing
@@ -55,6 +59,8 @@ struct ProfileSettingsView: View {
     /// `MiniPlayerStore.detachInline()`.
     @AppStorage("paladala.miniPlayerOnExit") private var miniPlayerOnExit: Bool = true
     @AppStorage("paladala.autoPlayNext") private var autoPlayNext: Bool = false
+    @AppStorage("paladala.btrEnabled") private var btrEnabled = true
+    @AppStorage("paladala.btrThreads") private var btrThreads = 0
     /// iCloud sync toggle stub. Defaults to `false` because the
     /// CloudKit / `NSUbiquitousKeyValueStore` plumbing does not
     /// exist yet — the toggle is rendered disabled with a
@@ -83,19 +89,7 @@ struct ProfileSettingsView: View {
     @EnvironmentObject private var authStore: AuthStore
 
     var body: some View {
-        // iOS Native: standard .listStyle(.insetGrouped) — gives
-        // the Settings app look (rounded section cards, grouped
-        // background, hairline separators).  Street keeps the
-        // default style so the hard-edged chrome (1.5pt ink borders
-        // from `paladalaCardSurface` etc.) reads as designed.
-        let isNative = PaladalaTheme.usesNativeLayout
-        Group {
-            if isNative {
-                listContent.listStyle(.insetGrouped)
-            } else {
-                listContent
-            }
-        }
+        listContent
     }
 
     @ViewBuilder
@@ -138,18 +132,12 @@ struct ProfileSettingsView: View {
             }
 
             Section("常用入口") {
-                ProfileQuickActionGrid(items: [
-                    // 离线缓存 is first so the downloads list is
-                    // the top-most landmark on the profile screen —
-                    // discoverable from here AND from the Home tab
-                    // top toolbar.
-                    .init(title: "離線快取", subtitle: "Downloads", symbol: "arrow.down.circle", destination: .downloads),
-                    .init(title: "歷史記錄", subtitle: "History", symbol: "clock.arrow.circlepath", destination: .history),
-                    .init(title: "我的收藏", subtitle: "Favorite", symbol: "star", destination: .favorites),
-                    .init(title: "稍後再看", subtitle: "Watch later", symbol: "clock.badge.checkmark", destination: .watchLater),
-                    .init(title: "訊息中心", subtitle: "Inbox", symbol: "tray"),
-                    .init(title: "追番追劇", subtitle: "Bangumi", symbol: "play.square.stack", destination: .bangumi)
-                ], repository: repository)
+                quickActionRow(title: "離線快取", symbol: "arrow.down.circle", tint: .blue, destination: .downloads)
+                quickActionRow(title: "歷史記錄", symbol: "clock.arrow.circlepath", tint: .blue, destination: .history)
+                quickActionRow(title: "我的收藏", symbol: "star", tint: .orange, destination: .favorites)
+                quickActionRow(title: "稍後再看", symbol: "clock.badge.checkmark", tint: .purple, destination: .watchLater)
+                quickActionRow(title: "訊息中心", symbol: "tray", tint: .green, destination: nil)
+                quickActionRow(title: "追番追劇", symbol: "play.square.stack", tint: .pink, destination: .bangumi)
             }
 
             Section("外觀") {
@@ -169,38 +157,48 @@ struct ProfileSettingsView: View {
                         value: newValue.rawValue
                     )
                 }
-                Picker("介面設計", selection: $designVariant) {
-                    // Same legacy-classic filter as the onboarding
-                    // picker — only the two shipped design languages
-                    // are offered.
-                    ForEach(DesignVariant.userFacingCases) { variant in
-                        Text(variant.title).tag(variant)
+                // 玻璃風格 — 5-step ladder (無玻璃 → 液體玻璃)
+                // applied live to every surface.  Sliders like
+                // this are the same pattern Apple's own Settings
+                // uses for intensity controls.
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("玻璃風格")
+                        Spacer()
+                        Text(GlassStyle(level: Int(glassLevel.rounded())).title)
+                            .foregroundStyle(.secondary)
                     }
-                }
-                .onChange(of: designVariant) { _, newValue in
-                    // The picker writes to `UserDefaults`
-                    // automatically; we additionally reapply
-                    // it to the static `PaladalaTheme` enum
-                    // so all computed tokens flip in the
-                    // current render pass.  iCloud-mirrored
-                    // so the choice follows the user across
-                    // their other devices.
-                    PaladalaTheme.apply(newValue)
-                    ICloudSync.shared.mirror(
-                        key: "paladala.designVariant",
-                        value: newValue.rawValue
-                    )
-                }
-                if designVariant == .expressive {
-                    Picker("主題色", selection: $expressiveSeed) {
-                        ForEach(DSTheme.seeds) { seed in
-                            Text(seed.name).tag(seed.rgb.hex)
+                    // Continuous slider — no stepped snapping. The
+                    // effective glass level is the nearest of the 5
+                    // rungs (rounded), so dragging feels smooth while
+                    // the applied style still lands on a real tier.
+                    Slider(value: $glassLevel, in: 0...4)
+                        .onChange(of: glassLevel) { _, newValue in
+                            let style = GlassStyle(level: Int(newValue.rounded()))
+                            glassStyleRaw = style.rawValue
+                            ICloudSync.shared.mirror(
+                                key: "paladala.glassStyle",
+                                value: style.rawValue
+                            )
                         }
+                        .onAppear {
+                            glassLevel = Double(
+                                (GlassStyle(rawValue: glassStyleRaw) ?? .liquid).level
+                            )
+                        }
+                    HStack {
+                        Text("無")
+                        Spacer()
+                        Text("液體玻璃")
                     }
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
                 }
-                Text(designVariant.blurb)
-                    .font(PaladalaTheme.FontRole.bodySmall)
-                    .foregroundStyle(PaladalaTheme.mutedInk)
+                if !GlassStyle.liquidAvailable {
+                    Text("液體玻璃需要 iOS 26 或以上。")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section("播放設定") {
@@ -230,6 +228,11 @@ struct ProfileSettingsView: View {
                 // on. Disabling tears the controller down on
                 // `VideoDetailView.onDisappear` instead.
                 Toggle("離開後保留小窗播放", isOn: $miniPlayerOnExit)
+                Toggle("線程撕裂加速", isOn: $btrEnabled)
+                if btrEnabled {
+                    Stepper("並行線程：\(btrThreads == 0 ? "自動" : "\(btrThreads)")",
+                            value: $btrThreads, in: 0...8)
+                }
             }
 
             Section {
@@ -444,11 +447,9 @@ struct ProfileSettingsView: View {
                     .foregroundStyle(.tertiary)
             }
         }
-        .scrollContentBackground(.hidden)
-        .listStyle(.plain)
-        .background(PaladalaTheme.canvas)
+        .listStyle(.insetGrouped)
         .navigationTitle("我的")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .task(id: authStore.activeAccount?.mid) {
             if let mid = authStore.activeAccount?.mid {
                 await profileModel.loadStats(mid: mid, repository: repository)
@@ -491,16 +492,16 @@ struct ProfileSettingsView: View {
                 HStack(spacing: 10) {
                     VipBadgeView(badge: badge, size: .standard)
                     Text(badge.text)
-                        .font(PaladalaTheme.FontRole.bodySmall)
+                        .font(.subheadline)
                         .foregroundStyle(.primary)
                     Spacer()
                     if badge.isExpired {
                         Text("已到期")
-                            .font(PaladalaTheme.FontRole.labelMono)
+                            .font(.caption)
                             .foregroundStyle(.red)
                     } else if let due = badge.dueDate {
                         Text("到期 \(Self.shortDateFormatter.string(from: due))")
-                            .font(PaladalaTheme.FontRole.labelMono)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -509,7 +510,7 @@ struct ProfileSettingsView: View {
                     Image(systemName: "crown")
                         .foregroundStyle(.secondary)
                     Text("當前賬號未開通大會員")
-                        .font(PaladalaTheme.FontRole.bodySmall)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Spacer()
                 }
@@ -530,120 +531,51 @@ struct ProfileSettingsView: View {
 
     @ViewBuilder
     private var signedOutHeader: some View {
-        let isNative = PaladalaTheme.usesNativeLayout
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 14) {
-                RoundedRectangle(cornerRadius: isNative ? 16 : 0, style: .continuous)
-                    .fill(PaladalaTheme.biliPink)
-                    .frame(width: 62, height: 62)
-                    .overlay(
-                        Text("BP")
-                            .font(.title3.weight(.bold))
-                            .foregroundStyle(.white)
-                    )
-                    .overlay {
-                        if !isNative {
-                            Rectangle()
-                                .strokeBorder(
-                                    PaladalaTheme.ink,
-                                    lineWidth: PaladalaTheme.borderWidth
-                                )
-                        }
-                    }
-                VStack(alignment: .leading, spacing: 5) {
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.system(size: 54))
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
                     Text("未登入")
-                        .font(isNative ? PaladalaTheme.IOSNative.headline
-                                       : PaladalaTheme.FontRole.headline)
-                        .textCase(isNative ? nil : .uppercase)
+                        .font(.headline)
                     Text("登入後同步歷史、收藏、關注和稍後再看")
-                        .font(isNative ? PaladalaTheme.IOSNative.subheadline
-                                       : PaladalaTheme.FontRole.bodySmall)
-                        .foregroundStyle(isNative ? .secondary : PaladalaTheme.mutedInk)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
             }
-            if isNative {
-                Button {
-                    router.openLogin()
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "qrcode.viewfinder")
-                        Text("登入 Bilibili 賬號")
-                            .font(.body.weight(.semibold))
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.footnote)
-                            .foregroundStyle(.white.opacity(0.85))
-                    }
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .foregroundStyle(.white)
+            Button {
+                router.openLogin()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "qrcode.viewfinder")
+                    Text("登入 Bilibili 賬號")
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .tint(Color.accentColor)
-            } else {
-                Button {
-                    router.openLogin()
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "qrcode.viewfinder")
-                        Text("登入 Bilibili 賬號")
-                            .font(PaladalaTheme.FontRole.labelMono)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(PaladalaTheme.biliPink)
-                    .foregroundStyle(PaladalaTheme.ink)
-                    .overlay {
-                        Rectangle()
-                            .strokeBorder(
-                                PaladalaTheme.ink,
-                                lineWidth: PaladalaTheme.borderWidth
-                            )
-                    }
-                    .background {
-                        Rectangle()
-                            .fill(PaladalaTheme.ink)
-                            .offset(
-                                x: PaladalaTheme.hardShadowOffset,
-                                y: PaladalaTheme.hardShadowOffset
-                            )
-                    }
-                }
-                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
             }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
         }
         .padding(.vertical, 8)
     }
 
     @ViewBuilder
     private func signedInHeader(account: StoredAccount) -> some View {
-        let isNative = PaladalaTheme.usesNativeLayout
         let header = HStack(spacing: 14) {
             avatar(for: account)
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
                     Text(account.name)
-                        .font(isNative ? PaladalaTheme.IOSNative.headline
-                                       : PaladalaTheme.FontRole.headline)
+                        .font(.headline)
                         .foregroundStyle(
-                            vipBadgeNicknameColor(for: account.vipBadge)
-                                ?? (isNative ? Color.primary : PaladalaTheme.ink)
+                            vipBadgeNicknameColor(for: account.vipBadge) ?? Color.primary
                         )
-                        .textCase(isNative ? nil : .uppercase)
                     if let badge = account.vipBadge, badge.isActive {
                         VipBadgeView(badge: badge, size: .standard)
                     }
                 }
                 Text("UID: \(account.mid)")
-                    .font(isNative ? PaladalaTheme.IOSNative.footnote
-                                   : PaladalaTheme.FontRole.labelMono)
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
                 HStack(spacing: 16) {
                     ProfileStat(label: "關注", value: profileModel.followingCount)
@@ -671,139 +603,70 @@ struct ProfileSettingsView: View {
             }
         }
         .padding(.vertical, 8)
-        if isNative {
-            // iOS Native: card chrome around the header.  The
-            // user card on the system Settings app uses
-            // secondarySystemGroupedBackground inside a grouped
-            // page — same idiom here.
-            header
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
-        } else {
-            header
-        }
+        header
+            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
     }
 
     @ViewBuilder
     private func avatar(for account: StoredAccount) -> some View {
-        let isNative = PaladalaTheme.usesNativeLayout
         let size: CGFloat = 62
         if let url = account.faceURL {
             ResilientImage(url: url, maximumPixelSize: 192)
                 .frame(width: size, height: size)
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: isNative ? 16 : 0,
-                        style: .continuous
-                    )
-                )
-                .overlay {
-                    if !isNative {
-                        Rectangle()
-                            .strokeBorder(
-                                PaladalaTheme.ink,
-                                lineWidth: PaladalaTheme.borderWidth
-                            )
-                    }
-                }
+                .clipShape(Circle())
         } else {
-            RoundedRectangle(cornerRadius: isNative ? 16 : 0, style: .continuous)
-                .fill(PaladalaTheme.biliPink)
+            Circle()
+                .fill(Color.accentColor.gradient)
                 .frame(width: size, height: size)
                 .overlay(
                     Text(String(account.name.prefix(1)))
-                        .font(.title3.weight(.black))
-                        .foregroundStyle(PaladalaTheme.ink)
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(.white)
                 )
-                .overlay {
-                    if !isNative {
-                        Rectangle()
-                            .strokeBorder(
-                                PaladalaTheme.ink,
-                                lineWidth: PaladalaTheme.borderWidth
-                            )
-                    }
-                }
         }
     }
 }
 
-private struct ProfileQuickAction: Identifiable {
-    enum Destination {
-        case history
-        case favorites
-        case watchLater
-        /// Local downloads list.  Unlike the other
-        /// destinations, the downloads list is reachable
-        /// without signing in — the user can still play
-        /// their already-downloaded videos while signed
-        /// out.  `route(for:)` therefore returns
-        /// `.downloads` for this case without an active
-        /// account.
-        case downloads
-        /// 追番 weekly timeline.  Mirrors the dedicated
-        /// `MainTab.bangumi` tab so the user can deep-link
-        /// from the profile screen (or from a search result
-        /// whose `card_goto` is `bangumi`) without leaving
-        /// their current tab.
-        case bangumi
-    }
-
-    let id = UUID()
-    let title: String
-    let subtitle: String
-    let symbol: String
-    var destination: Destination? = nil
+private enum QuickActionDestination {
+    case history
+    case favorites
+    case watchLater
+    case downloads
+    case bangumi
 }
 
-private struct ProfileQuickActionGrid: View {
-    let items: [ProfileQuickAction]
-    let repository: PaladalaRepository
-    @EnvironmentObject private var authStore: AuthStore
-    @EnvironmentObject private var router: AppRouter
-    @AppStorage("paladala.materialDesign") private var materialDesign: MaterialDesign = .liquidGlass
-    private let columns = [GridItem(.adaptive(minimum: 104), spacing: 16)]
-
-    var body: some View {
-        LazyVGrid(columns: columns, spacing: 16) {
-            ForEach(items) { item in
-                Button {
-                    guard let route = route(for: item) else { return }
-                    router.open(route)
-                } label: {
-                    quickActionCard(item)
-                }
-                .buttonStyle(PaladalaPressBounceButtonStyle())
-                .disabled(route(for: item) == nil)
-                .opacity(route(for: item) == nil ? 0.5 : 1)
+extension ProfileSettingsView {
+    /// iOS Settings-style quick action row: tinted rounded-square
+    /// glyph + title + chevron. Routes through `AppRouter` so
+    /// destinations that live on other tabs (追番) still land
+    /// correctly.
+    @ViewBuilder
+    fileprivate func quickActionRow(title: String, symbol: String, tint: Color,
+                        destination: QuickActionDestination?) -> some View {
+        let route = destination.flatMap { quickActionRoute(for: $0) }
+        Button {
+            if let route { router.open(route) }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: symbol)
+                    .font(.callout)
+                    .foregroundStyle(.white)
+                    .frame(width: 29, height: 29)
+                    .background(tint, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                Text(title)
+                    .foregroundStyle(Color.primary)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
             }
         }
-        .padding(.vertical, 4)
+        .disabled(route == nil)
+        .opacity(route == nil ? 0.5 : 1)
     }
 
-    @ViewBuilder
-    private func quickActionCard(_ item: ProfileQuickAction) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: item.symbol)
-                .font(.title3.weight(.black))
-                .foregroundStyle(PaladalaTheme.ink)
-                .frame(width: 32, height: 32)
-            Text(item.title)
-                .font(PaladalaTheme.FontRole.labelMono)
-                .foregroundStyle(PaladalaTheme.ink)
-                .lineLimit(1)
-            Text(item.subtitle)
-                .font(.system(size: 9, weight: .medium, design: .monospaced))
-                .foregroundStyle(PaladalaTheme.mutedInk)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, minHeight: 92)
-        .padding(.horizontal, 4)
-        .paladalaCardSurface(materialDesign)
-    }
-
-    private func route(for item: ProfileQuickAction) -> ProfileRoute? {
-        switch item.destination {
+    fileprivate func quickActionRoute(for destination: QuickActionDestination) -> ProfileRoute? {
+        switch destination {
         case .history:
             return authStore.activeAccount != nil ? .history : nil
         case .favorites:
@@ -814,19 +677,12 @@ private struct ProfileQuickActionGrid: View {
         case .watchLater:
             return authStore.activeAccount != nil ? .watchLater : nil
         case .downloads:
-            // Downloads are reachable signed-out — the
-            // user can still play their already-downloaded
-            // videos on airplane mode, which is the entire
-            // point of the feature.
+            // Downloads are reachable signed-out — the user can
+            // still play already-downloaded videos on airplane
+            // mode, which is the entire point of the feature.
             return .downloads
         case .bangumi:
-            // 追番 is reachable signed-out (PGC content is
-            // public). Switches to the dedicated tab via
-            // `AppRouter.openBangumiTimeline()` so the user
-            // lands in the right place.
             return .bangumiTimeline
-        case nil:
-            return nil
         }
     }
 }
@@ -838,33 +694,36 @@ private struct ProfileStat: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(value)
-                .font(PaladalaTheme.FontRole.labelMono)
-                .foregroundStyle(PaladalaTheme.ink)
+                .font(.headline)
             Text(label)
-                .font(.system(size: 10, weight: .medium, design: .monospaced))
-                .foregroundStyle(PaladalaTheme.mutedInk)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 }
 
+/// iOS Settings-style row: small tinted rounded-square glyph
+/// (the Settings.app idiom) + title + caption subtitle.
+/// Plain system fonts, no custom chrome.
 private struct PluginRow: View {
     let title: String
     let subtitle: String
     let symbol: String
+    var tint: Color = .accentColor
 
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: symbol)
-                .font(.body.weight(.black))
-                .foregroundStyle(PaladalaTheme.ink)
-                .frame(width: 28)
-            VStack(alignment: .leading) {
+                .font(.callout)
+                .foregroundStyle(.white)
+                .frame(width: 29, height: 29)
+                .background(tint, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(PaladalaTheme.FontRole.cardTitle)
-                    .foregroundStyle(PaladalaTheme.ink)
                 Text(subtitle)
-                    .font(PaladalaTheme.FontRole.labelMono)
-                    .foregroundStyle(PaladalaTheme.mutedInk)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
         }
     }

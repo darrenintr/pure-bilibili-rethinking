@@ -173,9 +173,10 @@ enum AppVersion {
     /// number on the About page.
     static func formatIdentifier(_ hex: String) -> String {
         let upper = hex.uppercased()
-        // Pad in case the input is shorter than 12 chars
-        // (shouldn't happen, but defensive).
-        let padded = upper.padding(toLength: 12, withPad: "0", startingAt: 0)
+        // Pad on the LEFT in case the input is shorter than
+        // 12 chars (shouldn't happen, but defensive) so the
+        // meaningful digits stay at the end.
+        let padded = String(repeating: "0", count: max(0, 12 - upper.count)) + upper
         let chunks = stride(from: 0, to: 12, by: 4).map { i -> String in
             let start = padded.index(padded.startIndex, offsetBy: i)
             let end = padded.index(start, offsetBy: 4)

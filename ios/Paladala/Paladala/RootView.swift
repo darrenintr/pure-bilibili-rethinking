@@ -133,11 +133,8 @@ struct RootView: View {
             // secondary gesture affordance.
             LoginSheet()
                 .presentationDragIndicator(.visible)
-                .presentationBackground(PaladalaTheme.paper)
-                .presentationCornerRadius(0)
         }
         .paladalaToggleStyle()
-        .modifier(StreetTabBarModifier())
         .fullScreenCover(isPresented: Binding(
             get: { hasPresentedFirstFrame && !didOnboard },
             set: { newValue in
@@ -169,7 +166,7 @@ struct RootView: View {
         }
         .overlay {
             if isOpeningAnimationVisible {
-                OpeningScreenAnimation {
+                SplashView {
                     isOpeningAnimationVisible = false
                 }
                 .allowsHitTesting(false)
@@ -221,190 +218,6 @@ struct RootView: View {
     }
 }
 
-private struct OpeningScreenAnimation: View {
-    let onFinished: () -> Void
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var tileScale: CGFloat = 0.88
-    @State private var tileOffset: CGFloat = 18
-    @State private var tileOpacity: Double = 0
-    @State private var playScale: CGFloat = 0.8
-    @State private var playOpacity: Double = 0
-    @State private var titleOffset: CGFloat = 14
-    @State private var titleOpacity: Double = 0
-    @State private var accentProgress: CGFloat = 0
-    @State private var screenOpacity: Double = 1
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                background
-
-                VStack(alignment: .leading, spacing: PaladalaTheme.Spacing.xxl) {
-                    ZStack {
-                        Rectangle()
-                            .fill(PaladalaTheme.ink)
-                            .frame(width: 118, height: 118)
-                            .offset(
-                                x: PaladalaTheme.hardShadowOffset,
-                                y: PaladalaTheme.hardShadowOffset
-                            )
-
-                        Rectangle()
-                            .fill(PaladalaTheme.biliPink)
-                            .frame(width: 118, height: 118)
-                            .overlay {
-                                Rectangle()
-                                    .strokeBorder(
-                                        PaladalaTheme.ink,
-                                        lineWidth: PaladalaTheme.borderWidth
-                                    )
-                            }
-
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 42, weight: .black))
-                            .foregroundStyle(PaladalaTheme.ink)
-                            .offset(x: 3)
-                            .scaleEffect(playScale)
-                            .opacity(playOpacity)
-
-                        Text("PLAY")
-                            .font(PaladalaTheme.FontRole.labelMono)
-                            .foregroundStyle(PaladalaTheme.paper)
-                            .padding(.horizontal, PaladalaTheme.Spacing.s)
-                            .padding(.vertical, PaladalaTheme.Spacing.xs)
-                            .background(PaladalaTheme.ink)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                            .padding(PaladalaTheme.Spacing.s)
-                    }
-                    .frame(width: 118, height: 118)
-                    .scaleEffect(tileScale)
-                    .offset(y: tileOffset)
-                    .opacity(tileOpacity)
-
-                    VStack(alignment: .leading, spacing: PaladalaTheme.Spacing.s) {
-                        Text("PALADALA")
-                            .font(PaladalaTheme.FontRole.displayMedium)
-                            .foregroundStyle(PaladalaTheme.ink)
-                            .tracking(-1)
-
-                        Text("PURE BILIBILI // NATIVE IOS")
-                            .font(PaladalaTheme.FontRole.labelMono)
-                            .foregroundStyle(PaladalaTheme.paper)
-                            .padding(.horizontal, PaladalaTheme.Spacing.s)
-                            .padding(.vertical, PaladalaTheme.Spacing.xs)
-                            .background(PaladalaTheme.ink)
-
-                        HStack(spacing: 0) {
-                            Rectangle()
-                                .fill(PaladalaTheme.biliPink)
-                                .frame(width: 74, height: 7)
-                            Rectangle()
-                                .fill(PaladalaTheme.ink)
-                                .frame(width: 32, height: 7)
-                        }
-                        .scaleEffect(x: accentProgress, anchor: .leading)
-                    }
-                    .opacity(titleOpacity)
-                    .offset(y: titleOffset)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                .padding(.horizontal, PaladalaTheme.Spacing.xxxl)
-                .padding(.bottom, geo.safeAreaInsets.bottom + PaladalaTheme.Spacing.xxl)
-            }
-            .opacity(screenOpacity)
-            .ignoresSafeArea()
-        }
-        .onAppear { run() }
-    }
-
-    private var background: some View {
-        ZStack {
-            PaladalaTheme.canvas
-
-            VStack(spacing: 0) {
-                HStack {
-                    Text("/// SIGNAL_01")
-                        .font(PaladalaTheme.FontRole.labelMono)
-                        .foregroundStyle(PaladalaTheme.paper)
-                    Spacer()
-                    Text("PALADALA")
-                        .font(PaladalaTheme.FontRole.labelMono)
-                        .foregroundStyle(PaladalaTheme.paper)
-                }
-                .padding(.horizontal, PaladalaTheme.Spacing.l)
-                .frame(height: 34)
-                .background(PaladalaTheme.ink)
-
-                Spacer()
-
-                HStack(spacing: PaladalaTheme.Spacing.s) {
-                    Rectangle()
-                        .fill(PaladalaTheme.biliPink)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 7)
-                    Rectangle()
-                        .fill(PaladalaTheme.ink)
-                        .frame(width: 46, height: 7)
-                }
-                .padding(.horizontal, PaladalaTheme.Spacing.l)
-                .padding(.bottom, PaladalaTheme.Spacing.l)
-                .scaleEffect(x: accentProgress, anchor: .leading)
-            }
-        }
-    }
-
-    private func run() {
-        if reduceMotion {
-            withAnimation(.easeOut(duration: 0.18)) {
-                tileOpacity = 1
-                playOpacity = 1
-                titleOpacity = 1
-                titleOffset = 0
-                tileScale = 1
-                tileOffset = 0
-                playScale = 1
-                accentProgress = 1
-            }
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 650_000_000)
-                withAnimation(.easeOut(duration: 0.18)) {
-                    screenOpacity = 0
-                }
-                try? await Task.sleep(nanoseconds: 180_000_000)
-                onFinished()
-            }
-            return
-        }
-
-        withAnimation(.spring(response: 0.38, dampingFraction: 0.78)) {
-            tileOpacity = 1
-            tileScale = 1
-            tileOffset = 0
-        }
-        withAnimation(.spring(response: 0.36, dampingFraction: 0.68).delay(0.12)) {
-            playOpacity = 1
-            playScale = 1
-        }
-        withAnimation(.easeOut(duration: 0.32).delay(0.18)) {
-            titleOpacity = 1
-            titleOffset = 0
-        }
-        withAnimation(.easeInOut(duration: 0.42).delay(0.24)) {
-            accentProgress = 1
-        }
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 1_250_000_000)
-            withAnimation(.easeInOut(duration: 0.32)) {
-                screenOpacity = 0
-                tileScale = 1.04
-            }
-            try? await Task.sleep(nanoseconds: 340_000_000)
-            onFinished()
-        }
-    }
-}
-
 private struct PhoneRootView: View {
     let repository: PaladalaRepository
     @EnvironmentObject private var router: AppRouter
@@ -416,7 +229,6 @@ private struct PhoneRootView: View {
     @Namespace private var heroNamespace
 
     var body: some View {
-        NavigationStack(path: $router.path) {
             TabView(selection: $router.selectedTab) {
                 // Each tab body is wrapped in LazyTab so the inner
                 // View (and its `@StateObject` / @State) is only
@@ -424,8 +236,9 @@ private struct PhoneRootView: View {
                 // State is preserved across tab switches via the
                 // wrapper's own @State, so going to Settings and back
                 // does not re-init HomeView. PR-A, audit #5.
-                LazyTab(tag: MainTab.home, activeTag: router.selectedTab) {
+                LazyTabNavStack(tag: MainTab.home, activeTag: router.selectedTab, path: $router.homePath) {
                     HomeView(repository: repository, heroNamespace: heroNamespace)
+                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
                 }
                 .tabItem {
                     // Apple's recommended "select bounce" — the
@@ -445,8 +258,9 @@ private struct PhoneRootView: View {
                 }
                 .tag(MainTab.home)
 
-                LazyTab(tag: MainTab.dynamic, activeTag: router.selectedTab) {
+                LazyTabNavStack(tag: MainTab.dynamic, activeTag: router.selectedTab, path: $router.dynamicPath) {
                     DynamicFeedView(repository: repository, heroNamespace: heroNamespace)
+                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
                 }
                 .tabItem {
                     Label {
@@ -458,8 +272,9 @@ private struct PhoneRootView: View {
                 }
                 .tag(MainTab.dynamic)
 
-                LazyTab(tag: MainTab.live, activeTag: router.selectedTab) {
+                LazyTabNavStack(tag: MainTab.live, activeTag: router.selectedTab, path: $router.livePath) {
                     LiveRoomsView(repository: repository)
+                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
                 }
                 .tabItem {
                     Label {
@@ -471,8 +286,9 @@ private struct PhoneRootView: View {
                 }
                 .tag(MainTab.live)
 
-                LazyTab(tag: MainTab.profile, activeTag: router.selectedTab) {
+                LazyTabNavStack(tag: MainTab.profile, activeTag: router.selectedTab, path: $router.profilePath) {
                     ProfileSettingsView(repository: repository)
+                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
                 }
                 .tabItem {
                     Label {
@@ -485,164 +301,48 @@ private struct PhoneRootView: View {
                 .tag(MainTab.profile)
             }
             .paladalaTabBarBehavior()
-            .modifier(ExpressivePhoneNavigation(selection: $router.selectedTab))
-            .navigationDestination(for: BiliVideo.self) { video in
-                VideoDetailView(video: video, repository: repository, heroNamespace: heroNamespace)
-            }
-            .navigationDestination(for: ProfileRoute.self) { route in
-                profileRouteView(route, repository: repository)
-            }
-            .navigationDestination(for: ReplyRoute.self) { route in
-                ReplyListView(video: route.video, rootComment: route.rootComment, repository: repository)
-            }
-            .navigationDestination(for: LocalVideoRoute.self) { route in
-                switch route {
-                case .local(let record):
-                    VideoDetailView(
-                        video: record.video,
-                        repository: repository,
-                        heroNamespace: heroNamespace,
-                        localRecord: record
-                    )
-                }
-            }
-            .navigationDestination(for: BangumiRoute.self) { route in
-                switch route {
-                case .timeline:
-                    BangumiHomeView(repository: repository, heroNamespace: heroNamespace)
-                case .seasonDetail(let seasonId):
-                    BangumiSeasonDetailView(
-                        repository: repository,
-                        seasonId: seasonId
-                    )
-                }
-            }
-            .navigationDestination(for: UPProfileRoute.self) { route in
-                switch route {
-                case .up(let mid):
-                    UPProfileView(mid: mid, repository: repository)
-                }
-            }
-        }
-        // System-provided interactive pop gesture handles back
-        // navigation; `NavigationStack` (iOS 16+) ships with
-        // swipe-from-edge built in. No custom gesture needed.
     }
 }
 
 private struct PadRootView: View {
     let repository: PaladalaRepository
     @EnvironmentObject private var router: AppRouter
-    /// Single shared namespace for the hero / zoom transition.
     @Namespace private var heroNamespace
-    /// Sidebar visibility. The collapse button flips this to
-    /// `.detailOnly`; the system chevron / drag handle brings it
-    /// back to `.all`. `NavigationSplitView` owns the actual
-    /// show/hide animation — we just hand it a binding.
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
-
-    /// Tabs rendered in the sidebar's main list. Excludes `.profile`
-    /// because the new design surfaces 我的 as a user card at the
-    /// bottom of the sidebar instead of a regular row. The five-case
-    /// `MainTab` enum stays unchanged so the phone tab bar keeps
-    /// working.
-    private static let sidebarTabs: [MainTab] = [.home, .dynamic, .live]
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            PadSidebar(
-                tabs: Self.sidebarTabs,
-                columnVisibility: $columnVisibility
-            )
-            .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 320)
-        } detail: {
-            NavigationStack(path: $router.path) {
-                selectedView
-                    .navigationDestination(for: BiliVideo.self) { video in
-                        VideoDetailView(video: video, repository: repository, heroNamespace: heroNamespace)
-                    }
-                    .navigationDestination(for: ProfileRoute.self) { route in
-                        profileRouteView(route, repository: repository)
-                    }
-                    .navigationDestination(for: ReplyRoute.self) { route in
-                        ReplyListView(video: route.video, rootComment: route.rootComment, repository: repository)
-                    }
-                    .navigationDestination(for: LocalVideoRoute.self) { route in
-                        switch route {
-                        case .local(let record):
-                            VideoDetailView(
-                                video: record.video,
-                                repository: repository,
-                                heroNamespace: heroNamespace,
-                                localRecord: record
-                            )
-                        }
-                    }
-                    .navigationDestination(for: BangumiRoute.self) { route in
-                        switch route {
-                        case .timeline:
-                            BangumiHomeView(repository: repository, heroNamespace: heroNamespace)
-                        case .seasonDetail(let seasonId):
-                            BangumiSeasonDetailView(
-                                repository: repository,
-                                seasonId: seasonId
-                            )
-                        }
-                    }
-                    .navigationDestination(for: UPProfileRoute.self) { route in
-                        switch route {
-                        case .up(let mid):
-                            UPProfileView(mid: mid, repository: repository)
-                        }
-                    }
+        // iPadOS 18+ native sidebar-adaptable TabView. In regular
+        // width it renders as a Liquid Glass sidebar; when the user
+        // collapses it (system toggle, top-leading), the tabs morph
+        // into the floating top bar — the exact Apple TV behaviour.
+        // Replaces the hand-rolled NavigationSplitView + custom
+        // sidebar list, which could never replicate that morph.
+        TabView(selection: $router.selectedTab) {
+            Tab(MainTab.home.title, systemImage: MainTab.home.symbolName, value: MainTab.home) {
+                LazyTabNavStack(tag: MainTab.home, activeTag: router.selectedTab, path: $router.homePath) {
+                    HomeView(repository: repository, heroNamespace: heroNamespace, iPadColumns: 3)
+                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
+                }
             }
-            // System-provided interactive pop gesture handles
-            // back navigation; no custom recognizer needed.
-        }
-    }
-
-    @ViewBuilder
-    private var selectedView: some View {
-        // Wrap the tab content in a ZStack keyed by `router.selectedTab`
-        // so swapping tabs animates the outgoing / incoming view
-        // with a crossfade + slide instead of a hard cut.  The
-        // `.id(...)` on the inner view forces SwiftUI to discard the
-        // previous tab's state (scroll position, async tasks) which
-        // also fixes the "iPad sidebar tap doesn't switch" symptom —
-        // without the id the navigation stack would sometimes keep
-        // showing the prior destination when both tabs route to the
-        // same `NavigationStack` shape.
-        //
-        // iPad column count: 3 when the sidebar is hidden
-        // (`.detailOnly` / `.doubleColumn`-ish), 2 when it is
-        // visible.  Threaded down to `HomeView` so the video grid
-        // re-flows on sidebar collapse / expand.
-        let iPadColumns = (columnVisibility == .detailOnly) ? 3 : 2
-        ZStack {
-            switch router.selectedTab {
-            case .home:
-                HomeView(
-                    repository: repository,
-                    heroNamespace: heroNamespace,
-                    iPadColumns: iPadColumns
-                )
-                    .transition(ScreenSwitchTransition.active)
-                    .id(MainTab.home)
-            case .dynamic:
-                DynamicFeedView(repository: repository, heroNamespace: heroNamespace)
-                    .transition(ScreenSwitchTransition.active)
-                    .id(MainTab.dynamic)
-            case .live:
-                LiveRoomsView(repository: repository)
-                    .transition(ScreenSwitchTransition.active)
-                    .id(MainTab.live)
-            case .profile:
-                ProfileSettingsView(repository: repository)
-                    .transition(ScreenSwitchTransition.active)
-                    .id(MainTab.profile)
+            Tab(MainTab.dynamic.title, systemImage: MainTab.dynamic.symbolName, value: MainTab.dynamic) {
+                LazyTabNavStack(tag: MainTab.dynamic, activeTag: router.selectedTab, path: $router.dynamicPath) {
+                    DynamicFeedView(repository: repository, heroNamespace: heroNamespace)
+                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
+                }
+            }
+            Tab(MainTab.live.title, systemImage: MainTab.live.symbolName, value: MainTab.live) {
+                LazyTabNavStack(tag: MainTab.live, activeTag: router.selectedTab, path: $router.livePath) {
+                    LiveRoomsView(repository: repository)
+                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
+                }
+            }
+            Tab(MainTab.profile.title, systemImage: MainTab.profile.symbolName, value: MainTab.profile) {
+                LazyTabNavStack(tag: MainTab.profile, activeTag: router.selectedTab, path: $router.profilePath) {
+                    ProfileSettingsView(repository: repository)
+                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
+                }
             }
         }
-        .animation(ScreenSwitchTransition.animation, value: router.selectedTab)
+        .tabViewStyle(.sidebarAdaptable)
     }
 }
 
@@ -672,247 +372,6 @@ enum ScreenSwitchTransition {
     static let animation: Animation = .spring(response: 0.26, dampingFraction: 0.86)
 }
 
-/// New iPad sidebar matching the redesigned mockup:
-///
-///  ┌────────────────────────────┐
-///  │ 🏠  首頁   (pink pill)      │   <- active row gets a
-///  │ 🧭  動態                    │      rounded pink capsule
-///  │ ((•))  直播                 │
-///  │                            │
-///  │  ┌──────┐                  │   <- user card: avatar +
-///  │  │ {un} │ 我的              │      username + 我的 label
-///  │  └──────┘                  │
-///  │                            │
-///  │ ≡<  收合                    │   <- collapse button
-///  └────────────────────────────┘
-///
-/// All copy is Traditional Chinese; the pink highlight uses
-/// `PaladalaTheme.biliPink` to stay consistent with the rest of
-/// the app.
-private struct PadSidebar: View {
-    let tabs: [MainTab]
-    @Binding var columnVisibility: NavigationSplitViewVisibility
-
-    @EnvironmentObject private var router: AppRouter
-    @EnvironmentObject private var authStore: AuthStore
-
-    var body: some View {
-        VStack(spacing: PaladalaTheme.Spacing.xl) {
-            tabList
-            Spacer(minLength: 0)
-            userCard
-            collapseButton
-        }
-        .padding(.horizontal, PaladalaTheme.Spacing.xl)
-        .padding(.top, PaladalaTheme.Spacing.xxl)
-        .padding(.bottom, PaladalaTheme.Spacing.xl)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(PaladalaTheme.canvas)
-        .overlay(alignment: .trailing) {
-            Rectangle()
-                .fill(PaladalaTheme.ink)
-                .frame(width: PaladalaTheme.borderWidth)
-                .accessibilityHidden(true)
-        }
-    }
-
-    private var tabList: some View {
-        VStack(spacing: PaladalaTheme.Spacing.m) {
-            ForEach(tabs) { tab in
-                SidebarRow(
-                    tab: tab,
-                    isActive: router.selectedTab == tab
-                ) {
-                    router.open(tab)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var userCard: some View {
-        Button {
-            router.open(.profile)
-        } label: {
-            HStack(spacing: PaladalaTheme.Spacing.m) {
-                sidebarAvatar
-                    .frame(width: 44, height: 44)
-                VStack(alignment: .leading, spacing: PaladalaTheme.Spacing.xs) {
-                    Text(usernameText)
-                        .font(PaladalaTheme.FontRole.headline)
-                        .foregroundStyle(PaladalaTheme.ink)
-                        .lineLimit(1)
-                    Text("我的")
-                        .font(PaladalaTheme.FontRole.labelMono)
-                        .foregroundStyle(PaladalaTheme.ink)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "arrow.up.right")
-                    .font(.caption.weight(.black))
-                    .foregroundStyle(PaladalaTheme.ink)
-            }
-            .padding(.horizontal, PaladalaTheme.Spacing.m)
-            .padding(.vertical, PaladalaTheme.Spacing.s)
-            .modifier(StreetSidebarSurface(
-                fill: router.selectedTab == .profile
-                    ? PaladalaTheme.biliPink
-                    : PaladalaTheme.paper
-            ))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var collapseButton: some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.22)) {
-                columnVisibility = .detailOnly
-            }
-        } label: {
-            HStack(spacing: PaladalaTheme.Spacing.m) {
-                Image(systemName: "line.3.horizontal.decrease.circle")
-                    .font(.title3)
-                    .foregroundStyle(PaladalaTheme.ink)
-                    .frame(width: 24)
-                Text("收合")
-                    .font(PaladalaTheme.FontRole.labelMono)
-                    .foregroundStyle(PaladalaTheme.ink)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, PaladalaTheme.Spacing.m)
-            .padding(.vertical, PaladalaTheme.Spacing.m)
-            .modifier(StreetSidebarSurface(fill: PaladalaTheme.paper))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var usernameText: String {
-        authStore.activeAccount?.name ?? "未登入"
-    }
-
-    @ViewBuilder
-    private var sidebarAvatar: some View {
-        let isNative = PaladalaTheme.usesNativeLayout
-        if let url = authStore.activeAccount?.faceURL {
-            ResilientImage(url: url)
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: isNative ? 12 : 0,
-                        style: .continuous
-                    )
-                )
-                .overlay {
-                    if !isNative {
-                        Rectangle()
-                            .strokeBorder(
-                                PaladalaTheme.ink,
-                                lineWidth: PaladalaTheme.borderWidth
-                            )
-                    }
-                }
-        } else {
-            RoundedRectangle(cornerRadius: isNative ? 12 : 0, style: .continuous)
-                .fill(PaladalaTheme.biliPink)
-                .overlay(
-                    Image(systemName: "person.fill")
-                        .font(.body)
-                        .foregroundStyle(PaladalaTheme.ink)
-                )
-                .overlay {
-                    if !isNative {
-                        Rectangle()
-                            .strokeBorder(
-                                PaladalaTheme.ink,
-                                lineWidth: PaladalaTheme.borderWidth
-                            )
-                    }
-                }
-        }
-    }
-}
-
-/// One row in the iPad sidebar. Every row uses the same hard-edged
-/// paper surface; the active destination switches to signal pink.
-private struct SidebarRow: View {
-    let tab: MainTab
-    let isActive: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: PaladalaTheme.Spacing.m) {
-                Image(systemName: tab.sidebarSymbolName)
-                    .font(.body.weight(.black))
-                    .frame(width: 24)
-                    .foregroundStyle(PaladalaTheme.ink)
-                Text(tab.title)
-                    .font(PaladalaTheme.FontRole.labelMono)
-                    .foregroundStyle(PaladalaTheme.ink)
-                Spacer(minLength: 0)
-                if isActive {
-                    Rectangle()
-                        .fill(PaladalaTheme.ink)
-                        .frame(width: 8, height: 8)
-                        .accessibilityHidden(true)
-                }
-            }
-            .padding(.horizontal, PaladalaTheme.Spacing.l)
-            .padding(.vertical, PaladalaTheme.Spacing.m)
-            .modifier(StreetSidebarSurface(
-                fill: isActive ? PaladalaTheme.biliPink : PaladalaTheme.paper
-            ))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-private struct StreetSidebarSurface: ViewModifier {
-    let fill: Color
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if PaladalaTheme.usesNativeLayout {
-            // iOS Native: rounded corner, no border, no hard shadow,
-            // system `fill` background. The active tab still uses
-            // `PaladalaTheme.biliPink` as the accent fill so the
-            // "selected" affordance is preserved — the user can
-            // override via system tint if the brand color ever
-            // changes, but the active-state cue stays consistent.
-            content
-                .background(
-                    fill,
-                    in: RoundedRectangle(
-                        cornerRadius: PaladalaTheme.cornerRadius,
-                        style: PaladalaTheme.cornerStyle
-                    )
-                )
-        } else {
-            content
-                .background {
-                    ZStack {
-                        Rectangle()
-                            .fill(PaladalaTheme.ink)
-                            .offset(
-                                x: PaladalaTheme.hardShadowOffset,
-                                y: PaladalaTheme.hardShadowOffset
-                            )
-                        Rectangle()
-                            .fill(fill)
-                    }
-                }
-                .overlay {
-                    Rectangle()
-                        .strokeBorder(
-                            PaladalaTheme.ink,
-                            lineWidth: PaladalaTheme.borderWidth
-                        )
-                }
-        }
-    }
-}
-
 @MainActor
 @ViewBuilder
 private func profileRouteView(_ route: ProfileRoute, repository: PaladalaRepository) -> some View {
@@ -937,47 +396,89 @@ private func profileRouteView(_ route: ProfileRoute, repository: PaladalaReposit
     }
 }
 
-/// Keep the native tab bar semantics while forcing an opaque paper
-/// background and signal-pink selection. This avoids translucent
-/// material without replacing the accessible system `TabView`.
-/// iOS Native is a no-op so the system draws its default tab bar
-/// (with the user-chosen accent color tint — no pink override).
-private struct StreetTabBarModifier: ViewModifier {
-    @ViewBuilder
+/// Native system tab bar on every OS version — iOS 26 renders
+/// it as Liquid Glass, earlier versions as system material.
+/// The custom DSNavBar / Street overlays are deleted.
+private struct _RemovedLegacyChromeModifiers: ViewModifier {
+    func body(content: Content) -> some View { content }
+}
+
+
+/// Shared navigation-destination registrations, applied inside each
+/// tab's own `NavigationStack`. Every tab can therefore push videos,
+/// replies, UP profiles, bangumi and local downloads independently —
+/// the Apple-native per-tab stack pattern.
+private struct PaladalaNavDestinations: ViewModifier {
+    let repository: PaladalaRepository
+    let heroNamespace: Namespace.ID?
+
     func body(content: Content) -> some View {
-        if PaladalaTheme.usesNativeLayout {
-            content
-        } else {
-            content
-                .toolbarBackground(PaladalaTheme.paper, for: .tabBar)
-                .toolbarBackground(.visible, for: .tabBar)
-                .tint(PaladalaTheme.biliPink)
-        }
+        content
+            .navigationDestination(for: BiliVideo.self) { video in
+                VideoDetailView(video: video, repository: repository, heroNamespace: heroNamespace)
+            }
+            .navigationDestination(for: ProfileRoute.self) { route in
+                profileRouteView(route, repository: repository)
+            }
+            .navigationDestination(for: ReplyRoute.self) { route in
+                ReplyListView(video: route.video, rootComment: route.rootComment, repository: repository)
+            }
+            .navigationDestination(for: LocalVideoRoute.self) { route in
+                switch route {
+                case .local(let record):
+                    VideoDetailView(
+                        video: record.video,
+                        repository: repository,
+                        heroNamespace: heroNamespace,
+                        localRecord: record
+                    )
+                }
+            }
+            .navigationDestination(for: BangumiRoute.self) { route in
+                switch route {
+                case .timeline:
+                    BangumiHomeView(repository: repository, heroNamespace: heroNamespace)
+                case .seasonDetail(let seasonId):
+                    BangumiSeasonDetailView(repository: repository, seasonId: seasonId)
+                }
+            }
+            .navigationDestination(for: UPProfileRoute.self) { route in
+                switch route {
+                case .up(let mid):
+                    UPProfileView(mid: mid, repository: repository)
+                }
+            }
     }
 }
 
-private struct ExpressivePhoneNavigation: ViewModifier {
-    @Binding var selection: MainTab
-    @DSPalette private var colors
+extension View {
+    func paladalaNavDestinations(repository: PaladalaRepository, heroNamespace: Namespace.ID?) -> some View {
+        modifier(PaladalaNavDestinations(repository: repository, heroNamespace: heroNamespace))
+    }
+}
 
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if PaladalaTheme.activeVariant == .expressive {
-            content
-                .toolbar(.hidden, for: .tabBar)
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    DSNavBar([
-                        DSNavItem(tab: MainTab.home, title: "探索", systemImage: "house", shape: .cookie9),
-                        DSNavItem(tab: MainTab.dynamic, title: "動態", systemImage: "person.2", shape: .clover8),
-                        DSNavItem(tab: MainTab.live, title: "直播", systemImage: "play.tv", shape: .puffy),
-                        DSNavItem(tab: MainTab.profile, title: "我的", systemImage: "person", shape: .sunny)
-                    ], selection: $selection)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(colors.surface)
-                }
-        } else {
-            content
+/// Per-tab `NavigationStack` + lazy arming. Combines `LazyTab`'s
+/// deferred `@StateObject` construction with each tab owning its
+/// navigation stack, which is what makes `.navigationTitle`,
+/// `.toolbar` and `.searchable` inside the tab render in the bar
+/// (they cannot propagate through a TabView to an outer stack).
+private struct LazyTabNavStack<Tag: Hashable, V: View>: View {
+    let tag: Tag
+    let activeTag: Tag?
+    @Binding var path: NavigationPath
+    @ViewBuilder let content: () -> V
+
+    @State private var armed: Bool = false
+
+    var body: some View {
+        // Always render the stack — gating the content behind the
+        // armed/EmptyView conditional made iOS 26's TabView hide the
+        // tab *items* of unvisited tabs entirely (the bar collapsed to
+        // showing only the tabs the user had already opened). The
+        // lazy-init cost of four tabs is negligible next to a broken
+        // tab bar.
+        NavigationStack(path: $path) {
+            content()
         }
     }
 }

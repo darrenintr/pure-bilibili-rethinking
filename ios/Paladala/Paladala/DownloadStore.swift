@@ -109,6 +109,39 @@ final class DownloadStore: ObservableObject {
         // which fails offline even though the bytes are
         // sitting in `Caches/Paladala/Downloads/ready/{bvid}/`.
         self.records = hydrateFromDiskSync()
+        migrateLegacyLayouts()
+    }
+
+    /// One-shot migration for downloads made before the merge
+    /// step worked: any record that still has the legacy
+    /// 4-file layout (`{video,audio}.{init,media}`) but no
+    /// merged `video.mp4` gets merged in place. Runs on
+    /// `ioQueue` — the byte-copy of a few hundred MB must not
+    /// sit on the main actor during launch. Idempotent: the
+    /// merge itself skips tracks whose output already exists.
+    private func migrateLegacyLayouts() {
+        let snapshot = records
+        ioQueue.async {
+            for record in snapshot {
+                let directory = self.readyDirectory(for: record.bvid)
+                let fm = FileManager.default
+                let mergedVideo = directory.appendingPathComponent("video.mp4")
+                guard !fm.fileExists(atPath: mergedVideo.path) else { continue }
+                let legacyVideoInit = directory.appendingPathComponent("video.init")
+                guard fm.fileExists(atPath: legacyVideoInit.path) else { continue }
+                let result = DownloadManager.mergeSegmentsIntoMp4(
+                    staging: directory,
+                    hasAudio: record.dash.audio != nil
+                )
+                diagLog(.download, "legacy layout migration",
+                        details: [
+                            "bvid": record.bvid,
+                            "merged": result.ok,
+                            "video_bytes": result.videoBytes,
+                            "audio_bytes": result.audioBytes
+                        ])
+            }
+        }
     }
 
     // MARK: lifecycle

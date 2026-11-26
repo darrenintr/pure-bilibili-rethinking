@@ -7,30 +7,12 @@ struct PaladalaGlassButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(PaladalaTheme.FontRole.labelMono)
-            .textCase(.uppercase)
-            .foregroundStyle(PaladalaTheme.ink)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.primary)
             .padding(.horizontal, PaladalaTheme.Spacing.l)
             .padding(.vertical, PaladalaTheme.Spacing.m)
-            .background(PaladalaTheme.paper)
-            .overlay {
-                Rectangle()
-                    .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
-            }
-            .background {
-                if !configuration.isPressed {
-                    Rectangle()
-                        .fill(PaladalaTheme.ink)
-                        .offset(
-                            x: PaladalaTheme.hardShadowOffset,
-                            y: PaladalaTheme.hardShadowOffset
-                        )
-                }
-            }
-            .offset(
-                x: configuration.isPressed ? PaladalaTheme.pressedOffset : 0,
-                y: configuration.isPressed ? PaladalaTheme.pressedOffset : 0
-            )
+            .paladalaGlassSurface(in: Capsule())
+            .opacity(configuration.isPressed ? 0.75 : 1)
             .animation(
                 reduceMotion ? nil : .easeOut(duration: 0.08),
                 value: configuration.isPressed
@@ -50,13 +32,15 @@ struct PaladalaPressBounceButtonStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
+        // Apple Music / Photos press feedback: a gentle scale dip
+        // with a slight opacity fade. Replaces the old Street
+        // hard-edge x/y offset, which read as a print artifact
+        // rather than a touch response.
         configuration.label
-            .offset(
-                x: configuration.isPressed ? PaladalaTheme.pressedOffset : 0,
-                y: configuration.isPressed ? PaladalaTheme.pressedOffset : 0
-            )
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .opacity(configuration.isPressed ? 0.85 : 1)
             .animation(
-                reduceMotion ? nil : .easeOut(duration: 0.08),
+                reduceMotion ? nil : .spring(response: 0.22, dampingFraction: 0.75),
                 value: configuration.isPressed
             )
     }
@@ -243,6 +227,40 @@ struct PaladalaBackdrop: View, Equatable {
 }
 
 extension View {
+    /// The single surface treatment for the whole app, driven by
+    /// the 玻璃風格 setting's 5-level ladder: `clear` → system
+    /// fill, `ultraThin`/`frosted`/`thick` → the matching system
+    /// material, `liquid` → `.glassEffect` on iOS 26+ (falls
+    /// back to `.regularMaterial` below).
+    @ViewBuilder
+    func paladalaGlassSurface<S: InsettableShape>(
+        in shape: S,
+        tint: Color? = nil
+    ) -> some View {
+        let style = PaladalaTheme.glassStyle
+        if style == .liquid {
+            #if compiler(>=6.2)
+            if #available(iOS 26.0, *) {
+                self.glassEffect(
+                    tint.map { Glass.regular.tint($0) } ?? .regular,
+                    in: shape
+                )
+            } else {
+                self.background(.regularMaterial, in: shape)
+            }
+            #else
+            self.background(.regularMaterial, in: shape)
+            #endif
+        } else if let material = style.material {
+            self.background(material, in: shape)
+        } else {
+            self.background(
+                tint ?? Color(uiColor: .secondarySystemFill),
+                in: shape
+            )
+        }
+    }
+
     /// Card surface — the standard "panel" applied to feeds, video
     /// cards, profile rows, and AI summary cards (15+ call sites).
     /// Variant-aware:
@@ -265,46 +283,18 @@ extension View {
         stroke: Color? = nil,
         strokeWidth: CGFloat = 0.5
     ) -> some View {
-        let isNative = PaladalaTheme.usesNativeLayout
         let shape = RoundedRectangle(
-            cornerRadius: isNative ? PaladalaTheme.cornerRadius : cornerRadius,
-            style: PaladalaTheme.cornerStyle
+            cornerRadius: PaladalaTheme.cornerRadius,
+            style: .continuous
         )
-        let effectiveFill: Color = isNative
-            ? Color(uiColor: .secondarySystemGroupedBackground)
-            : (tint ?? PaladalaTheme.cardBackground)
-        self
-            .background(effectiveFill, in: shape)
-            .overlay {
-                if !isNative {
-                    shape.strokeBorder(
-                        stroke ?? PaladalaTheme.ink,
-                        lineWidth: stroke == nil ? PaladalaTheme.borderWidth : strokeWidth
-                    )
-                }
-            }
-            .background {
-                if !isNative {
-                    shape
-                        .fill(PaladalaTheme.ink)
-                        .offset(
-                            x: PaladalaTheme.hardShadowOffset,
-                            y: PaladalaTheme.hardShadowOffset
-                        )
-                }
-            }
+        self.paladalaGlassSurface(in: shape, tint: tint)
     }
 
     @ViewBuilder
     func paladalaPillSurface(
         _ design: MaterialDesign
     ) -> some View {
-        self
-            .background(PaladalaTheme.paper)
-            .overlay {
-                Rectangle()
-                    .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
-            }
+        self.paladalaGlassSurface(in: Capsule())
     }
 
     /// Force the navigation bar to a Street-style opaque `paper`
@@ -315,13 +305,7 @@ extension View {
     /// `DynamicFeedToolbarGlassModifier` (5 call sites).
     @ViewBuilder
     func paladalaNavBarGlass(_ design: MaterialDesign = .liquidGlass) -> some View {
-        if PaladalaTheme.usesNativeLayout {
-            self
-        } else {
-            self
-                .toolbarBackground(PaladalaTheme.paper, for: .navigationBar)
-                .toolbarBackground(.visible, for: .navigationBar)
-        }
+        self
     }
 
     /// Force the tab bar to a Street-style opaque `paper`
@@ -330,13 +314,7 @@ extension View {
     /// on iOS 26+).
     @ViewBuilder
     func paladalaToolbarGlass(_ design: MaterialDesign = .liquidGlass) -> some View {
-        if PaladalaTheme.usesNativeLayout {
-            self
-        } else {
-            self
-                .toolbarBackground(PaladalaTheme.paper, for: .tabBar)
-                .toolbarBackground(.visible, for: .tabBar)
-        }
+        self
     }
 
     /// List chrome — applies the variant-correct list style +
@@ -351,17 +329,10 @@ extension View {
     ///   *not* apply their own `paladalaStreetPanel`.
     @ViewBuilder
     func paladalaListChrome() -> some View {
-        if PaladalaTheme.usesNativeLayout {
-            self
-                .scrollContentBackground(.hidden)
-                .listStyle(.insetGrouped)
-                .background(Color(uiColor: .systemGroupedBackground))
-        } else {
-            self
-                .scrollContentBackground(.hidden)
-                .listStyle(.plain)
-                .background(PaladalaTheme.canvas)
-        }
+        self
+            .scrollContentBackground(.hidden)
+            .listStyle(.insetGrouped)
+            .background(Color(uiColor: .systemGroupedBackground))
     }
 
     /// Per-row chrome — applies the variant-correct row
@@ -375,13 +346,7 @@ extension View {
     ///   trying to hide them would defeat the HIG card look.
     @ViewBuilder
     func paladalaListRowChrome() -> some View {
-        if PaladalaTheme.usesNativeLayout {
-            self
-        } else {
-            self
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-        }
+        self
     }
 
     /// Toggle style that matches the active design variant.
@@ -396,20 +361,17 @@ extension View {
     /// concrete style type that SwiftUI is happy with.
     @ViewBuilder
     func paladalaToggleStyle() -> some View {
-        if PaladalaTheme.activeVariant == .expressive {
-            self.toggleStyle(.dsSwitch)
-        } else if PaladalaTheme.usesNativeLayout {
-            self.toggleStyle(.switch)
-        } else {
-            self.toggleStyle(PaladalaStreetToggleStyle())
-        }
+        self.toggleStyle(.switch)
     }
 
     @ViewBuilder
     func paladalaTabBarBehavior() -> some View {
+        // Force `.never` — iOS 26's automatic minimize collapses the
+        // bar to a single capsule (only the active tab), which hid the
+        // other three tabs and read as "the tab bar is broken/empty".
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
-            self.tabBarMinimizeBehavior(.onScrollDown)
+            self.tabBarMinimizeBehavior(.never)
         } else {
             self
         }
@@ -423,36 +385,17 @@ extension View {
         isSelected: Bool,
         design: MaterialDesign
     ) -> some View {
-        if PaladalaTheme.usesNativeLayout {
-            // iOS Native: capsule + systemFill background.
-            // Selected state uses Color.accentColor (follows the
-            // user's iOS tint setting).  SF Pro subheadline, no
-            // uppercase — the system visual language.
-            self
-                .font(PaladalaTheme.IOSNative.subheadline)
-                .foregroundStyle(isSelected ? Color.white : Color.primary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(
-                    isSelected
-                        ? Color.accentColor
-                        : Color(uiColor: .systemFill)
-                )
-                .clipShape(Capsule())
-        } else {
-            // Street Minimal: hard-edged rectangle, mono uppercase
-            // label, 1.5pt ink border, paper background.  Brand
-            // language of the Street variant.
-            self
-                .font(PaladalaTheme.FontRole.labelMono)
-                .textCase(.uppercase)
-                .foregroundStyle(isSelected ? PaladalaTheme.paper : PaladalaTheme.ink)
-                .background(isSelected ? PaladalaTheme.ink : PaladalaTheme.paper)
-                .overlay {
-                    Rectangle()
-                        .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
-                }
-        }
+        // Native capsule chip — glass in liquid mode, tinted
+        // capsule when selected.
+        self
+            .font(PaladalaTheme.IOSNative.subheadline)
+            .foregroundStyle(isSelected ? Color.white : Color.primary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .paladalaGlassSurface(
+                in: Capsule(),
+                tint: isSelected ? Color.accentColor.opacity(0.85) : nil
+            )
     }
 
     /// Picker-style chip. Tap to set `selection` to `value`. Renders
@@ -548,8 +491,8 @@ extension View {
     @ViewBuilder
     func paladalaSheetGlass() -> some View {
         self
-            .presentationBackground(PaladalaTheme.paper)
-            .presentationCornerRadius(0)
+            .presentationBackground(.regularMaterial)
+            .presentationCornerRadius(24)
     }
 
     /// Street Minimal uses a static skeleton. Besides matching the dry,
@@ -578,49 +521,23 @@ extension View {
     /// make the card invisible.  All 9 current call sites pass
     /// `paper`; if a future caller wants a custom iOS Native fill,
     /// they can fork this modifier.
+    @ViewBuilder
     func paladalaStreetPanel(
         fill: Color = PaladalaTheme.paper,
         elevated: Bool = true
     ) -> some View {
-        let isNative = PaladalaTheme.usesNativeLayout
         let shape = RoundedRectangle(
             cornerRadius: PaladalaTheme.cornerRadius,
-            style: PaladalaTheme.cornerStyle
+            style: .continuous
         )
-        let effectiveFill: Color = isNative
-            ? Color(uiColor: .secondarySystemGroupedBackground)
-            : fill
-        return self
-            .background(effectiveFill)
-            .overlay {
-                if !isNative {
-                    shape
-                        .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.borderWidth)
-                }
-            }
-            .background {
-                // Hard shadow only renders for non-iosNative variants.
-                // iOS Native already has `hardShadowOffset == 0` (so
-                // the offset is a no-op), but skipping the whole
-                // `fill(.ink)` layer also keeps the panel from
-                // interfering with `.regularMaterial` glass backgrounds
-                // stacked above it.
-                if elevated, !isNative {
-                    shape
-                        .fill(PaladalaTheme.ink)
-                        .offset(
-                            x: PaladalaTheme.hardShadowOffset,
-                            y: PaladalaTheme.hardShadowOffset
-                        )
-                }
-            }
+        return self.paladalaGlassSurface(in: shape, tint: fill == PaladalaTheme.paper ? nil : fill)
     }
 
+    @ViewBuilder
     func paladalaSectionHeader() -> some View {
         self
-            .font(PaladalaTheme.FontRole.sectionHeader)
-            .textCase(.uppercase)
-            .foregroundStyle(PaladalaTheme.ink)
+            .font(.title3.weight(.bold))
+            .foregroundStyle(.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -635,11 +552,7 @@ extension View {
     /// row) and the variant switch handles itself.
     @ViewBuilder
     func paladalaActionPill(accent: Color = PaladalaTheme.biliPink) -> some View {
-        if PaladalaTheme.usesNativeLayout {
-            self
-        } else {
-            self.buttonStyle(PaladalaActionPillStyle(accent: accent))
-        }
+        self
     }
 }
 
@@ -661,7 +574,7 @@ private struct PaladalaChip: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
         }
-        .foregroundStyle(isSelected ? PaladalaTheme.paper : PaladalaTheme.ink)
+        .foregroundStyle(isSelected ? Color.white : Color.primary)
         .frame(maxWidth: .infinity, minHeight: 44)
         .padding(.horizontal, 8)
     }

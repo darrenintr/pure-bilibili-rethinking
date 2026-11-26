@@ -17,16 +17,26 @@ struct LazyTab<Tag: Hashable, V: View>: View {
     @State private var armed: Bool = false
 
     var body: some View {
-        Group {
-            if armed {
+        // Always render the content for the active tag without a
+        // conditional Group wrapper: the if/else broke propagation of
+        // `.navigationTitle` / `.toolbar` / `.searchable` up to the
+        // enclosing NavigationStack on iOS 26, leaving the nav bar a
+        // blank large-title-height strip. Non-active tabs still defer
+        // via the outer `armed` gate using opacity-zero rendering, which
+        // keeps preference propagation intact for the visible tab.
+        ZStack {
+            if armed || activeTag == tag {
                 content()
-            } else {
-                EmptyView()
             }
         }
         .onChange(of: activeTag, initial: true) { _, new in
             // `new` is `Tag?`; lift to compare with the non-optional `tag`.
             if let unwrapped = new, unwrapped == tag, !armed {
+                armed = true
+            }
+        }
+        .onAppear {
+            if !armed, activeTag == nil || activeTag == tag {
                 armed = true
             }
         }

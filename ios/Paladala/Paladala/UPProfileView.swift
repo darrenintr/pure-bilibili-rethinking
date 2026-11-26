@@ -615,7 +615,7 @@ struct UPProfileView: View {
         .background(PaladalaTheme.coolGray)
         .overlay {
             Rectangle()
-                .strokeBorder(PaladalaTheme.ink, lineWidth: PaladalaTheme.hairlineWidth)
+                .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
         }
         // Tappable pills wrap in a Button so the user gets a
         // built-in hit target + accessibility affordance;

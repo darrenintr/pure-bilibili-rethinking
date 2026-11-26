@@ -20,6 +20,7 @@ struct HomeView: View {
     @EnvironmentObject private var authStore: AuthStore
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @StateObject private var model = HomeViewModel()
+    @State private var feedRevealed = false
     @State private var isShortVideoFeedPresented = false
     @AppStorage("paladala.materialDesign") private var materialDesign: MaterialDesign = .liquidGlass
     /// Observed so SwiftUI re-evaluates the toolbar's
@@ -60,72 +61,11 @@ struct HomeView: View {
                      count: PaladalaTheme.activeVariant == .expressive ? 2 : 1)
     }
 
-    /// Street-style search bar extracted out of `body` so the
-    /// body expression stays under the Swift type-checker
-    /// budget.  Lives in `.safeAreaInset(edge: .top)` so it
-    /// sits flush with the nav bar above and pushes the feed
-    /// content below.
-    private var searchBar: some View {
-        UISearchFieldBridge(
-            text: $model.searchQuery,
-            prompt: "搜尋 Bilibili 影片和 UP 主",
-            onSubmit: {
-                model.clearSuggestions()
-                model.category = .search
-                Task {
-                    await model.load(repository: repository, accountMid: accountMid)
-                    await model.runAllSearch(repository: repository)
-                }
-            },
-            onQueryChanged: { query in
-                model.searchQueryChanged(query, repository: repository)
-            }
-        )
-        .padding(.horizontal, PaladalaTheme.Spacing.l)
-        .padding(.vertical, PaladalaTheme.Spacing.s)
-        .background(PaladalaTheme.paper)
-    }
-
-    /// Search bar plus a live keystroke-rate suggestions
-    /// dropdown.  Wrapped in a VStack so the dropdown sits
-    /// flush under the bridge and the whole stack is one
-    /// `safeAreaInset` insertion.  The dropdown is empty
-    /// (and therefore zero-height) when the user hasn't
-    /// typed yet, so it doesn't push the feed content
-    /// down at idle.
-    private var searchBarSection: some View {
-        VStack(spacing: 0) {
-            searchBar
-            if !model.searchQuery.isEmpty && !model.searchSuggestions.isEmpty {
-                SuggestionList(
-                    suggestions: model.searchSuggestions,
-                    onSelect: { suggestion in
-                        // Tap-to-fill: mirror the old
-                        // `.searchCompletion` behaviour.  The
-                        // bridge updates its text via the
-                        // binding, then we run the same
-                        // submit path so the feed jumps to
-                        // the chosen result without waiting
-                        // for the user to hit the keyboard's
-                        // search button.
-                        model.searchQuery = suggestion.displayName
-                        model.clearSuggestions()
-                        model.category = .search
-                        Task {
-                            await model.load(repository: repository, accountMid: accountMid)
-                            await model.runAllSearch(repository: repository)
-                        }
-                    }
-                )
-            }
-        }
-    }
-
     var body: some View {
         ScrollViewReader { proxy in
             feedContent(scrollProxy: proxy)
                 .background(Color.clear)
-                .navigationTitle("Paladala")
+                .navigationTitle("首頁")
                 // Apple large-title guidance for top-level
                 // navigation: the title collapses into the
                 // chrome on scroll and re-expands when the
@@ -138,9 +78,7 @@ struct HomeView: View {
                 // Street stays on `.inline` because the hard-edged
                 // style works better with a permanently compact
                 // title.
-                .navigationBarTitleDisplayMode(
-                    PaladalaTheme.usesNativeLayout ? .large : .inline
-                )
+                .navigationBarTitleDisplayMode(.large)
                 // PR-fix-2026-07-10: replace `.searchable` with
                 // a hand-rolled `UISearchFieldBridge` so the
                 // search bar carries Street Minimal chrome
@@ -152,12 +90,33 @@ struct HomeView: View {
                 // longer wires up automatically — see the
                 // bridge's doc-comment for follow-up.
                 //
-                // Extracted into `searchBarSection` (private
-                // computed property) so the body expression
-                // stays readable for the Swift type-checker
-                // and so the live keystroke suggestions have
-                // somewhere to live under the bridge.
-                .safeAreaInset(edge: .top, spacing: 0) { searchBarSection }
+                // Native system search — the search field lives
+                // inside the navigation bar itself (Apple Music /
+                // Podcasts pattern), so there is no custom inset
+                // bar and no dead space under the large title.
+                .modifier(
+                    AdaptiveSearchModifier(
+                        searchQuery: $model.searchQuery,
+                        horizontalSizeClass: horizontalSizeClass
+                    )
+                )
+                .onChange(of: model.searchQuery) { _, query in
+                    model.searchQueryChanged(query, repository: repository)
+                }
+                .onSubmit(of: .search) {
+                    model.clearSuggestions()
+                    model.category = .search
+                    Task {
+                        await model.load(repository: repository, accountMid: accountMid)
+                        await model.runAllSearch(repository: repository)
+                    }
+                }
+                .searchSuggestions {
+                    ForEach(model.searchSuggestions, id: \.displayName) { suggestion in
+                        Text(suggestion.displayName)
+                            .searchCompletion(suggestion.displayName)
+                    }
+                }
                 // PR-fix-2026-07-10: the trailing toolbar
                 // column (5 icons on the right of the nav
                 // bar) was rendering with the iOS 26 Liquid
@@ -175,7 +134,8 @@ struct HomeView: View {
                 // scroll, otherwise the system re-introduces
                 // the glass material when the user scrolls
                 // the feed.
-                .toolbarBackground(PaladalaTheme.paper, for: .navigationBar)
+                // Nav bar stays on the system material so the
+                // iOS 26 Liquid Glass chrome shows through.
                 .toolbarBackground(.visible, for: .navigationBar)
                 .toolbar {
                     ToolbarItemGroup(placement: .topBarTrailing) {
@@ -195,6 +155,21 @@ struct HomeView: View {
                             }
                             .accessibilityLabel(L10n.home.refresh)
                             Menu {
+                                Section("分類") {
+                                    ForEach(HomeCategory.androidTabs) { category in
+                                        Button {
+                                            Haptics.selection()
+                                            model.category = category
+                                        } label: {
+                                            if model.category == category {
+                                                Label(category.title, systemImage: "checkmark")
+                                            } else {
+                                                Text(category.title)
+                                            }
+                                        }
+                                    }
+                                }
+                                Divider()
                                 Button {
                                     Haptics.tap()
                                     router.open(.downloads)
@@ -215,16 +190,13 @@ struct HomeView: View {
                                     Label("動態", systemImage: "bell")
                                 }
                             } label: {
-                                Image(systemName: "ellipsis.circle")
+                                HStack(spacing: 3) {
+                                    Text(model.category.title)
+                                    Image(systemName: "chevron.down")
+                                        .font(.caption2.weight(.semibold))
+                                }
                             }
-                            .accessibilityLabel("更多")
-                            Button {
-                                Haptics.tap()
-                                router.open(.profile)
-                            } label: {
-                                Image(systemName: "person.crop.circle")
-                            }
-                            .accessibilityLabel("我的")
+                            .accessibilityLabel("分類同更多")
                         } else {
                             // Street Minimal: 5 icons on the right of
                             // the nav bar.  The hard-edged toolbar chrome
@@ -332,10 +304,6 @@ struct HomeView: View {
                     .frame(height: 0)
                     .id("feedTop")
 
-                categoryStrip
-                if model.category == .popular {
-                    popularSubCategoryStrip
-                }
                 if let error = model.errorMessage {
                     VStack(spacing: 10) {
                         ErrorBanner(message: error)
@@ -418,6 +386,35 @@ struct HomeView: View {
                             }
                         }
                     }
+                    .opacity(feedRevealed ? 1 : 0)
+                    .offset(y: feedRevealed ? 0 : 14)
+                    .onChange(of: model.videos.isEmpty) { _, isEmpty in
+                        // Entrance: the first time content lands the
+                        // grid fades in and rises slightly — the same
+                        // content-first reveal Apple Music uses when a
+                        // page populates. One-shot per feed load;
+                        // subsequent pagination appends render
+                        // immediately (opacity already 1).
+                        if !isEmpty && !feedRevealed {
+                            withAnimation(.easeOut(duration: 0.35)) {
+                                feedRevealed = true
+                            }
+                        }
+                    }
+                    .onChange(of: model.category) { _, _ in
+                        // Re-arm the reveal for category switches so
+                        // the new feed doesn't pop in abruptly.
+                        feedRevealed = model.videos.isEmpty == false
+                    }
+                    .onAppear {
+                        // `onChange` only fires on transitions — if
+                        // the feed was already populated when this
+                        // view first renders (fast cache hit), the
+                        // grid would stay invisible forever.
+                        if !model.videos.isEmpty {
+                            feedRevealed = true
+                        }
+                    }
                     paginationFooter
                 }
             }
@@ -426,62 +423,30 @@ struct HomeView: View {
         .scrollIndicators(.hidden)
         .refreshable {
             Haptics.medium()
-            await model.load(repository: repository, accountMid: accountMid)
-            withAnimation(.easeOut(duration: 0.2)) {
-                proxy.scrollTo("feedTop", anchor: .top)
-            }
-        }
-    }
-
-    private var categoryStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            PaladalaGlassContainer(materialDesign: materialDesign, spacing: 8) {
-                HStack(spacing: 8) {
-                    ForEach(HomeCategory.androidTabs) { category in
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                model.category = category
-                            }
-                            Haptics.selection()
-                        } label: {
-                            Text(category.title)
-                                .font(PaladalaTheme.FontRole.labelMono)
-                                .padding(.horizontal, 13)
-                                .padding(.vertical, 9)
-                                .paladalaSelectionChip(
-                                    isSelected: model.category == category,
-                                    design: materialDesign
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-    }
-
-    private var popularSubCategoryStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            PaladalaGlassContainer(materialDesign: materialDesign, spacing: 8) {
-                HStack(spacing: 8) {
-                    ForEach(PopularSubCategory.allCases) { subCategory in
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                model.popularSubCategory = subCategory
-                            }
-                            Haptics.selection()
-                        } label: {
-                            Text(subCategory.title)
-                                .font(PaladalaTheme.FontRole.labelMono)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .paladalaSelectionChip(
-                                    isSelected: model.popularSubCategory == subCategory,
-                                    design: materialDesign
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
+            // CRITICAL: preserve the current feed while refreshing.
+            // Clearing `videos` up-front switches the view to the
+            // empty-state branch, which destroys the ScrollView that
+            // owns this very refresh task — SwiftUI then cancels it
+            // mid-flight (NSURLError -999), every fallback aborts,
+            // and the feed is stuck empty until relaunch. Keeping
+            // the existing rows mounted is also the standard Apple
+            // behaviour (content stays, spinner overlays on top).
+            // Run the fetch detached from the refreshable operation
+            // task. On iOS 26 SwiftUI cancels that operation almost
+            // immediately when the scroll view hierarchy updates
+            // during the gesture, which used to propagate into the
+            // in-flight URLSession requests (NSURLError -999) and
+            // killed every fallback along with them. A detached
+            // task is immune: the refresh control ends its spinner
+            // right away while the network load completes on its
+            // own and swaps the new rows in when they arrive.
+            let model = model
+            let repository = repository
+            let accountMid = accountMid
+            Task { @MainActor in
+                await model.load(repository: repository, accountMid: accountMid, preservingExistingContent: true)
+                withAnimation(.easeOut(duration: 0.2)) {
+                    proxy.scrollTo("feedTop", anchor: .top)
                 }
             }
         }
@@ -1153,3 +1118,58 @@ private struct SuggestionList: View {
     }
 }
 
+
+/// iOS 26+: collapse the search field into a magnifier icon in
+/// the toolbar on regular-width layouts (iPad), where the
+/// always-visible drawer row wastes a full strip of vertical
+/// space. Tapping the icon expands the field with the system's
+/// own liquid animation. Compact widths (iPhone) keep the
+/// visible drawer — one-handed reachability matters more there.
+/// Adaptive search chrome. Compact width (iPhone): the field is
+/// always visible in the navigation bar drawer. Regular width
+/// (iPad): no forced drawer placement — the system default —
+/// plus `.minimize` on iOS 26, which collapses the field into a
+/// magnifier icon in the toolbar and expands it with the system's
+/// liquid animation on tap. `.minimize` cannot collapse a forced
+/// drawer placement, which is why the placement itself has to
+/// change with size class.
+private struct AdaptiveSearchModifier: ViewModifier {
+    @Binding var searchQuery: String
+    let horizontalSizeClass: UserInterfaceSizeClass?
+
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26, *) {
+            if horizontalSizeClass == .regular {
+                content
+                    .searchable(
+                        text: $searchQuery,
+                        placement: .navigationBarDrawer(displayMode: .automatic),
+                        prompt: "搜尋 Bilibili 影片和 UP 主"
+                    )
+            } else {
+                content
+                    .searchable(
+                        text: $searchQuery,
+                        prompt: "搜尋 Bilibili 影片和 UP 主"
+                    )
+                    .searchToolbarBehavior(.minimize)
+            }
+        } else {
+            content
+                .searchable(
+                    text: $searchQuery,
+                    placement: .navigationBarDrawer(displayMode: .always),
+                    prompt: "搜尋 Bilibili 影片和 UP 主"
+                )
+        }
+        #else
+        content
+            .searchable(
+                text: $searchQuery,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "搜尋 Bilibili 影片和 UP 主"
+            )
+        #endif
+    }
+}

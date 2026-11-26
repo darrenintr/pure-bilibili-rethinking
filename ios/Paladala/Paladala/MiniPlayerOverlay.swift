@@ -32,25 +32,18 @@ struct MiniPlayerOverlay: View {
             HStack(spacing: PaladalaTheme.Spacing.s) {
                 AVPlayerThumbnailView(player: controller.player)
                     .frame(width: 104, height: 60)
-                    .clipShape(Rectangle())
-                    .overlay {
-                        Rectangle()
-                            .strokeBorder(
-                                PaladalaTheme.ink,
-                                lineWidth: PaladalaTheme.borderWidth
-                            )
-                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                 VStack(alignment: .leading, spacing: PaladalaTheme.Spacing.xs) {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(video.title)
-                            .font(PaladalaTheme.FontRole.bodySmall.weight(.bold))
-                            .foregroundStyle(PaladalaTheme.ink)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
                             .lineLimit(1)
                             .truncationMode(.tail)
                         Text(video.ownerName)
-                            .font(PaladalaTheme.FontRole.labelMono)
-                            .foregroundStyle(PaladalaTheme.ink.opacity(0.68))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.tail)
                     }
@@ -70,10 +63,10 @@ struct MiniPlayerOverlay: View {
                     store.togglePlayPause()
                 } label: {
                     Image(systemName: store.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.title3.weight(.black))
-                        .foregroundStyle(PaladalaTheme.ink)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.primary)
                         .frame(width: 36, height: 36)
-                        .modifier(MiniPlayerControlSurface(fill: PaladalaTheme.biliPink))
+                        .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(store.isPlaying ? "Pause" : "Play")
@@ -86,10 +79,10 @@ struct MiniPlayerOverlay: View {
                     store.expand()
                 } label: {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.subheadline.weight(.black))
-                        .foregroundStyle(PaladalaTheme.ink)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
                         .frame(width: 36, height: 36)
-                        .modifier(MiniPlayerControlSurface(fill: PaladalaTheme.paper))
+                        .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Expand to inline player")
@@ -99,10 +92,10 @@ struct MiniPlayerOverlay: View {
                     store.close()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.subheadline.weight(.black))
-                        .foregroundStyle(PaladalaTheme.paper)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
                         .frame(width: 36, height: 36)
-                        .modifier(MiniPlayerControlSurface(fill: PaladalaTheme.ink))
+                        .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Close mini-player")
@@ -135,28 +128,19 @@ struct MiniPlayerOverlay: View {
             // `currentTime`.
             let displayProgress = isScrubbing ? Double(scrubFraction) : liveProgress
             ZStack(alignment: .leading) {
-                Rectangle()
-                    .fill(PaladalaTheme.coolGray)
+                Capsule()
+                    .fill(Color.primary.opacity(0.18))
                     .frame(height: 4)
-                    .overlay {
-                        Rectangle()
-                            .strokeBorder(PaladalaTheme.ink, lineWidth: 1)
-                    }
-                Rectangle()
-                    .fill(PaladalaTheme.biliPink)
+                Capsule()
+                    .fill(Color.accentColor)
                     .frame(width: max(0, geo.size.width * displayProgress), height: 4)
 
                 if isScrubbing {
-                    // Knob at the finger so the user gets a
-                    // physical "I'm holding the playhead" cue.
-                    Rectangle()
-                        .fill(PaladalaTheme.paper)
-                        .frame(width: 10, height: 10)
-                        .overlay {
-                            Rectangle()
-                                .strokeBorder(PaladalaTheme.ink, lineWidth: 1)
-                        }
-                        .offset(x: max(0, geo.size.width * scrubFraction) - 5)
+                    Circle()
+                        .fill(Color.accentColor)
+                        .frame(width: 12, height: 12)
+                        .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                        .offset(x: max(0, geo.size.width * scrubFraction) - 6)
                 }
 
                 scrubBubble(width: geo.size.width)
@@ -207,18 +191,11 @@ struct MiniPlayerOverlay: View {
             let total = store.duration > 0 ? store.duration : 1
             let seconds = Double(scrubFraction) * total
             Text(formatTime(seconds))
-                .font(PaladalaTheme.FontRole.labelMono.monospacedDigit())
-                .foregroundStyle(PaladalaTheme.paper)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.white)
                 .padding(.horizontal, PaladalaTheme.Spacing.s)
                 .padding(.vertical, PaladalaTheme.Spacing.xs)
-                .background(PaladalaTheme.ink)
-                .overlay {
-                    Rectangle()
-                        .strokeBorder(
-                            PaladalaTheme.biliPink,
-                            lineWidth: PaladalaTheme.borderWidth
-                        )
-                }
+                .background(.black.opacity(0.8), in: Capsule())
                 .fixedSize()
                 .offset(x: bubbleOffset(width: width), y: -22)
                 .transition(.opacity.combined(with: .scale(scale: 0.85)))
@@ -297,10 +274,10 @@ private struct MiniPlayerChromeModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .overlay(alignment: .top) {
-                Rectangle()
-                    .fill(PaladalaTheme.ink)
-                    .frame(width: 34, height: 3)
-                    .offset(y: 4)
+                Capsule()
+                    .fill(Color.primary.opacity(0.35))
+                    .frame(width: 34, height: 4)
+                    .offset(y: 5)
                     .opacity(Double(dismissProgress))
                     .accessibilityHidden(true)
             }
@@ -311,23 +288,11 @@ private struct MiniPlayerChromeModifier: ViewModifier {
             // on 0pt (a no-op) because the chrome is hard-edged.
             .clipShape(
                 RoundedRectangle(
-                    cornerRadius: PaladalaTheme.usesNativeLayout ? 20 : 0,
+                    cornerRadius: 20,
                     style: .continuous
                 )
             )
             .background { chromeBackground }
-            .overlay {
-                // iOS Native: no border, the Liquid Glass edge is the
-                // chrome.  Street: 1.5pt ink stroke for the hard-edged
-                // Street Minimal look.
-                if PaladalaTheme.activeVariant != .iosNative {
-                    Rectangle()
-                        .strokeBorder(
-                            PaladalaTheme.ink,
-                            lineWidth: PaladalaTheme.borderWidth
-                        )
-                }
-            }
             .offset(y: max(0, dragOffset))
             .scaleEffect(reduceMotion ? 1.0 : 1.0 - (dismissProgress * 0.035), anchor: .bottom)
             .opacity(Double(1.0 - (dismissProgress * 0.18)))
@@ -349,30 +314,13 @@ private struct MiniPlayerChromeModifier: ViewModifier {
             .accessibilityLabel("Mini player for \(videoTitle)")
     }
 
-    /// Variant-aware background.  iOS Native → system `.regularMaterial`,
-    /// which on iOS 26+ auto-promotes to Liquid Glass and on iOS 18-25
-    /// renders as the standard translucent material.  The deployment
-    /// target is iOS 18 (see `IPHONEOS_DEPLOYMENT_TARGET` in
-    /// `project.pbxproj`), so we can't use the iOS 26-only
-    /// `.glassEffect(_:)` modifier here — the Xcode 16 SDK doesn't
-    /// expose it.  Street → paper fill + 4pt ink hard shadow.
-    @ViewBuilder
+    /// Glass-style-aware background driven by the 5-level
+    /// 玻璃風格 setting (material ladder → `.glassEffect`).
     private var chromeBackground: some View {
-        if PaladalaTheme.usesNativeLayout {
-            Color.clear
-                .background(.regularMaterial)
-        } else {
-            ZStack {
-                Rectangle()
-                    .fill(PaladalaTheme.ink)
-                    .offset(
-                        x: PaladalaTheme.hardShadowOffset,
-                        y: PaladalaTheme.hardShadowOffset
-                    )
-                Rectangle()
-                    .fill(PaladalaTheme.paper)
-            }
-        }
+        Color.clear
+            .paladalaGlassSurface(
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+            )
     }
 }
 

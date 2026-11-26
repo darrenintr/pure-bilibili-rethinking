@@ -1475,6 +1475,10 @@ final class LocalHLSProxyServer: @unchecked Sendable {
 
     private let queue = DispatchQueue(label: "Paladala.LocalHLSProxy")
     fileprivate let lock = NSRecursiveLock()
+    /// Counters for rate-limited hot-path diag lines
+    /// (see `respondBytes` / `tryLocalSegment`).
+    private var responseLogCount = 0
+    private var localMissCount = 0
     private var listener: NWListener?
     private var lanListener: NWListener?
     /// Test seam — exposes the listener's current state for XCTest assertions.
@@ -3033,7 +3037,13 @@ final class LocalHLSProxyServer: @unchecked Sendable {
                 .map { frag -> Int64 in
                     let bytes = Int64(frag.byteRange.upperBound
                                       - frag.byteRange.lowerBound)
-                    return bytes * 8 / Int64(frag.duration)
+                    // `duration` is a `Double` in seconds — a
+                    // fragment shorter than 1 s truncates to 0
+                    // through `Int64()` and the integer division
+                    // traps ("Division by zero" on the proxy queue,
+                    // killing the app mid-manifest). Compute in
+                    // Double and convert the *result*.
+                    return Int64((Double(bytes) * 8.0 / frag.duration).rounded())
                 }
                 .max() ?? 0
         }
@@ -3101,8 +3111,18 @@ final class LocalHLSProxyServer: @unchecked Sendable {
         var lines: [String] = [
             "#EXTM3U",
             "#EXT-X-VERSION:6",
-            "#EXT-X-INDEPENDENT-SEGMENTS",
         ]
+        // Only declare INDEPENDENT-SEGMENTS when every video
+        // fragment really starts on a SAP.  Declaring it on a
+        // stream whose fragments don't is a spec violation —
+        // a seek into a non-SAP segment starts decoding
+        // mid-GOP and the player shows green frames until
+        // the next keyframe.
+        let allSAP = (videoSegments?.fragments ?? [])
+            .allSatisfy { $0.startsWithSAP }
+        if videoSegments == nil || allSAP {
+            lines.append("#EXT-X-INDEPENDENT-SEGMENTS")
+        }
         if source.audio != nil {
             lines.append(
                 "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"aac\","
@@ -3532,55 +3552,339 @@ fileprivate func proxySegmentRange(
         )
         return
     }
-    let activeURL = activeUpstream(for: track)
-    var upstreamReq = URLRequest(url: activeURL)
-    upstreamReq.setValue(referer, forHTTPHeaderField: "Referer")
-    upstreamReq.setValue(
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) "
-        + "AppleWebKit/605.1.15 (KHTML, like Gecko) "
-        + "Version/18.0 Mobile/15E148 Safari/604.1",
-        forHTTPHeaderField: "User-Agent"
-    )
     let byteCount = frag.byteRange.count
-    upstreamReq.setValue(
-        "bytes=\(frag.byteRange.lowerBound)-\(frag.byteRange.upperBound - 1)",
-        forHTTPHeaderField: "Range"
-    )
-    upstreamReq.httpMethod = "GET"
-
-    let stream = StreamingProxyTask(
-        server: self,
-        connection: connection,
-        upstream: activeURL,
-        request: upstreamReq,
-        mode: "segment[\(idx)]",
-        // Segment URLs are independent resources — no Range
-        // shifting math, AVPlayer treats each as a self-
-        // contained segment.
-        clientSentRange: false,
-        contentRangeShift: nil,
-        passContentRange: false,
-        connID: connID,
-        rangeStart: frag.byteRange.lowerBound,
-        rangeEnd: frag.byteRange.upperBound - 1
-    )
-    retain(stream: stream)
-    stream.start()
-
-    if Self.requestMetadataLogEnabled {
-        diagLog(.playback, "LocalHLSProxyServer /segment served",
-                details: [
-                    "conn": connID,
-                    "kind": params["k"] ?? "?",
-                    "n": idx,
-                    "startTime": String(format: "%.3f", frag.startTime),
-                    "duration": String(format: "%.3f", frag.duration),
-                    "byteRange": "\(frag.byteRange.lowerBound)"
-                        + "-\(frag.byteRange.upperBound - 1)",
-                    "bytes": byteCount
-                ])
+    // BTR (Bilibili-thread-ripper style): split the segment
+    // into parallel Range chunks fanned across the track's CDN
+    // mirrors when enabled and the segment is big enough to
+    // benefit. Small segments and inits stay on the single
+    // stream — chunking them only adds round trips.
+    if Self.btrEnabled, byteCount >= Self.btrMinBytes {
+        serveSegmentViaBTR(
+            track: track,
+            byteRange: frag.byteRange,
+            idx: idx,
+            kind: params["k"] ?? "?",
+            referer: referer,
+            connection: connection,
+            connID: connID
+        )
+        return
     }
+    serveSegmentSingleStream(
+        track: track,
+        byteRange: frag.byteRange,
+        idx: idx,
+        kind: params["k"] ?? "?",
+        referer: referer,
+        connection: connection,
+        connID: connID
+    )
 }
+
+    /// Single-connection segment serve — the pre-BTR path and
+    /// the fallback when the chunked fetch fails or is disabled.
+    private func serveSegmentSingleStream(
+        track: BiliDashSource.Track,
+        byteRange: Range<Int64>,
+        idx: Int,
+        kind: String,
+        referer: String,
+        connection: NWConnection,
+        connID: String
+    ) {
+        let activeURL = activeUpstream(for: track)
+        var upstreamReq = URLRequest(url: activeURL)
+        upstreamReq.setValue(referer, forHTTPHeaderField: "Referer")
+        upstreamReq.setValue(
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) "
+            + "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+            + "Version/18.0 Mobile/15E148 Safari/604.1",
+            forHTTPHeaderField: "User-Agent"
+        )
+        upstreamReq.setValue(
+            "bytes=\(byteRange.lowerBound)-\(byteRange.upperBound - 1)",
+            forHTTPHeaderField: "Range"
+        )
+        upstreamReq.httpMethod = "GET"
+
+        let stream = StreamingProxyTask(
+            server: self,
+            connection: connection,
+            upstream: activeURL,
+            request: upstreamReq,
+            mode: "segment[\(idx)]",
+            // Segment URLs are independent resources — no Range
+            // shifting math, AVPlayer treats each as a self-
+            // contained segment.
+            clientSentRange: false,
+            contentRangeShift: nil,
+            passContentRange: false,
+            connID: connID,
+            rangeStart: byteRange.lowerBound,
+            rangeEnd: byteRange.upperBound - 1
+        )
+        retain(stream: stream)
+        stream.start()
+
+        if Self.requestMetadataLogEnabled {
+            diagLog(.playback, "LocalHLSProxyServer /segment served",
+                    details: [
+                        "conn": connID,
+                        "kind": kind,
+                        "n": idx,
+                        "byteRange": "\(byteRange.lowerBound)"
+                            + "-\(byteRange.upperBound - 1)",
+                        "bytes": byteRange.count
+                    ])
+        }
+    }
+
+    // MARK: - BTR (thread-ripper) chunked fetch
+
+    /// Whether the multi-threaded segment fetch is on. Stored in
+    /// UserDefaults so the 設定 toggle applies without a restart;
+    /// defaults to on.
+    private static var btrEnabled: Bool {
+        UserDefaults.standard.object(forKey: "paladala.btrEnabled") as? Bool ?? true
+    }
+    /// Threads per segment. `paladala.btrThreads == 0` means
+    /// auto → 4, matching BTR's default; the UI slider writes
+    /// 1...8.
+    private static var btrThreads: Int {
+        let raw = UserDefaults.standard.integer(forKey: "paladala.btrThreads")
+        return raw > 0 ? min(raw, 8) : 8
+    }
+    /// Segments below this size are not worth chunking.
+    private static let btrMinBytes: Int64 = 256 * 1024
+    /// Target chunk size; the actual count is also capped by
+    /// `btrThreads` so big segments spread wider.
+    private static let btrChunkBytes: Int64 = 256 * 1024
+    private static let btrMaxChunks = 8
+
+    /// Fetch `byteRange` as N contiguous chunks, each issued to a
+    /// different CDN mirror from `[track.baseURL] + backupURLs`
+    /// round-robin, then splice the bodies in order and serve as
+    /// one 200 response — downstream-identical to the
+    /// single-stream path. On any chunk exhausting every mirror
+    /// we fall back to `serveSegmentSingleStream`.
+    private func serveSegmentViaBTR(
+        track: BiliDashSource.Track,
+        byteRange: Range<Int64>,
+        idx: Int,
+        kind: String,
+        referer: String,
+        connection: NWConnection,
+        connID: String
+    ) {
+        var candidates: [URL] = []
+        for url in [track.baseURL] + track.backupURLs where !candidates.contains(url) {
+            candidates.append(url)
+        }
+        guard !candidates.isEmpty else {
+            serveSegmentSingleStream(
+                track: track, byteRange: byteRange, idx: idx,
+                kind: kind, referer: referer,
+                connection: connection, connID: connID
+            )
+            return
+        }
+        let total = byteRange.upperBound - byteRange.lowerBound
+        let chunkCount = max(
+            1,
+            min(Self.btrThreads, Self.btrMaxChunks,
+                Int(total / Self.btrChunkBytes))
+        )
+        // Fast-start sizing: the first chunk is deliberately
+        // small (64 KB) so the streaming assembly below can put
+        // first bytes on the wire after a single short fetch
+        // instead of waiting for an even-share chunk. The rest
+        // of the range is spread evenly across the remaining
+        // chunks. With per-connection CDN throttling (~0.3 MB/s
+        // observed in the field) this cuts time-to-first-byte
+        // from seconds to well under one.
+        var chunks: [Range<Int64>] = []
+        chunks.reserveCapacity(chunkCount)
+        var cursor = byteRange.lowerBound
+        if chunkCount > 1 {
+            let firstSize = min(Int64(64 * 1024), total / Int64(chunkCount))
+            chunks.append(cursor..<(cursor + firstSize))
+            cursor += firstSize
+            let restTotal = byteRange.upperBound - cursor
+            let restCount = chunkCount - 1
+            let base = restTotal / Int64(restCount)
+            let rem = restTotal % Int64(restCount)
+            for i in 0..<restCount {
+                let size = base + (Int64(i) < rem ? 1 : 0)
+                chunks.append(cursor..<(cursor + size))
+                cursor += size
+            }
+        } else {
+            chunks.append(cursor..<byteRange.upperBound)
+        }
+        let startedAt = Date()
+        // Streaming assembly: send the response headers up-front
+        // (the total length is known), then write each chunk body
+        // in order as soon as it lands. AVPlayer sees first bytes
+        // after only chunk 0 completes instead of waiting for the
+        // slowest chunk of the set — under per-connection CDN
+        // throttling this is the difference between a 1-2s start
+        // and the 5s+ stall that tripped CoreMediaErrorDomain
+        // -12889 timeouts.
+        let sendGroup = DispatchGroup()
+        sendHeader(
+            connection: connection,
+            sendGroup: sendGroup,
+            status: 200,
+            contentType: "video/mp4",
+            contentLength: total,
+            connID: connID
+        )
+        Task { [weak self] in
+            guard let self else { return }
+            var failed: Error?
+            var sentBytes = 0
+            // The connection is owned by this handler end-to-end —
+            // the loopback client either reads everything or drops,
+            // and cancellation is serialized through the same
+            // closure chain — so the cross-task capture is race-free
+            // in practice even though NWConnection isn't Sendable.
+            nonisolated(unsafe) let downstream = connection
+            nonisolated(unsafe) let group_ = sendGroup
+            do {
+                // swiftlint:disable:next redundant_sendable_silencing
+                nonisolated(unsafe) let chunks_ = chunks
+                nonisolated(unsafe) let candidates_ = candidates
+                nonisolated(unsafe) let referer_ = referer
+                sentBytes = try await withThrowingTaskGroup(of: (Int, Data).self, returning: Int.self) { group in
+                    for (index, chunk) in chunks_.enumerated() {
+                        group.addTask { [self] in
+                            var lastError: Error = RangeFetchError.timedOut
+                            for attempt in 0..<candidates_.count {
+                                let url = candidates_[(index + attempt) % candidates_.count]
+                                do {
+                                    let outcome = try await self.fetchExactRange(
+                                        url: url,
+                                        range: chunk,
+                                        referer: referer_,
+                                        purpose: "segment[\(idx)] \(kind) chunk \(index)"
+                                    )
+                                    return (index, outcome.data)
+                                } catch {
+                                    lastError = error
+                                }
+                            }
+                            throw lastError
+                        }
+                    }
+                    // Write in index order: out-of-order completions
+                    // wait in the buffer until every earlier chunk
+                    // has hit the wire, so the body stays contiguous.
+                    var buffer: [Int: Data] = [:]
+                    var nextIndex = 0
+                    var bytesWritten = 0
+                    while let (index, data) = try await group.next() {
+                        buffer[index] = data
+                        while let ordered = buffer.removeValue(forKey: nextIndex) {
+                            group_.enter()
+                            bytesWritten += ordered.count
+                            downstream.send(
+                                content: ordered,
+                                completion: .contentProcessed { _ in
+                                    group_.leave()
+                                }
+                            )
+                            nextIndex += 1
+                        }
+                    }
+                    return bytesWritten
+                }
+            } catch {
+                failed = error
+            }
+            if let failed {
+                diagLog(.playback,
+                        "LocalHLSProxyServer BTR streaming fetch failed mid-response",
+                        details: [
+                            "conn": connID,
+                            "kind": kind,
+                            "n": idx,
+                            "sentBytes": sentBytes,
+                            "error": "\(failed)"
+                        ])
+                // Headers are already on the wire, so we can't
+                // re-issue a clean single-stream fallback — the
+                // connection simply drops, AVPlayer retries the
+                // segment, and the next request can take the
+                // single-stream path if BTR keeps failing.
+                connection.cancel()
+                return
+            }
+            sendGroup.notify(queue: .global()) { [weak self] in
+                guard let self else { return }
+                if Self.requestMetadataLogEnabled {
+                    diagLog(.playback,
+                            "LocalHLSProxyServer /segment streamed via BTR",
+                            details: [
+                                "conn": connID,
+                                "kind": kind,
+                                "n": idx,
+                                "chunks": chunks.count,
+                                "mirrors": candidates.count,
+                                "bytes": sentBytes,
+                                "elapsedMs": self.elapsedMilliseconds(since: startedAt)
+                            ])
+                }
+                connection.cancel()
+            }
+        }
+    }
+
+    /// Fan `chunks` across `candidates` round-robin; each chunk
+    /// retries on the next mirror before failing the whole fetch.
+    /// Parts land out of order in the task group and are spliced
+    /// back into index order — same as BTR's reassembly.
+    private func btrFetchChunks(
+        chunks: [Range<Int64>],
+        candidates: [URL],
+        referer: String,
+        purpose: String
+    ) async throws -> Data {
+        var parts = [Data?](repeating: nil, count: chunks.count)
+        try await withThrowingTaskGroup(of: (Int, Data).self) { group in
+            for (index, chunk) in chunks.enumerated() {
+                group.addTask { [self] in
+                    var lastError: Error = RangeFetchError.timedOut
+                    for attempt in 0..<candidates.count {
+                        let url = candidates[(index + attempt) % candidates.count]
+                        do {
+                            let outcome = try await self.fetchExactRange(
+                                url: url,
+                                range: chunk,
+                                referer: referer,
+                                purpose: "\(purpose) chunk \(index)"
+                            )
+                            return (index, outcome.data)
+                        } catch {
+                            lastError = error
+                        }
+                    }
+                    throw lastError
+                }
+            }
+            for try await (index, data) in group {
+                parts[index] = data
+            }
+        }
+        var body = Data()
+        body.reserveCapacity(
+            chunks.reduce(0) { $0 + Int($1.upperBound - $1.lowerBound) }
+        )
+        for part in parts {
+            guard let part else { throw RangeFetchError.timedOut }
+            body.append(part)
+        }
+        return body
+    }
 
     /// Proxy a single segment request.  AVPlayer issues
     /// `GET /init?...` for the fMP4 map and `GET /media?...`
@@ -4554,8 +4858,9 @@ fileprivate func proxySegmentRange(
         qn: Int,
         cid: Int64,
         kind: PrefetchKind,
-        absRange: Range<Int64>
+        absRange requestedRange: Range<Int64>
     ) -> (data: Data, totalSize: Int64)? {
+        var absRange = requestedRange
         let key = PlaybackPrefetchManager.cacheKey(
             bvid: bvid, qn: qn, cid: cid
         )
@@ -4584,26 +4889,43 @@ fileprivate func proxySegmentRange(
             // cache but the bytes were wrong" once the
             // `served from local cache` log has the
             // miss count next to it.
-            diagLog(.playback,
-                    "LocalHLSProxyServer /segment local cache miss",
-                    details: [
-                        "key": key,
-                        "kind": kind == .video ? "video" : "audio",
-                        "range":
-                            "\(absRange.lowerBound)"
-                            + "-\(absRange.upperBound - 1)",
-                        "filePath": fileURL.path
-                    ])
+            // Per-miss diag is high-cardinality (one line
+            // per segment request during playback), so rate-
+            // limit to every 20th miss with the total count.
+            lock.lock()
+            localMissCount += 1
+            let missSeq = localMissCount
+            lock.unlock()
+            if missSeq % 20 == 1 {
+                diagLog(.playback,
+                        "LocalHLSProxyServer /segment local cache miss",
+                        details: [
+                            "key": key,
+                            "kind": kind == .video ? "video" : "audio",
+                            "range":
+                                "\(absRange.lowerBound)"
+                                + "-\(absRange.upperBound - 1)",
+                            "missCount": missSeq
+                        ])
+            }
             return nil
         }
-        // Clamp the requested range to the actual file
-        // size.  `absRange.upperBound` may be `Int64.max`
-        // for "read to EOF" ranges; clamping here turns
-        // that into a real bound so the FileHandle read
-        // doesn't have to.
-        let clampedEnd = min(absRange.upperBound, totalSize)
-        guard clampedEnd > absRange.lowerBound else { return nil }
-        let clamped = absRange.lowerBound..<clampedEnd
+        // The cache file may still be mid-write from a
+        // concurrent prefetch.  Only serve a range the file
+        // fully covers — clamping would hand AVPlayer a
+        // truncated body under a Content-Range that declares
+        // more bytes than were delivered, and the decoder
+        // shows that corruption as green frames.
+        // `absRange.upperBound == Int64.max` means "read to
+        // EOF": clamp to totalSize so the response can
+        // legally 206 to end-of-file.
+        if absRange.upperBound == Int64.max {
+            guard totalSize > absRange.lowerBound else { return nil }
+            absRange = absRange.lowerBound..<totalSize
+        } else {
+            guard absRange.upperBound <= totalSize else { return nil }
+        }
+        let clamped = absRange
         guard let handle = try? FileHandle(forReadingFrom: fileURL)
         else { return nil }
         defer { try? handle.close() }
@@ -4787,6 +5109,18 @@ fileprivate func proxySegmentRange(
             extraHeaders: extraHeaders
         )
         response.append(body)
+        // Rate-limit the per-response diag line: AVPlayer
+        // fires 5-10 concurrent requests per buffer fill, so
+        // logging every send means constant log.jsonl writes
+        // on the playback hot path.  Keep every 20th as a
+        // heartbeat, tagged with the total count.
+        let seq: Int = {
+            lock.lock()
+            defer { lock.unlock() }
+            responseLogCount += 1
+            return responseLogCount
+        }()
+        let logThisResponse = seq % 20 == 1
         if Self.wireDumpEnabled {
             // Diagnostic: dump the actual bytes we are about
             // to hand to `connection.send` so we can see the
@@ -4803,22 +5137,17 @@ fileprivate func proxySegmentRange(
         connection.send(
             content: response,
             completion: .contentProcessed { _ in
-                // PR-B B7: log the connection.cancel()
-                // that fires after a successful body send.
-                // Without this line, the only signal in
-                // the dump is the connection-state
-                // transition a few ms later; the operator
-                // can't tell whether the cancel was
-                // expected (response complete) or a
-                // peer-closed race.
-                diagLog(.proxy,
-                        "respondBytes: connection.cancel",
-                        details: [
-                            "conn": connID,
-                            "label": label,
-                            "status": status,
-                            "bytesSent": body.count
-                        ])
+                if logThisResponse {
+                    diagLog(.proxy,
+                            "respondBytes: connection.cancel",
+                            details: [
+                                "conn": connID,
+                                "label": label,
+                                "status": status,
+                                "bytesSent": body.count,
+                                "responsesServed": seq
+                            ])
+                }
                 connection.cancel()
             }
         )

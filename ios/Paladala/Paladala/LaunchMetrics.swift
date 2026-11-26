@@ -135,7 +135,11 @@ final class LaunchMetrics: @unchecked Sendable {
     /// a no-op for them.
     private var firedEvents: Set<String> = []
 
-    nonisolated private init() {}
+    // Internal (not private) so tests can build an isolated
+    // instance — the shared singleton races the app's own
+    // startup milestone emissions and makes assertions on
+    // `milestones` non-deterministic.
+    init() {}
 
     /// Record a milestone. Safe to call from any thread. The first
     /// call anchors `startMachTime` to "now"; every subsequent
