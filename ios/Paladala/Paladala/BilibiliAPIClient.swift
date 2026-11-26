@@ -3438,6 +3438,10 @@ struct VideoDTO: Decodable, Sendable {
     /// resulting `BiliVideo` so the AI 视频总结 endpoint can send
     /// the required `up_mid` query parameter.
     let ownerMid: Int64
+    /// Upstream card type from recommendation feeds (`av`, `ad`,
+    /// `live`, `bangumi`, …). `nil` on endpoints that don't emit
+    /// it (popular, search) — those pass the filter unchanged.
+    let goto: String?
 
     var model: BiliVideo {
         BiliVideo(
@@ -3464,6 +3468,11 @@ struct VideoDTO: Decodable, Sendable {
     var validModel: BiliVideo? {
         guard !bvid.isEmpty || aid > 0 else { return nil }
         guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        // Filter unsupported card types out of recommendation
+        // feeds: ad cards deep-link into ad landing pages and
+        // live cards open live rooms — neither flow exists in
+        // this app, so tapping them was a dead end.
+        if let goto, goto != "av", goto != "bangumi" { return nil }
         return model
     }
 
@@ -3472,6 +3481,7 @@ struct VideoDTO: Decodable, Sendable {
         bvid = container.decodeString(keys: ["bvid", "param"]) ?? ""
         aid = container.decodeInt(keys: ["aid", "id"]) ?? 0
         cid = container.decodeInt(keys: ["cid"]) ?? 0
+        goto = container.decodeString(keys: ["goto", "card_goto"])
         title = container.decodeString(keys: ["title"])?.strippingHTML ?? "Untitled"
         coverURL = container.decodeString(keys: ["pic", "cover"])?.httpsURL
         duration = container.decodeInt(keys: ["duration"]) ?? 0

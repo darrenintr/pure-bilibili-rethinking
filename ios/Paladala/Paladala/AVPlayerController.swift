@@ -1364,7 +1364,27 @@ final class PlayerController: ObservableObject {
                     "title": error.title
                 ])
         if allowAutomaticRecovery {
-            _ = scheduleAutomaticRecovery(for: error, source: source)
+            let staged = scheduleAutomaticRecovery(for: error, source: source)
+            if !staged, error.recoveryAction != .signInAgain {
+                // The staged cascade is exhausted — keep retrying
+                // quietly in the background instead of leaving a
+                // dead-end error panel for the user to dismiss.
+                // Each failure republishes through this same path,
+                // so the loop sustains itself at ~8s intervals
+                // until playback recovers or the user leaves.
+                recoverySequence &+= 1
+                let sequence = recoverySequence
+                recoveryTask?.cancel()
+                recoveryTask = Task { @MainActor [weak self] in
+                    try? await Task.sleep(nanoseconds: 8_000_000_000)
+                    guard !Task.isCancelled, let self else { return }
+                    guard self.recoverySequence == sequence else { return }
+                    self.recoveryTask = nil
+                    diagLog(.playback, "PlayerController persistent auto-retry",
+                            details: ["error": self.recoveryKey(for: error)])
+                    self.retryPlayback()
+                }
+            }
         }
     }
 

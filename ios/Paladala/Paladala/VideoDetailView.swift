@@ -159,6 +159,10 @@ struct VideoDetailView: View {
     /// scrolling down shrinks the player, scrolling back up
     /// grows it.
     @State private var playerScale: CGFloat = 1.0
+    /// User-controlled player size multiplier, dragged in via the
+    /// bottom-right resize grip and remembered across launches.
+    @AppStorage("paladala.playerSizeBias") private var playerSizeBias: Double = 1.0
+    @State private var playerSizeBiasDragStart: Double? = nil
     /// User's preferred comment sort, persisted across launches. The
     /// view writes through to the model and to the underlying fetch
     /// whenever the user toggles the picker.
@@ -271,8 +275,9 @@ struct VideoDetailView: View {
             let minPlayerHeight = isImmersiveMode
                 ? totalH * 0.9
                 : max(150, mediaHeight * 0.82)
-            let playerHeight = maxPlayerHeight
-                + (minPlayerHeight - maxPlayerHeight) * (1.0 - playerScale)
+            let playerHeight = (maxPlayerHeight
+                + (minPlayerHeight - maxPlayerHeight) * (1.0 - playerScale))
+                * playerSizeBias
 
             if horizontalSizeClass == .regular && geo.size.width >= 900 {
                 // iPad / large-width split: player + metadata on the
@@ -711,7 +716,7 @@ struct VideoDetailView: View {
         // Re-derive the player height from the *left column* width —
         // the parent computed it against the full screen width,
         // which would make the 16:9 surface far too tall here.
-        let columnPlayerHeight = leftWidth * 9 / 16 * playerScale
+        let columnPlayerHeight = leftWidth * 9 / 16 * playerScale * playerSizeBias
         HStack(alignment: .top, spacing: 0) {
             VStack(spacing: 0) {
                 playerSurface
@@ -931,6 +936,43 @@ struct VideoDetailView: View {
         // (play/pause, skip) sit in the centre of the view and
         // are not clipped by the rounded rectangle.
         .clipShape(RoundedRectangle(cornerRadius: PaladalaTheme.cardRadius, style: PaladalaTheme.cornerStyle))
+        .overlay(alignment: .bottomTrailing) {
+            playerResizeGrip
+        }
+    }
+
+    /// Bottom-right corner grip that drag-resizes the player
+    /// surface vertically ( pinch-style affordance) and persists
+    /// the multiplier via `playerSizeBias`. The grip stays out of
+    /// the way of AVKit's transport controls: it is small,
+    /// bottom-trailing, and only intercepts touches in its own
+    /// 44x44 hit area.
+    private var playerResizeGrip: some View {
+        Image(systemName: "arrow.up.left.and.arrow.down.right")
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(.white.opacity(0.85))
+            .padding(8)
+            .background(.black.opacity(0.45), in: Circle())
+            .padding(6)
+            .contentShape(Rectangle().size(width: 44, height: 44))
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        if playerSizeBiasDragStart == nil {
+                            playerSizeBiasDragStart = playerSizeBias
+                        }
+                        let start = playerSizeBiasDragStart ?? 1.0
+                        // Dragging down-right enlarges; up-left shrinks.
+                        // ~240pt of travel maps to the full 0.6…1.6 range.
+                        let delta = (value.translation.height + value.translation.width) / 480
+                        playerSizeBias = min(1.6, max(0.6, start + delta))
+                    }
+                    .onEnded { _ in
+                        playerSizeBiasDragStart = nil
+                        Haptics.selection()
+                    }
+            )
+            .accessibilityLabel("調整播放器大小")
     }
 
     @ViewBuilder

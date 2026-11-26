@@ -3655,7 +3655,7 @@ fileprivate func proxySegmentRange(
         return raw > 0 ? min(raw, 8) : 4
     }
     /// Segments below this size are not worth chunking.
-    private static let btrMinBytes: Int64 = 384 * 1024
+    private static let btrMinBytes: Int64 = 256 * 1024
     /// Target chunk size; the actual count is also capped by
     /// `btrThreads` so big segments spread wider.
     private static let btrChunkBytes: Int64 = 256 * 1024
