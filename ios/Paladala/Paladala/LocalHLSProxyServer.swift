@@ -3652,7 +3652,7 @@ fileprivate func proxySegmentRange(
     /// 1...8.
     private static var btrThreads: Int {
         let raw = UserDefaults.standard.integer(forKey: "paladala.btrThreads")
-        return raw > 0 ? min(raw, 8) : 4
+        return raw > 0 ? min(raw, 8) : 8
     }
     /// Segments below this size are not worth chunking.
     private static let btrMinBytes: Int64 = 256 * 1024
@@ -3694,15 +3694,32 @@ fileprivate func proxySegmentRange(
             min(Self.btrThreads, Self.btrMaxChunks,
                 Int(total / Self.btrChunkBytes))
         )
-        let base = total / Int64(chunkCount)
-        let rem = total % Int64(chunkCount)
+        // Fast-start sizing: the first chunk is deliberately
+        // small (64 KB) so the streaming assembly below can put
+        // first bytes on the wire after a single short fetch
+        // instead of waiting for an even-share chunk. The rest
+        // of the range is spread evenly across the remaining
+        // chunks. With per-connection CDN throttling (~0.3 MB/s
+        // observed in the field) this cuts time-to-first-byte
+        // from seconds to well under one.
         var chunks: [Range<Int64>] = []
         chunks.reserveCapacity(chunkCount)
         var cursor = byteRange.lowerBound
-        for i in 0..<chunkCount {
-            let size = base + (Int64(i) < rem ? 1 : 0)
-            chunks.append(cursor..<(cursor + size))
-            cursor += size
+        if chunkCount > 1 {
+            let firstSize = min(Int64(64 * 1024), total / Int64(chunkCount))
+            chunks.append(cursor..<(cursor + firstSize))
+            cursor += firstSize
+            let restTotal = byteRange.upperBound - cursor
+            let restCount = chunkCount - 1
+            let base = restTotal / Int64(restCount)
+            let rem = restTotal % Int64(restCount)
+            for i in 0..<restCount {
+                let size = base + (Int64(i) < rem ? 1 : 0)
+                chunks.append(cursor..<(cursor + size))
+                cursor += size
+            }
+        } else {
+            chunks.append(cursor..<byteRange.upperBound)
         }
         let startedAt = Date()
         // Streaming assembly: send the response headers up-front
