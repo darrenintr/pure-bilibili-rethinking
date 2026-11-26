@@ -148,22 +148,6 @@ struct RootView: View {
                 .animation(.easeOut(duration: 0.18),
                            value: networkMonitorIsOnline)
         }
-        .overlay(alignment: .bottomTrailing) {
-            // Pad the mini-player off the tab bar and the safe area.
-            // 16pt on the trailing edge, 80pt on the bottom (above
-            // the tab bar's glass chrome). On iPad we offset further
-            // so the overlay doesn't collide with the sidebar's
-            // resize handle.
-            HStack {
-                Spacer(minLength: 16)
-                MiniPlayerOverlay()
-                    .frame(maxWidth: horizontalSizeClass == .regular ? 360 : 340)
-            }
-            .padding(.trailing, horizontalSizeClass == .regular ? 32 : 16)
-            .padding(.bottom, horizontalSizeClass == .regular ? 32 : 80)
-            .animation(.easeOut(duration: 0.18),
-                       value: miniPlayerIsShowing)
-        }
         .overlay {
             if isOpeningAnimationVisible {
                 SplashView {
@@ -173,12 +157,6 @@ struct RootView: View {
                 .transition(.opacity)
             }
         }
-    }
-
-    /// Mirror of `miniPlayerStore.isShowingMiniPlayer` so the
-    /// overlay's animation key is value-based, not environment-based.
-    private var miniPlayerIsShowing: Bool {
-        miniPlayerStore.isShowingMiniPlayer
     }
 
     private func handle(_ url: URL) {

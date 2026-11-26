@@ -17,7 +17,7 @@ import SwiftUI
 ///    `PlayerController` (which starts the local HLS proxy for VOD
 ///    DASH) and starts a `WatchSession`.
 /// 2. `VideoDetailView.onDisappear` calls `detachInline()`. The
-///    store flips `isShowingMiniPlayer` to `true`; the player keeps
+///    playback is torn down (the mini-player was removed in
 ///    playing. The `MiniPlayerOverlay` becomes visible.
 /// 3. The user taps the mini-player; `MiniPlayerOverlay` calls
 ///    `router.openVideo(currentVideo)` which re-pushes the video
@@ -27,12 +27,11 @@ import SwiftUI
 ///    the playhead is continuous and `progress=0` is not re-fired.
 /// 4. The user taps the mini-player's "X" — `close()` tears down the
 ///    controller and the watch session. The local HLS proxy is
-///    stopped, and `isShowingMiniPlayer` flips back to `false`.
+///    stopped; native PiP covers continue-watching.
 @MainActor
 final class MiniPlayerStore: ObservableObject {
     @Published private(set) var currentVideo: BiliVideo?
     @Published private(set) var controller: PlayerController?
-    @Published private(set) var isShowingMiniPlayer: Bool = false
 
     /// Mirror of the controller's `@Published` state so SwiftUI
     /// views observing the store can react to playhead changes
@@ -88,11 +87,6 @@ final class MiniPlayerStore: ObservableObject {
             // controller and watch session.  Hide the mini-player
             // if a previous navigation push surfaced it so the
             // inline player re-takes over.
-            if isShowingMiniPlayer {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                    isShowingMiniPlayer = false
-                }
-            }
             diagLog(.playback, "MiniPlayerStore.bind: idempotent re-bind",
                     details: ["videoID": video.id])
             return
@@ -167,44 +161,16 @@ final class MiniPlayerStore: ObservableObject {
     /// video screen should fully stop playback, not leave a
     /// floating window behind.
     func detachInline() {
+        // The mini-player is gone: leaving the detail page now
+        // always tears playback down. Users who want to keep
+        // watching elsewhere use native Picture-in-Picture
+        // (available in the player controls), which covers the
+        // browse-while-watching case across the whole system.
         guard controller != nil else { return }
-        guard !isShowingMiniPlayer else { return }
-        let defaults = UserDefaults.standard
-        let key = "paladala.miniPlayerOnExit"
-        let miniPlayerOnExit = defaults.object(forKey: key) as? Bool ?? true
-        if miniPlayerOnExit == false {
-            // Default is "on" — `@AppStorage` writes `true` on
-            // first toggle but leaves the key absent otherwise.
-            // Treat the absent state as "on" so existing users
-            // don't suddenly lose the mini-player after the upgrade.
-            diagLog(.playback, "MiniPlayerStore.detachInline: miniPlayerOnExit=false → teardown")
-            teardownController()
-            return
-        }
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            isShowingMiniPlayer = true
-        }
-    }
-
-    /// User tapped the mini-player's "X". Tear down the controller
-    /// and stop the watch session. The local HLS proxy is shut
-    /// down inside `PlayerController.tearDown()`.
-    func close() {
+        diagLog(.playback, "PlaybackStore.detachInline: teardown")
         teardownController()
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            isShowingMiniPlayer = false
-        }
     }
 
-    /// User tapped the mini-player to expand back into the inline
-    /// surface. We just flip the flag; the parent's navigation
-    /// push re-mounts `VideoDetailView` which calls `bind` (which
-    /// is idempotent).
-    func expand() {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            isShowingMiniPlayer = false
-        }
-    }
 
     func play() {
         controller?.player.play()

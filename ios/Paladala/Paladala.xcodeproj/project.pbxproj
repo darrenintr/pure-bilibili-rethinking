@@ -49,7 +49,6 @@
 		100000000000000000000122 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000224 /* OnboardingView.swift */; };
 		100000000000000000000123 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000225 /* NetworkMonitor.swift */; };
 		100000000000000000000124 /* MiniPlayerStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000226 /* MiniPlayerStore.swift */; };
-		100000000000000000000125 /* MiniPlayerOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000227 /* MiniPlayerOverlay.swift */; };
 		1000000000000000000001A1 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1000000000000000000001A2 /* SplashView.swift */; };
 		10000000000000000000012A /* Localizable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000022A /* Localizable.swift */; };
 		MU00000000000000000000D0 /* LyricTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = MU00000000000000000000C0 /* LyricTypes.swift */; };
@@ -168,7 +167,6 @@
 		100000000000000000000224 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		100000000000000000000225 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
 		100000000000000000000226 /* MiniPlayerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerStore.swift; sourceTree = "<group>"; };
-		100000000000000000000227 /* MiniPlayerOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerOverlay.swift; sourceTree = "<group>"; };
 		1000000000000000000001A2 /* SplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
 		10000000000000000000022A /* Localizable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localizable.swift; sourceTree = "<group>"; };
 		MU00000000000000000000C0 /* LyricTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricTypes.swift; sourceTree = "<group>"; };
@@ -322,7 +320,6 @@
 				100000000000000000000224 /* OnboardingView.swift */,
 				100000000000000000000225 /* NetworkMonitor.swift */,
 				100000000000000000000226 /* MiniPlayerStore.swift */,
-				100000000000000000000227 /* MiniPlayerOverlay.swift */,
 				1000000000000000000001A2 /* SplashView.swift */,
 				10000000000000000000022A /* Localizable.swift */,
 				MU00000000000000000000A0 /* Music */,
@@ -733,7 +730,6 @@
 				100000000000000000000122 /* OnboardingView.swift in Sources */,
 				100000000000000000000123 /* NetworkMonitor.swift in Sources */,
 				100000000000000000000124 /* MiniPlayerStore.swift in Sources */,
-				100000000000000000000125 /* MiniPlayerOverlay.swift in Sources */,
 				1000000000000000000001A1 /* SplashView.swift in Sources */,
 				10000000000000000000012A /* Localizable.swift in Sources */,
 				MU00000000000000000000D0 /* LyricTypes.swift in Sources */,
