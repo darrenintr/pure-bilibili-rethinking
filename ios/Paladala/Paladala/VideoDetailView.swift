@@ -164,6 +164,15 @@ struct VideoDetailView: View {
     /// bottom-right resize grip and remembered across launches.
     @AppStorage("paladala.playerSizeBias") private var playerSizeBias: Double = 1.0
     @State private var playerSizeBiasDragStart: Double? = nil
+    // Transient bias while the corner grip is being dragged.
+    // Writing `@AppStorage` (UserDefaults) on every gesture event
+    // broadcast a change notification app-wide each frame and
+    // re-rendered the whole detail page mid-drag — the visible
+    // stutter the user reported. During the drag we mutate this
+    // plain `@State` instead (cheap, localised invalidation) and
+    // commit to storage once, on release.
+    @State private var playerSizeBiasLive: Double? = nil
+    private var effectivePlayerSizeBias: Double { playerSizeBiasLive ?? playerSizeBias }
     /// User's preferred comment sort, persisted across launches. The
     /// view writes through to the model and to the underlying fetch
     /// whenever the user toggles the picker.
@@ -278,7 +287,7 @@ struct VideoDetailView: View {
                 : max(150, mediaHeight * 0.82)
             let playerHeight = (maxPlayerHeight
                 + (minPlayerHeight - maxPlayerHeight) * (1.0 - playerScale))
-                * playerSizeBias
+                * effectivePlayerSizeBias
 
             if horizontalSizeClass == .regular && geo.size.width >= 900 {
                 // iPad / large-width split: player + metadata on the
@@ -717,7 +726,7 @@ struct VideoDetailView: View {
         // Re-derive the player height from the *left column* width —
         // the parent computed it against the full screen width,
         // which would make the 16:9 surface far too tall here.
-        let columnPlayerHeight = leftWidth * 9 / 16 * playerScale * playerSizeBias
+        let columnPlayerHeight = leftWidth * 9 / 16 * playerScale * effectivePlayerSizeBias
         HStack(alignment: .top, spacing: 0) {
             VStack(spacing: 0) {
                 playerSurface
@@ -969,9 +978,13 @@ struct VideoDetailView: View {
                         // Dragging down-right enlarges; up-left shrinks.
                         // ~240pt of travel maps to the full 0.6…1.6 range.
                         let delta = (value.translation.height + value.translation.width) / 480
-                        playerSizeBias = min(1.6, max(0.6, start + delta))
+                        playerSizeBiasLive = min(1.6, max(0.6, start + delta))
                     }
                     .onEnded { _ in
+                        if let live = playerSizeBiasLive {
+                            playerSizeBias = live
+                        }
+                        playerSizeBiasLive = nil
                         playerSizeBiasDragStart = nil
                         Haptics.selection()
                     }
