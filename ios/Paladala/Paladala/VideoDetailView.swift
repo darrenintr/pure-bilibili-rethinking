@@ -957,8 +957,8 @@ struct VideoDetailView: View {
             .stroke(Color.white.opacity(0.75), lineWidth: 2)
             .frame(width: 26, height: 26)
             .shadow(color: .black.opacity(0.5), radius: 1.5)
-            .padding(8)
-            .contentShape(Rectangle().size(width: 44, height: 44))
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
@@ -1144,7 +1144,7 @@ struct VideoDetailView: View {
     }
 
     private func rateLabel(_ rate: Double) -> String {
-        rate == floor(rate) ? "\(Int(rate))x" : String(format: "%.2gx", rate)
+        rate == floor(rate) ? "\(Int(rate))x" : String(format: "%gx", rate)
     }
 
     /// Subtitle toggle.  Disabled when the upstream didn't
