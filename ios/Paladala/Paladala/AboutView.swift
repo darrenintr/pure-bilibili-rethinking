@@ -34,22 +34,70 @@ struct AboutView: View {
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: PaladalaTheme.Spacing.xxl) {
-                headerSection
-                identitySection
-                updateSection
-                footerSection
+        List {
+            headerSection
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listSectionSeparator(.hidden)
+
+            Section {
+                identityRow(label: L10n.about.version, value: version.marketingVersion)
+                identityRow(label: L10n.about.build, value: version.buildNumber)
+                identifierRowStyled
+                identityRow(label: L10n.about.releaseType, value: version.releaseTypeDisplay)
+                identityRow(label: L10n.about.channel, value: version.channel.nonEmptyOrDash)
+                if let commit = version.commitShort {
+                    identityRow(label: L10n.about.commit, value: commit)
+                }
+                identityRow(label: L10n.about.buildDate, value: formatDate(version.buildDate))
+                identityRow(label: L10n.about.bundleId, value: version.bundleId)
+            } header: {
+                Text("構建資訊")
+            } footer: {
+                Text("特別辨識號用於精確標識當前構建，反饋問題時附上它可以幫我們快速定位。")
             }
-            .padding(PaladalaTheme.Spacing.l)
+
+            Section {
+                Button {
+                    checkForUpdates()
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 28, height: 28)
+                            .background(Color.accentColor.gradient, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                        Text(L10n.about.checkForUpdates)
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        if case .checking = updateState {
+                            ProgressView()
+                        }
+                    }
+                }
+                .disabled(updateState == .checking)
+
+                if updateState != .idle {
+                    updateResultCard
+                }
+            } header: {
+                Text("更新")
+            } footer: {
+                Text(L10n.about.checkSourceHint)
+            }
         }
+        .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(PaladalaTheme.canvas)
         .navigationTitle(L10n.about.title)
-        .navigationBarTitleDisplayMode(.inline)
         .overlay(alignment: .bottom) {
             if let toast = copyToast {
-                copyToastView(toast)
+                Text(toast)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(.black.opacity(0.75), in: Capsule())
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .padding(.bottom, 16)
             }
@@ -62,212 +110,65 @@ struct AboutView: View {
     // MARK: - Sections
 
     private var headerSection: some View {
-        VStack(spacing: PaladalaTheme.Spacing.m) {
-            // App icon placeholder
-            Rectangle()
-                .fill(PaladalaTheme.biliPink)
-                .frame(width: 88, height: 88)
-                .overlay(
-                    Text("BP")
-                        .font(.system(size: 36, weight: .black, design: .monospaced))
-                        .foregroundStyle(PaladalaTheme.ink)
-                )
-                .overlay {
-                    Rectangle()
-                        .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
-                }
+        VStack(spacing: 10) {
+            // App-icon-style glyph: the same glass TV mark as the
+            // splash screen, rendered natively — no "BP" mono
+            // placeholder.
+            ZStack {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.accentColor.opacity(0.18).gradient)
+                Image(systemName: "tv.fill")
+                    .font(.system(size: 36, weight: .medium))
+                    .foregroundStyle(Color.accentColor)
+            }
+            .frame(width: 88, height: 88)
+            .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
 
             Text("Paladala")
-                .font(.system(size: 28, weight: .black, design: .monospaced))
-                .foregroundStyle(PaladalaTheme.ink)
+                .font(.title.weight(.bold))
 
             Text("Pure Bilibili · Native iOS")
-                .font(PaladalaTheme.FontRole.labelMono)
-                .foregroundStyle(PaladalaTheme.mutedInk)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
 
             Text(version.versionLine)
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                .foregroundStyle(PaladalaTheme.mutedInk)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, PaladalaTheme.Spacing.l)
+        .padding(.vertical, 8)
     }
 
-    private var identitySection: some View {
-        VStack(spacing: 0) {
-            // Section header
-            HStack {
-                Text("構建資訊")
-                    .font(.system(size: 11, weight: .black, design: .monospaced))
-                    .foregroundStyle(PaladalaTheme.mutedInk)
-                    .textCase(.uppercase)
-                Spacer()
-            }
-            .padding(.horizontal, PaladalaTheme.Spacing.l)
-            .padding(.bottom, PaladalaTheme.Spacing.s)
-
-            // Card
-            VStack(spacing: 0) {
-                identityRow(label: L10n.about.version, value: version.marketingVersion, showDivider: true)
-                identityRow(label: L10n.about.build, value: version.buildNumber, showDivider: true)
-                identifierRowStyled
-                identityRow(label: L10n.about.releaseType, value: version.releaseTypeDisplay, showDivider: true)
-                identityRow(label: L10n.about.channel, value: version.channel.nonEmptyOrDash, showDivider: version.commitShort != nil)
-
-                if let commit = version.commitShort {
-                    identityRow(label: L10n.about.commit, value: commit, showDivider: true)
-                }
-
-                identityRow(label: L10n.about.buildDate, value: formatDate(version.buildDate), showDivider: true)
-                identityRow(label: L10n.about.bundleId, value: version.bundleId, showDivider: false)
-            }
-            .background(PaladalaTheme.paper)
-            .overlay {
-                Rectangle()
-                    .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
-            }
-            .background {
-                Rectangle()
-                    .fill(PaladalaTheme.ink)
-                    .offset(x: PaladalaTheme.hardShadowOffset, y: PaladalaTheme.hardShadowOffset)
-            }
-
-            // Footer note
-            Text("特別辨識號用於精確標識當前構建，反饋問題時附上它可以幫我們快速定位。")
-                .font(.system(size: 10, weight: .medium, design: .monospaced))
-                .foregroundStyle(PaladalaTheme.mutedInk)
-                .padding(.horizontal, PaladalaTheme.Spacing.l)
-                .padding(.top, PaladalaTheme.Spacing.s)
-        }
-    }
-
-    private func identityRow(label: String, value: String, showDivider: Bool) -> some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: PaladalaTheme.Spacing.m) {
-                Text(label)
-                    .font(.system(size: 13, weight: .semibold, design: .default))
-                    .foregroundStyle(PaladalaTheme.mutedInk)
-                    .frame(width: 90, alignment: .leading)
-
-                Text(value)
-                    .font(PaladalaTheme.FontRole.labelMono)
-                    .foregroundStyle(PaladalaTheme.ink)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .textSelection(.enabled)
-            }
-            .padding(.horizontal, PaladalaTheme.Spacing.l)
-            .padding(.vertical, PaladalaTheme.Spacing.m)
-
-            if showDivider {
-                Rectangle()
-                    .fill(PaladalaTheme.ink)
-                    .frame(height: PaladalaTheme.hairlineWidth)
-            }
+    private func identityRow(label: String, value: String) -> some View {
+        HStack(spacing: 12) {
+            Text(label)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            Text(value)
+                .font(.callout.monospacedDigit())
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.trailing)
+                .textSelection(.enabled)
         }
     }
 
     private var identifierRowStyled: some View {
-        VStack(spacing: 0) {
-            Button {
-                copyIdentifier()
-            } label: {
-                HStack(alignment: .firstTextBaseline, spacing: PaladalaTheme.Spacing.m) {
-                    Text(L10n.about.identifier)
-                        .font(.system(size: 13, weight: .semibold, design: .default))
-                        .foregroundStyle(PaladalaTheme.mutedInk)
-                        .frame(width: 90, alignment: .leading)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(version.identifierDisplay)
-                            .font(PaladalaTheme.FontRole.labelMono)
-                            .foregroundStyle(PaladalaTheme.biliPink)
-                            .textSelection(.enabled)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Image(systemName: "doc.on.doc")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(PaladalaTheme.mutedInk)
-                }
-                .padding(.horizontal, PaladalaTheme.Spacing.l)
-                .padding(.vertical, PaladalaTheme.Spacing.m)
+        Button {
+            copyIdentifier()
+        } label: {
+            HStack(spacing: 12) {
+                Text(L10n.about.identifier)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                Text(version.identifierDisplay)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(Color.accentColor)
+                    .multilineTextAlignment(.trailing)
+                    .lineLimit(2)
+                Image(systemName: "doc.on.doc")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
             }
-            .buttonStyle(.plain)
-
-            Rectangle()
-                .fill(PaladalaTheme.ink)
-                .frame(height: PaladalaTheme.hairlineWidth)
-        }
-    }
-
-    private var updateSection: some View {
-        VStack(spacing: 0) {
-            // Section header
-            HStack {
-                Text("更新")
-                    .font(.system(size: 11, weight: .black, design: .monospaced))
-                    .foregroundStyle(PaladalaTheme.mutedInk)
-                    .textCase(.uppercase)
-                Spacer()
-            }
-            .padding(.horizontal, PaladalaTheme.Spacing.l)
-            .padding(.bottom, PaladalaTheme.Spacing.s)
-
-            // Card
-            VStack(spacing: 0) {
-                // Check for updates button
-                Button {
-                    checkForUpdates()
-                } label: {
-                    HStack(spacing: PaladalaTheme.Spacing.m) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.system(size: 16, weight: .black))
-                            .foregroundStyle(PaladalaTheme.ink)
-                            .frame(width: 28)
-
-                        Text(L10n.about.checkForUpdates)
-                            .font(PaladalaTheme.FontRole.cardTitle)
-                            .foregroundStyle(PaladalaTheme.ink)
-
-                        Spacer()
-
-                        if case .checking = updateState {
-                            ProgressView()
-                                .tint(PaladalaTheme.ink)
-                        }
-                    }
-                    .padding(.horizontal, PaladalaTheme.Spacing.l)
-                    .padding(.vertical, PaladalaTheme.Spacing.m)
-                }
-                .buttonStyle(.plain)
-                .disabled(updateState == .checking)
-
-                // Update result
-                if updateState != .idle {
-                    Rectangle()
-                        .fill(PaladalaTheme.ink)
-                        .frame(height: PaladalaTheme.hairlineWidth)
-
-                    updateResultCard
-                }
-            }
-            .background(PaladalaTheme.paper)
-            .overlay {
-                Rectangle()
-                    .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
-            }
-            .background {
-                Rectangle()
-                    .fill(PaladalaTheme.ink)
-                    .offset(x: PaladalaTheme.hardShadowOffset, y: PaladalaTheme.hardShadowOffset)
-            }
-
-            // Footer note
-            Text(L10n.about.checkSourceHint)
-                .font(.system(size: 10, weight: .medium, design: .monospaced))
-                .foregroundStyle(PaladalaTheme.mutedInk)
-                .padding(.horizontal, PaladalaTheme.Spacing.l)
-                .padding(.top, PaladalaTheme.Spacing.s)
         }
     }
 
@@ -277,159 +178,95 @@ struct AboutView: View {
         case .idle:
             EmptyView()
         case .checking:
-            HStack(spacing: PaladalaTheme.Spacing.s) {
+            HStack(spacing: 8) {
                 ProgressView()
-                    .tint(PaladalaTheme.ink)
                 Text(L10n.about.checking)
-                    .font(PaladalaTheme.FontRole.labelMono)
-                    .foregroundStyle(PaladalaTheme.mutedInk)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
-            .padding(PaladalaTheme.Spacing.l)
         case .upToDate(let remote):
-            HStack(spacing: PaladalaTheme.Spacing.s) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(Color.green)
-                Text("\(L10n.about.upToDate) · \(remote)")
-                    .font(PaladalaTheme.FontRole.labelMono)
-                    .foregroundStyle(PaladalaTheme.mutedInk)
-            }
-            .padding(PaladalaTheme.Spacing.l)
+            Label("\(L10n.about.upToDate) · \(remote)", systemImage: "checkmark.circle.fill")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .symbolRenderingMode(.multicolor)
         case .updateAvailable(let remote, let downloadURL):
-            updateAvailableCard(remote: remote, downloadURL: downloadURL)
+            updateAvailableRows(remote: remote, downloadURL: downloadURL)
         case .devBuild(let remote, let downloadURL):
-            devBuildCard(remote: remote, downloadURL: downloadURL)
+            devBuildRows(remote: remote, downloadURL: downloadURL)
         case .failed(let message):
-            HStack(spacing: PaladalaTheme.Spacing.s) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                Text(message)
-                    .font(PaladalaTheme.FontRole.labelMono)
-                    .foregroundStyle(PaladalaTheme.mutedInk)
-            }
-            .padding(PaladalaTheme.Spacing.l)
+            Label(message, systemImage: "exclamationmark.triangle.fill")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .symbolRenderingMode(.multicolor)
         }
-    }
-
-    private func updateAvailableCard(remote: String, downloadURL: URL?) -> some View {
-        VStack(alignment: .leading, spacing: PaladalaTheme.Spacing.m) {
-            HStack(spacing: PaladalaTheme.Spacing.s) {
-                Image(systemName: "arrow.up.circle.fill")
-                    .foregroundStyle(PaladalaTheme.biliPink)
-                Text("\(L10n.about.updateAvailable) · \(remote)")
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
-                    .foregroundStyle(PaladalaTheme.ink)
-            }
-
-            installButton(downloadURL: downloadURL)
-
-            installStatusMessages
-
-            if let url = Self.gitHubReleasesURL {
-                githubLink(url: url, label: L10n.about.viewOnGitHub)
-            }
-        }
-        .padding(PaladalaTheme.Spacing.l)
-    }
-
-    private func devBuildCard(remote: String?, downloadURL: URL?) -> some View {
-        VStack(alignment: .leading, spacing: PaladalaTheme.Spacing.m) {
-            HStack(spacing: PaladalaTheme.Spacing.s) {
-                Image(systemName: "hammer.fill")
-                    .foregroundStyle(PaladalaTheme.biliPink)
-                Text(L10n.about.devBuild)
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
-                    .foregroundStyle(PaladalaTheme.ink)
-            }
-
-            if let remote {
-                Text(L10n.about.upToDate + " · \(remote)")
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundStyle(PaladalaTheme.mutedInk)
-            }
-
-            installButton(downloadURL: downloadURL)
-
-            installStatusMessages
-
-            if let url = Self.gitHubReleasesURL {
-                githubLink(url: url, label: L10n.about.viewOnGitHub)
-            }
-        }
-        .padding(PaladalaTheme.Spacing.l)
     }
 
     @ViewBuilder
-    private func installButton(downloadURL: URL?) -> some View {
+    private func updateAvailableRows(remote: String, downloadURL: URL?) -> some View {
+        Label("\(L10n.about.updateAvailable) · \(remote)", systemImage: "arrow.up.circle.fill")
+            .font(.callout.weight(.semibold))
+            .foregroundStyle(.primary)
+            .symbolRenderingMode(.multicolor)
+        installRows(downloadURL: downloadURL)
+    }
+
+    @ViewBuilder
+    private func devBuildRows(remote: String?, downloadURL: URL?) -> some View {
+        Label(L10n.about.devBuild, systemImage: "hammer.fill")
+            .font(.callout.weight(.semibold))
+            .foregroundStyle(.primary)
+        if let remote {
+            Text("\(L10n.about.upToDate) · \(remote)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        installRows(downloadURL: downloadURL)
+    }
+
+    @ViewBuilder
+    private func installRows(downloadURL: URL?) -> some View {
         if let downloadURL {
             Button {
                 Task {
                     await updateManager.installLatestFromStore(downloadURL: downloadURL)
                 }
             } label: {
-                HStack(spacing: PaladalaTheme.Spacing.s) {
+                HStack {
                     if updateManager.installState == .opening {
                         ProgressView()
-                            .tint(PaladalaTheme.ink)
                             .scaleEffect(0.8)
                     } else {
                         Image(systemName: "arrow.down.circle.fill")
-                            .font(.system(size: 14, weight: .bold))
                     }
                     Text(installButtonLabel)
-                        .font(.system(size: 13, weight: .bold, design: .monospaced))
                 }
-                .foregroundStyle(PaladalaTheme.ink)
-                .padding(.horizontal, PaladalaTheme.Spacing.l)
-                .padding(.vertical, 10)
                 .frame(maxWidth: .infinity)
-                .background(PaladalaTheme.biliPink)
-                .overlay {
-                    Rectangle()
-                        .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
-                }
-                .background {
-                    Rectangle()
-                        .fill(PaladalaTheme.ink)
-                        .offset(x: 3, y: 3)
-                }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.borderedProminent)
             .disabled(updateManager.installState == .opening)
         } else {
-            // No downloadURL from apps.json (source not
-            // published yet, or the manifest couldn't be
-            // parsed). Fall back to the legacy Shortcut
-            // install path so the user still has a way
-            // forward; this preserves the old behaviour
-            // for the empty-source edge case.
             Button {
                 Task {
                     await updateManager.downloadAndInstallLatest()
                 }
             } label: {
-                HStack(spacing: PaladalaTheme.Spacing.s) {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.system(size: 14, weight: .bold))
-                    Text(L10n.about.openInAltStore)
-                        .font(.system(size: 13, weight: .bold, design: .monospaced))
-                }
-                .foregroundStyle(PaladalaTheme.ink)
-                .padding(.horizontal, PaladalaTheme.Spacing.l)
-                .padding(.vertical, 10)
-                .frame(maxWidth: .infinity)
-                .background(PaladalaTheme.biliPink.opacity(0.5))
-                .overlay {
-                    Rectangle()
-                        .strokeBorder(PaladalaTheme.glassStroke, lineWidth: 0.5)
-                }
-                .background {
-                    Rectangle()
-                        .fill(PaladalaTheme.ink)
-                        .offset(x: 3, y: 3)
-                }
+                Label(L10n.about.openInAltStore, systemImage: "arrow.down.circle.fill")
+                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.bordered)
             .disabled(updateManager.updateDownloadState == .downloading)
+        }
+
+        installStatusMessages
+
+        if let url = Self.gitHubReleasesURL {
+            Button {
+                openURL(url)
+            } label: {
+                Label(L10n.about.viewOnGitHub, systemImage: "arrow.up.right.square")
+                    .font(.callout)
+            }
+            .foregroundStyle(Color.accentColor)
         }
     }
 
@@ -437,72 +274,35 @@ struct AboutView: View {
     private var installStatusMessages: some View {
         switch updateManager.installState {
         case .idle, .opening, .opened:
-            // No inline message for the "happy path" — the
-            // store app takes over once the URL-scheme
-            // handoff completes, so the user is already in
-            // the install dialog.
             EmptyView()
         case .noStoreFound:
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
-                    Text(L10n.about.noStoreDetected)
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .foregroundStyle(PaladalaTheme.mutedInk)
-                }
+            VStack(alignment: .leading, spacing: 4) {
+                Label(L10n.about.noStoreDetected, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Text("已為你開啟源頁,喺 AltStore / SideStore 重新整理源後即可一鍵安裝。")
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundStyle(PaladalaTheme.mutedInk)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
             }
         case .failed(let message):
-            HStack(spacing: 6) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                Text(message)
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundStyle(PaladalaTheme.mutedInk)
-            }
+            Label(message, systemImage: "exclamationmark.triangle.fill")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
 
-        // Legacy Shortcut path status — only relevant when
-        // the user fell back to it (no downloadURL case
-        // above). Kept here so the existing
-        // `.failed("请先安装快捷指令")` path still surfaces
-        // the setup hint.
         if case .failed(let error) = updateManager.updateDownloadState {
             if error.contains("快捷指令") {
                 Button {
                     shortcutManager.checkAndPromptIfNeeded()
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "wrench.and.screwdriver")
-                        Text("設定快捷指令")
-                    }
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(PaladalaTheme.biliPink)
+                    Label("設定快捷指令", systemImage: "wrench.and.screwdriver")
+                        .font(.caption.weight(.semibold))
                 }
+                .foregroundStyle(Color.accentColor)
             }
         }
     }
 
-    private func githubLink(url: URL, label: String) -> some View {
-        Button {
-            openURL(url)
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "arrow.up.right.square")
-                Text(label)
-            }
-            .font(.system(size: 12, weight: .semibold, design: .monospaced))
-            .foregroundStyle(PaladalaTheme.mutedInk)
-        }
-    }
-
-    /// Label under the "用 AltStore 安装" / "用 SideStore 安装"
-    /// button. Driven by the detected install path: the
-    /// button copy tells the user which store we're handing
-    /// the install to.
     private var installButtonLabel: String {
         switch updateManager.installState {
         case .opening:
@@ -519,44 +319,9 @@ struct AboutView: View {
         case .noStoreFound, .failed:
             return L10n.about.openInAltStore
         case .idle:
-            // We don't know which store is installed at
-            // this point (canOpenURL is per-tap, not
-            // cached), so render a neutral copy that works
-            // for either. The button is re-tappable; on
-            // first tap the actual store detection runs.
             return L10n.about.openInAltStore
         }
     }
-
-    private var footerSection: some View {
-        VStack(spacing: PaladalaTheme.Spacing.xs) {
-            Text("Paladala")
-                .font(.system(size: 16, weight: .black, design: .monospaced))
-                .foregroundStyle(PaladalaTheme.ink)
-            Text("Pure Bilibili · Native iOS")
-                .font(.system(size: 10, weight: .medium, design: .monospaced))
-                .foregroundStyle(PaladalaTheme.mutedInk)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, PaladalaTheme.Spacing.l)
-    }
-
-    // MARK: - Copy toast
-
-    private func copyToastView(_ text: String) -> some View {
-        Text(text)
-            .font(.caption.weight(.medium))
-            .foregroundStyle(PaladalaTheme.paper)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(PaladalaTheme.ink)
-            .overlay {
-                Rectangle()
-                    .strokeBorder(PaladalaTheme.paper, lineWidth: 1)
-            }
-    }
-
-    // MARK: - Actions
 
     private func copyIdentifier() {
         UIPasteboard.general.string = version.identifierDisplay
