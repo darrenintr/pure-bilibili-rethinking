@@ -1020,6 +1020,11 @@ final class VideoDetailViewModel: ObservableObject {
             // playurl only needs aid+cid+qn, and waiting for the
             // detail round-trip first costs a full RTT (~0.3-0.7s)
             // of startup latency on every open.
+            // Remember the cid playback actually opened with: for a
+            // multi-part video the card carries the requested part's
+            // cid while the refreshed detail resets to the first part
+            // — the history report below must use the opened part.
+            let openedCid = detail.cid
             if detail.cid > 0 {
                 async let playbackResult = repository.playback(
                     for: detail,
@@ -1088,7 +1093,7 @@ final class VideoDetailViewModel: ObservableObject {
             // Start of playback: report progress=0 to mark it in the history list.
             // The periodic 30s heartbeat is handled by WatchSession in the View layer.
             Task {
-                try? await repository.reportHistory(for: detail, cid: detail.cid, progress: 0)
+                try? await repository.reportHistory(for: detail, cid: openedCid > 0 ? openedCid : detail.cid, progress: 0)
             }
         } catch let error as BilibiliAPIError {
             // Funnel drop — record the failure to Crashlytics
