@@ -3678,8 +3678,19 @@ fileprivate func proxySegmentRange(
         referer: String,
         purpose: String
     ) async throws -> (Int, Data) {
-        try await withThrowingTaskGroup(of: (Int, Data).self) { race in
-            for (offset, url) in candidates.enumerated() {
+        // Rotate the starting mirror per chunk so the segment's
+        // chunks spread across every CDN mirror immediately —
+        // without this all chunks pile onto the primary mirror
+        // and the backups sit idle until the hedge fires.
+        let ordered: [URL]
+        if candidates.count > 1 {
+            let shift = index % candidates.count
+            ordered = Array(candidates[shift...]) + Array(candidates[..<shift])
+        } else {
+            ordered = candidates
+        }
+        return try await withThrowingTaskGroup(of: (Int, Data).self) { race in
+            for (offset, url) in ordered.enumerated() {
                 race.addTask { [self] in
                     if offset > 0 {
                         try await Task.sleep(
