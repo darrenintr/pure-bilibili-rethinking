@@ -743,7 +743,10 @@ struct BangumiSeasonDetailView: View {
         // Finished (or effectively finished) episodes must not
         // reopen at the end credits — clear any stored position
         // instead so the next open replays from the start.
-        if duration > 0, position >= duration - 30 || position / duration >= 0.95 {
+        // Ratio-only: a seconds-remaining clause would clear
+        // bookmarks on short episodes (11s into a 40s episode has
+        // under 30s remaining yet most of it is unwatched).
+        if duration > 0, position / duration >= 0.95 {
             UserDefaults.standard.removeObject(forKey: "paladala.pgc.resume.\(epId)")
             return
         }
