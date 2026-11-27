@@ -629,6 +629,11 @@ actor PlaybackPrefetchManager {
         var req = URLRequest(url: url)
         req.setValue(referer, forHTTPHeaderField: "Referer")
         req.setValue(Self.biliUserAgent, forHTTPHeaderField: "User-Agent")
+        // The CDN answers full-file GETs with HTTP 567 — every
+        // successful media request in the proxy path carries a Range
+        // header. An open-ended `bytes=0-` is still a ranged request
+        // upstream (206 with the whole body) so the download succeeds.
+        req.setValue("bytes=0-", forHTTPHeaderField: "Range")
         req.setValue("*/*", forHTTPHeaderField: "Accept")
         req.setValue("gzip, deflate", forHTTPHeaderField: "Accept-Encoding")
         req.setValue("https://www.bilibili.com", forHTTPHeaderField: "Origin")
