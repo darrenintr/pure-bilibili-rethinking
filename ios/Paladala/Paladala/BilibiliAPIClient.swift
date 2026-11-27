@@ -1508,7 +1508,7 @@ final class BilibiliAPIClient: @unchecked Sendable {
     /// Throws when the room is offline (code != 0 or no playable
     /// streams) so the caller can show a specific "未开播" message
     /// instead of pretending playback failed.
-    func livePlaybackURL(roomID: Int) async throws -> BiliLivePlayback {
+    func livePlaybackURL(roomID: Int, qn: Int = 10000) async throws -> BiliLivePlayback {
         // `data` may be `nil` when the room is offline (code != 0).
         // `LivePlayInfoPayload` is the same either way; we just
         // re-check `code` after the optional chain.
@@ -1523,10 +1523,10 @@ final class BilibiliAPIClient: @unchecked Sendable {
                 URLQueryItem(name: "format", value: "0,1,2"),
                 // codec: 0=AVC, 1=HEVC
                 URLQueryItem(name: "codec", value: "0,1"),
-                // qn 10000 = "原画" (highest). The room usually
-                // returns a single qn here; the player can step
-                // down via the quality sheet if it wants.
-                URLQueryItem(name: "qn", value: "10000"),
+                // qn 10000 = "原画" (highest). The player re-
+                // issues this fetch with a lower qn when the
+                // user picks a quality from the menu.
+                URLQueryItem(name: "qn", value: "\(qn)"),
                 URLQueryItem(name: "platform", value: "web"),
                 URLQueryItem(name: "ptype", value: "8")
             ]
@@ -1582,6 +1582,22 @@ final class BilibiliAPIClient: @unchecked Sendable {
         // for a future FLV-enabled player.
         let hls = hlsTS + hlsFMP4 + hlsOther
 
+        // Quality ladder: union of every codec's accept_qn,
+        // highest first. Most rooms publish the same ladder on
+        // each codec, so this is effectively the first codec's
+        // list; the union protects mixed-codec rooms.
+        var ladderSet = Set<Int>()
+        var currentQn: Int? = nil
+        for stream in data.playurlInfo?.playurl.stream ?? [] {
+            for fmt in stream.format {
+                for codec in fmt.codec {
+                    codec.acceptQn?.forEach { ladderSet.insert($0) }
+                    if currentQn == nil { currentQn = codec.currentQPS }
+                }
+            }
+        }
+        let acceptQn = ladderSet.sorted(by: >)
+
         let referer = URL(string: "https://live.bilibili.com/\(roomID)")!
         let info = data.roomInfo
         return BiliLivePlayback(
@@ -1590,7 +1606,9 @@ final class BilibiliAPIClient: @unchecked Sendable {
             hostName: info?.areaName ?? "",
             hlsCandidates: hls,
             flvCandidates: flv,
-            referer: referer
+            referer: referer,
+            acceptQn: acceptQn,
+            currentQn: currentQn ?? qn
         )
     }
 
@@ -4641,12 +4659,17 @@ private struct LivePlayCodec: Decodable, Sendable {
     let currentQPS: Int?
     let baseURL: String
     let urlInfo: [LivePlayURLHost]
+    /// Quality ladder the room is willing to serve (e.g.
+    /// [10000, 400, 250, 150, 80]) — the live player's
+    /// quality menu renders exactly these.
+    let acceptQn: [Int]?
 
     enum CodingKeys: String, CodingKey {
         case codecName = "codec_name"
         case currentQPS = "current_qn"
         case baseURL = "base_url"
         case urlInfo = "url_info"
+        case acceptQn = "accept_qn"
     }
 }
 

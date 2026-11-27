@@ -134,6 +134,13 @@ private struct LivePlayerView: View {
         }
         .navigationTitle(room.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if let playback, !playback.acceptQn.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    qualityMenu(playback: playback)
+                }
+            }
+        }
         .task {
             await loadPlayback()
         }
@@ -265,6 +272,74 @@ private struct LivePlayerView: View {
         .paladalaStreetPanel(fill: PaladalaTheme.paper)
     }
 
+    /// Bilibili live qn ladder → display name. Only the standard
+    /// five steps get a friendly label; anything else renders as
+    /// the raw integer (rooms occasionally publish test ladders).
+    private func liveQnLabel(_ qn: Int) -> String {
+        switch qn {
+        case 10000: return "原畫"
+        case 400: return "藍光"
+        case 250: return "超清"
+        case 150: return "高清"
+        case 80: return "流暢"
+        default: return "\(qn)"
+        }
+    }
+
+    /// Live quality menu — re-resolves the room at the picked qn
+    /// and swaps the controller, so a congested 原畫 edge can be
+    /// stepped down to 藍光/超清 without leaving the room.
+    private func qualityMenu(playback: BiliLivePlayback) -> some View {
+        Menu {
+            ForEach(playback.acceptQn, id: \.self) { qn in
+                Button {
+                    guard qn != playback.currentQn else { return }
+                    Haptics.tap()
+                    Task { await switchQuality(qn) }
+                } label: {
+                    if qn == playback.currentQn {
+                        Label(liveQnLabel(qn), systemImage: "checkmark")
+                    } else {
+                        Text(liveQnLabel(qn))
+                    }
+                }
+            }
+        } label: {
+            Label(liveQnLabel(playback.currentQn), systemImage: "slider.horizontal.3")
+        }
+    }
+
+    private func switchQuality(_ qn: Int) async {
+        controller?.tearDown()
+        controller = nil
+        playback = nil
+        do {
+            let resolved = try await repository.livePlayback(for: room, qn: qn)
+            playback = resolved
+            if resolved.hlsURL != nil {
+                await bindController(for: resolved)
+            } else {
+                errorMessage = "該直播間僅提供 FLV 流，AVPlayer 暫不支援。請改用支援 FLV 的客戶端。"
+            }
+        } catch {
+            errorMessage = "直播間地址解析失敗：\(error.localizedDescription)"
+        }
+    }
+
+    /// Shared controller-construction for the initial load and
+    /// quality switches — the proxy-wrapped HLS path is identical
+    /// in both cases.
+    private func bindController(for resolved: BiliLivePlayback) async {
+        guard let hlsURL = resolved.hlsURL else { return }
+        let livePlayback: BiliPlayback
+        if let proxyURL = try? await LocalHLSProxyServer.shared.serveLive(playback: resolved) {
+            livePlayback = BiliPlayback(dash: nil, fallbackURL: proxyURL, referer: resolved.referer)
+        } else {
+            livePlayback = BiliPlayback(dash: nil, fallbackURL: hlsURL, referer: resolved.referer)
+        }
+        controller = PlayerController(playback: livePlayback)
+    }
+
     private func loadPlayback() async {
         do {
             let resolved = try await repository.livePlayback(for: room)
@@ -276,33 +351,9 @@ private struct LivePlayerView: View {
             // controller is created from the HLS URL when the
             // room offers one. If only FLV is offered, we surface
             // a friendly error and skip controller init.
-            if let hlsURL = resolved.hlsURL {
+            if resolved.hlsURL != nil {
                 if controller == nil {
-                    // Prefer the local HLS proxy so we get CDN
-                    // failover (Bilibili's live CDN edges 403
-                    // more often than VOD). The proxy also
-                    // strips the upstream Referer / UA from
-                    // every request, which is what AVPlayer
-                    // needs to avoid the CDN's 403 on signed
-                    // m3u8 URLs. Falls back to the direct URL
-                    // if the proxy can't bind a port (e.g.
-                    // a previous teardown left it dead).
-                    let livePlayback: BiliPlayback
-                    if let proxyURL = try? await LocalHLSProxyServer.shared
-                        .serveLive(playback: resolved) {
-                        livePlayback = BiliPlayback(
-                            dash: nil,
-                            fallbackURL: proxyURL,
-                            referer: resolved.referer
-                        )
-                    } else {
-                        livePlayback = BiliPlayback(
-                            dash: nil,
-                            fallbackURL: hlsURL,
-                            referer: resolved.referer
-                        )
-                    }
-                    controller = PlayerController(playback: livePlayback)
+                    await bindController(for: resolved)
                 }
             } else {
                 errorMessage = "該直播間僅提供 FLV 流，AVPlayer 暫不支援。請改用支援 FLV 的客戶端。"

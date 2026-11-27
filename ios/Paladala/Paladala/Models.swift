@@ -1137,6 +1137,13 @@ struct BiliLivePlayback: Hashable, Sendable {
     /// Empty when the room only exposes HLS.
     let flvCandidates: [URL]
     let referer: URL
+    /// Quality ladder the room serves (10000 原畫 / 400 藍光 /
+    /// 250 超清 / 150 高清 / 80 流暢), highest first. Empty on
+    /// legacy responses — the live player hides the quality
+    /// menu then.
+    var acceptQn: [Int] = []
+    /// The qn the fetched URLs actually play at.
+    var currentQn: Int = 10000
 
     /// First HLS candidate, or `nil` when the room is FLV-only.
     var hlsURL: URL? { hlsCandidates.first }
