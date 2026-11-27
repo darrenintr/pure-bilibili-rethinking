@@ -305,6 +305,12 @@ struct BangumiSeasonDetailView: View {
             }
         }
         .navigationTitle(detail?.title ?? "番劇詳情")
+        .onDisappear {
+            // Back navigation never goes through closePgcPlayer —
+            // without this the episode position is lost when the
+            // user leaves the season page mid-playback.
+            persistLivePosition()
+        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.visible, for: .navigationBar)
         .task(id: seasonId) { await load() }
@@ -640,9 +646,8 @@ struct BangumiSeasonDetailView: View {
                     "epId": ep.epId,
                     "title": ep.title
                 ])
-        if let oldEp = selectedEpisode, oldEp.epId != ep.epId,
-           let position = pgcController?.currentTime, position > 10 {
-            Self.saveResumePosition(position, epId: oldEp.epId)
+        if let oldEp = selectedEpisode, oldEp.epId != ep.epId {
+            persistLivePosition()
         }
         selectedEpisode = ep
         pgcPlaybackError = nil
@@ -658,10 +663,7 @@ struct BangumiSeasonDetailView: View {
     private func closePgcPlayer() {
         diagLog(.bangumi, "BangumiSeasonDetail close pgc player",
                 details: ["epId": selectedEpisode?.epId ?? -1])
-        if let ep = selectedEpisode,
-           let position = pgcController?.currentTime, position > 10 {
-            Self.saveResumePosition(position, epId: ep.epId)
-        }
+        persistLivePosition()
         pgcController = nil
         pgcPlaybackError = nil
         isFetchingPgcPlayback = false
@@ -710,16 +712,17 @@ struct BangumiSeasonDetailView: View {
                 // ready — retry briefly instead of chaining into
                 // the controller's load lifecycle.
                 Task { @MainActor in
-                    for _ in 0..<10 {
+                    // Wait for a real duration: `seek(to:)` performs
+                    // immediately only when duration > 0 — earlier it
+                    // would park in `pendingUserSeek`, whose drain
+                    // already ran during startup, stranding the seek.
+                    for _ in 0..<20 {
                         try? await Task.sleep(nanoseconds: 500_000_000)
                         guard self.pgcController === controller else { return }
-                        if controller.playbackState == .ready {
+                        if controller.duration > 0 {
                             controller.seek(to: resume)
                             return
                         }
-                    }
-                    if self.pgcController === controller {
-                        controller.seek(to: resume)
                     }
                 }
             }
@@ -736,8 +739,25 @@ struct BangumiSeasonDetailView: View {
         }
     }
 
-    private static func saveResumePosition(_ position: Double, epId: Int64) {
+    private static func saveResumePosition(_ position: Double, epId: Int64, duration: Double = 0) {
+        // Finished (or effectively finished) episodes must not
+        // reopen at the end credits — clear any stored position
+        // instead so the next open replays from the start.
+        if duration > 0, position >= duration - 30 || position / duration >= 0.95 {
+            UserDefaults.standard.removeObject(forKey: "paladala.pgc.resume.\(epId)")
+            return
+        }
         UserDefaults.standard.set(position, forKey: "paladala.pgc.resume.\(epId)")
+    }
+
+    /// Snapshot the live position for the currently-playing episode.
+    /// Called on close, on episode switch, and on disappear (back
+    /// navigation bypasses `closePgcPlayer` entirely).
+    private func persistLivePosition() {
+        guard let ep = selectedEpisode,
+              let controller = pgcController,
+              controller.currentTime > 10 else { return }
+        Self.saveResumePosition(controller.currentTime, epId: ep.epId, duration: controller.duration)
     }
 
     private static func resumePosition(epId: Int64) -> Double? {
