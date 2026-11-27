@@ -260,6 +260,8 @@ struct BangumiSeasonDetailView: View {
     let repository: PaladalaRepository
     let seasonId: Int64
 
+    @EnvironmentObject private var miniPlayerStore: MiniPlayerStore
+
     @State private var detail: BangumiSeasonDetail?
     @State private var isLoading: Bool = false
     @State private var loadError: String? = nil
@@ -587,7 +589,12 @@ struct BangumiSeasonDetailView: View {
             // player (the 看番 idiom) instead of a static episode
             // list the user has to interpret. Region-locked episodes
             // land in the panel's error state, same as a manual tap.
-            if selectedEpisode == nil, let first = fetched.episodes.first {
+            // Skip the autoplay while another video is floating in
+            // Picture-in-Picture — starting a DASH episode would
+            // re-reserve the shared proxy underneath it and cut the
+            // floating stream off mid-playback.
+            let pipActive = miniPlayerStore.controller?.isPictureInPictureActive ?? false
+            if selectedEpisode == nil, !pipActive, let first = fetched.episodes.first {
                 onEpisodeTap(first)
             }
             diagLog(.bangumi, "BangumiSeasonDetail load succeeded",
@@ -681,6 +688,15 @@ struct BangumiSeasonDetailView: View {
             // skips the `WatchSession` history reporter (PGC
             // episodes don't expose a usable `BiliVideo` /
             // `B站 v2 aid+cid`).
+            // The fetch outlives the panel: if the user closed
+            // the player (or tapped a different episode) while
+            // the playurl was in flight, binding now would start
+            // audible playback with no visible controls. Only
+            // bind when this episode is still the selected one.
+            guard selectedEpisode?.epId == ep.epId else {
+                isFetchingPgcPlayback = false
+                return
+            }
             let controller = PlayerController(
                 playback: playback,
                 video: nil
