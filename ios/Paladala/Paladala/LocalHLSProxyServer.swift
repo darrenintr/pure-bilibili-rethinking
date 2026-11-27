@@ -80,6 +80,74 @@ extension ProxyServerError: LocalizedError {
 /// A 127.0.0.1-only HTTP server that exposes an HLS manifest
 /// for a single `BiliPlayback`.  Always access through
 /// `LocalHLSProxyServer.shared`.
+/// Rolling per-host throughput measurements collected from real
+/// chunk fetches. B站 throttles per connection, and mirror quality
+/// differs by an order of magnitude on the same network (field
+/// measurement: akam 2.8 MB/s vs cosov 1.2 MB/s) — yet the playurl
+/// backup list is unordered. Steering chunk rotation by measured
+/// throughput makes fast hosts serve the majority of chunks while
+/// the hedge race keeps measuring the rest for free.
+final class BtrHostThroughput: @unchecked Sendable {
+    static let shared = BtrHostThroughput()
+
+    private struct Stat {
+        /// EWMA of bytes/second. Alpha is high enough to react to
+        /// congestion within a few chunks, low enough that one
+        /// slow chunk doesn't sink a host.
+        var ewma: Double
+    }
+
+    private let lock = NSLock()
+    private var stats: [String: Stat] = [:]
+
+    func record(host: String, bytes: Int, elapsedMs: Int) {
+        guard elapsedMs > 0, bytes > 0, !host.isEmpty else { return }
+        let bps = Double(bytes) / (Double(elapsedMs) / 1000.0)
+        lock.lock()
+        if var existing = stats[host] {
+            existing.ewma = existing.ewma * 0.6 + bps * 0.4
+            stats[host] = existing
+        } else {
+            stats[host] = Stat(ewma: bps)
+        }
+        lock.unlock()
+    }
+
+    func score(host: String) -> Double? {
+        lock.lock()
+        let value = stats[host]?.ewma
+        lock.unlock()
+        return value
+    }
+
+    /// Order candidates fastest-first. Hosts with no measurement
+    /// yet sort ahead of measured-but-slow ones (optimistic
+    /// exploration) but behind measured-fast ones; ties keep the
+    /// upstream order so the first chunk of a session looks
+    /// identical to the pre-steering behaviour.
+    func ordered(_ candidates: [URL]) -> [URL] {
+        guard candidates.count > 1 else { return candidates }
+        return candidates.enumerated().sorted { lhs, rhs in
+            let ls = score(host: lhs.element.host ?? "")
+            let rs = score(host: rhs.element.host ?? "")
+            switch (ls, rs) {
+            case let (l?, r?):
+                if l != r { return l > r }
+                return lhs.offset < rhs.offset
+            case (nil, nil):
+                return lhs.offset < rhs.offset
+            case (_?, nil):
+                // Measured beats unmeasured only when the
+                // measurement is decent (> 300 KB/s); a host we
+                // know is slow yields to the unknown.
+                return (ls ?? 0) >= 300_000
+            case (nil, _?):
+                return (rs ?? 0) < 300_000
+            }
+        }.map { $0.element }
+    }
+}
+
 final class LocalHLSProxyServer: @unchecked Sendable {
     /// OS-chosen port (`0`).  `NWListener.start` picks a real
     /// loopback port on its own; the `requiredLocalEndpoint`
@@ -3682,12 +3750,18 @@ fileprivate func proxySegmentRange(
         // chunks spread across every CDN mirror immediately —
         // without this all chunks pile onto the primary mirror
         // and the backups sit idle until the hedge fires.
+        // Throughput-steered ordering: measured-fast hosts lead
+        // the race for most chunks. The per-chunk rotation is
+        // kept as a fallback offset ONLY while no host has any
+        // measurement yet (first chunks of a session) — after
+        // that, ordering comes from real fetch data.
+        let steered = BtrHostThroughput.shared.ordered(candidates)
         let ordered: [URL]
-        if candidates.count > 1 {
+        if candidates.count > 1, steered == candidates {
             let shift = index % candidates.count
             ordered = Array(candidates[shift...]) + Array(candidates[..<shift])
         } else {
-            ordered = candidates
+            ordered = steered
         }
         return try await withThrowingTaskGroup(of: (Int, Data).self) { race in
             for (offset, url) in ordered.enumerated() {
@@ -3703,6 +3777,14 @@ fileprivate func proxySegmentRange(
                         range: chunk,
                         referer: referer,
                         purpose: purpose
+                    )
+                    // Feed the steering table even when this task
+                    // loses the race — a completed fetch is a valid
+                    // throughput sample for its host either way.
+                    BtrHostThroughput.shared.record(
+                        host: url.host ?? "",
+                        bytes: outcome.data.count,
+                        elapsedMs: outcome.elapsedMs
                     )
                     return (index, outcome.data)
                 }
