@@ -94,12 +94,6 @@ struct HomeView: View {
                 // inside the navigation bar itself (Apple Music /
                 // Podcasts pattern), so there is no custom inset
                 // bar and no dead space under the large title.
-                .modifier(
-                    AdaptiveSearchModifier(
-                        searchQuery: $model.searchQuery,
-                        horizontalSizeClass: horizontalSizeClass
-                    )
-                )
                 .onChange(of: model.searchQuery) { _, query in
                     model.searchQueryChanged(query, repository: repository)
                 }
@@ -548,7 +542,7 @@ private struct HomeOfflineBanner: View {
     }
 }
 
-private struct SearchUserResultsStrip: View {
+struct SearchUserResultsStrip: View {
     let users: [BiliUserSearchResult]
     @EnvironmentObject private var router: AppRouter
     @AppStorage("paladala.materialDesign") private var materialDesign: MaterialDesign = .liquidGlass
@@ -1153,7 +1147,6 @@ private struct AdaptiveSearchModifier: ViewModifier {
                         text: $searchQuery,
                         prompt: "搜尋 Bilibili 影片和 UP 主"
                     )
-                    .searchToolbarBehavior(.minimize)
             }
         } else {
             content

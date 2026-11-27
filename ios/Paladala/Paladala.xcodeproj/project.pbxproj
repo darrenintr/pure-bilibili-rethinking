@@ -47,6 +47,7 @@
 		100000000000000000000120 /* DeviceInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000222 /* DeviceInfo.swift */; };
 		100000000000000000000121 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000223 /* Haptics.swift */; };
 		100000000000000000000122 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000224 /* OnboardingView.swift */; };
+		10000000000000000000900 /* SearchTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000901 /* SearchTabView.swift */; };
 		100000000000000000000123 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000225 /* NetworkMonitor.swift */; };
 		100000000000000000000124 /* MiniPlayerStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000226 /* MiniPlayerStore.swift */; };
 		1000000000000000000001A1 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1000000000000000000001A2 /* SplashView.swift */; };
@@ -165,6 +166,7 @@
 		100000000000000000000222 /* DeviceInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceInfo.swift; sourceTree = "<group>"; };
 		100000000000000000000223 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
 		100000000000000000000224 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		10000000000000000000901 /* SearchTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchTabView.swift; sourceTree = "<group>"; };
 		100000000000000000000225 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
 		100000000000000000000226 /* MiniPlayerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerStore.swift; sourceTree = "<group>"; };
 		1000000000000000000001A2 /* SplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
@@ -318,6 +320,7 @@
 				100000000000000000000222 /* DeviceInfo.swift */,
 				100000000000000000000223 /* Haptics.swift */,
 				100000000000000000000224 /* OnboardingView.swift */,
+				10000000000000000000901 /* SearchTabView.swift */,
 				100000000000000000000225 /* NetworkMonitor.swift */,
 				100000000000000000000226 /* MiniPlayerStore.swift */,
 				1000000000000000000001A2 /* SplashView.swift */,
@@ -728,6 +731,7 @@
 				100000000000000000000120 /* DeviceInfo.swift in Sources */,
 				100000000000000000000121 /* Haptics.swift in Sources */,
 				100000000000000000000122 /* OnboardingView.swift in Sources */,
+				10000000000000000000900 /* SearchTabView.swift in Sources */,
 				100000000000000000000123 /* NetworkMonitor.swift in Sources */,
 				100000000000000000000124 /* MiniPlayerStore.swift in Sources */,
 				1000000000000000000001A1 /* SplashView.swift in Sources */,

@@ -173,6 +173,19 @@ struct VideoDetailView: View {
     // commit to storage once, on release.
     @State private var playerSizeBiasLive: Double? = nil
     private var effectivePlayerSizeBias: Double { playerSizeBiasLive ?? playerSizeBias }
+
+    /// Height÷width of the actual video stream (e.g. 16/9 for
+    /// landscape, 16/9 flipped for vertical video). Falls back
+    /// to 9:16 landscape ratio while the manifest is loading.
+    /// Using the real aspect stops vertical videos letterboxing
+    /// inside a hard-coded 16:9 box.
+    private var playerAspectHeightOverWidth: CGFloat {
+        if let track = model.playback?.dash?.video,
+           let w = track.width, let h = track.height, w > 0 {
+            return CGFloat(h) / CGFloat(w)
+        }
+        return 9.0 / 16.0
+    }
     /// User's preferred comment sort, persisted across launches. The
     /// view writes through to the model and to the underlying fetch
     /// whenever the user toggles the picker.
@@ -280,7 +293,7 @@ struct VideoDetailView: View {
             // The reference surface is a full-width 16:9 editorial block.
             // Immersive mode remains available, but the default no longer
             // consumes over half of a portrait screen before metadata appears.
-            let mediaHeight = geo.size.width * 9 / 16
+            let mediaHeight = geo.size.width * playerAspectHeightOverWidth
             let maxPlayerHeight = isImmersiveMode ? totalH * 0.8 : mediaHeight
             let minPlayerHeight = isImmersiveMode
                 ? totalH * 0.9
@@ -721,12 +734,17 @@ struct VideoDetailView: View {
     /// modifier as the single-column layout when it is visible.
     @ViewBuilder
     private func iPadSplitBody(geo: GeometryProxy, playerHeight: CGFloat) -> some View {
-        let panelWidth: CGFloat = 380
+        // Enlarging the player squeezes the recommendation
+        // panel instead of only growing downward — the split
+        // width is a fixed budget, so a bigger player means a
+        // narrower rail (clamped so it never collapses or
+        // swallows the screen).
+        let panelWidth: CGFloat = min(460, max(260, 380 / effectivePlayerSizeBias))
         let leftWidth = geo.size.width - panelWidth
         // Re-derive the player height from the *left column* width —
         // the parent computed it against the full screen width,
         // which would make the 16:9 surface far too tall here.
-        let columnPlayerHeight = leftWidth * 9 / 16 * playerScale * effectivePlayerSizeBias
+        let columnPlayerHeight = leftWidth * playerAspectHeightOverWidth * playerScale * effectivePlayerSizeBias
         HStack(alignment: .top, spacing: 0) {
             VStack(spacing: 0) {
                 playerSurface

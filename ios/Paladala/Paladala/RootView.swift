@@ -208,75 +208,40 @@ private struct PhoneRootView: View {
 
     var body: some View {
             TabView(selection: $router.selectedTab) {
-                // Each tab body is wrapped in LazyTab so the inner
-                // View (and its `@StateObject` / @State) is only
-                // constructed when the user first selects that tab.
-                // State is preserved across tab switches via the
-                // wrapper's own @State, so going to Settings and back
-                // does not re-init HomeView. PR-A, audit #5.
-                LazyTabNavStack(tag: MainTab.home, activeTag: router.selectedTab, path: $router.homePath) {
-                    HomeView(repository: repository, heroNamespace: heroNamespace)
-                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
-                }
-                .tabItem {
-                    // Apple's recommended "select bounce" — the
-                    // SF Symbol scales up + back down when the
-                    // value flips. Previously the binder was
-                    // `selectedTab` itself, which made every
-                    // tab icon observe the same value and
-                    // bounce on every switch. The bool
-                    // per-tab now flips only for the freshly
-                    // selected one, matching HIG.
-                    Label {
-                        Text(MainTab.home.title)
-                    } icon: {
-                        Image(systemName: MainTab.home.symbolName)
-                            .symbolEffect(.bounce, value: router.selectedTab == MainTab.home)
+                Tab(MainTab.home.title, systemImage: MainTab.home.symbolName, value: MainTab.home) {
+                    LazyTabNavStack(tag: MainTab.home, activeTag: router.selectedTab, path: $router.homePath) {
+                        HomeView(repository: repository, heroNamespace: heroNamespace)
+                            .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
                     }
                 }
-                .tag(MainTab.home)
-
-                LazyTabNavStack(tag: MainTab.dynamic, activeTag: router.selectedTab, path: $router.dynamicPath) {
-                    DynamicFeedView(repository: repository, heroNamespace: heroNamespace)
-                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
-                }
-                .tabItem {
-                    Label {
-                        Text(MainTab.dynamic.title)
-                    } icon: {
-                        Image(systemName: MainTab.dynamic.symbolName)
-                            .symbolEffect(.bounce, value: router.selectedTab == MainTab.dynamic)
+                Tab(MainTab.dynamic.title, systemImage: MainTab.dynamic.symbolName, value: MainTab.dynamic) {
+                    LazyTabNavStack(tag: MainTab.dynamic, activeTag: router.selectedTab, path: $router.dynamicPath) {
+                        DynamicFeedView(repository: repository, heroNamespace: heroNamespace)
+                            .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
                     }
                 }
-                .tag(MainTab.dynamic)
-
-                LazyTabNavStack(tag: MainTab.live, activeTag: router.selectedTab, path: $router.livePath) {
-                    LiveRoomsView(repository: repository)
-                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
-                }
-                .tabItem {
-                    Label {
-                        Text(MainTab.live.title)
-                    } icon: {
-                        Image(systemName: MainTab.live.symbolName)
-                            .symbolEffect(.bounce, value: router.selectedTab == MainTab.live)
+                Tab(MainTab.live.title, systemImage: MainTab.live.symbolName, value: MainTab.live) {
+                    LazyTabNavStack(tag: MainTab.live, activeTag: router.selectedTab, path: $router.livePath) {
+                        LiveRoomsView(repository: repository)
+                            .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
                     }
                 }
-                .tag(MainTab.live)
-
-                LazyTabNavStack(tag: MainTab.profile, activeTag: router.selectedTab, path: $router.profilePath) {
-                    ProfileSettingsView(repository: repository)
-                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
-                }
-                .tabItem {
-                    Label {
-                        Text(MainTab.profile.title)
-                    } icon: {
-                        Image(systemName: MainTab.profile.symbolName)
-                            .symbolEffect(.bounce, value: router.selectedTab == MainTab.profile)
+                Tab(MainTab.profile.title, systemImage: MainTab.profile.symbolName, value: MainTab.profile) {
+                    LazyTabNavStack(tag: MainTab.profile, activeTag: router.selectedTab, path: $router.profilePath) {
+                        ProfileSettingsView(repository: repository)
+                            .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
                     }
                 }
-                .tag(MainTab.profile)
+                // iOS 26 native search tab — the magnifier separates
+                // into its own capsule at the trailing edge of the
+                // tab bar and expands with the system's Liquid Glass
+                // morph, auto-focusing the `.searchable` inside.
+                Tab(value: MainTab.search, role: .search) {
+                    NavigationStack {
+                        SearchTabView(repository: repository, heroNamespace: heroNamespace)
+                            .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
+                    }
+                }
             }
             .paladalaTabBarBehavior()
     }
@@ -316,6 +281,16 @@ private struct PadRootView: View {
             Tab(MainTab.profile.title, systemImage: MainTab.profile.symbolName, value: MainTab.profile) {
                 LazyTabNavStack(tag: MainTab.profile, activeTag: router.selectedTab, path: $router.profilePath) {
                     ProfileSettingsView(repository: repository)
+                        .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
+                }
+            }
+            // iOS 26 native search tab: the magnifier lives in the
+            // tab bar / sidebar footer and expands with the system's
+            // Liquid Glass morph animation (Apple Music pattern).
+            // `.searchable` inside auto-focuses when the tab opens.
+            Tab(value: MainTab.search, role: .search) {
+                NavigationStack {
+                    SearchTabView(repository: repository, heroNamespace: heroNamespace)
                         .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
                 }
             }
