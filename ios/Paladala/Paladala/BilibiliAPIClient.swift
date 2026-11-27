@@ -1589,6 +1589,12 @@ final class BilibiliAPIClient: @unchecked Sendable {
         var ladderSet = Set<Int>()
         var currentQn: Int? = nil
         for stream in data.playurlInfo?.playurl.stream ?? [] {
+            // HLS streams only — the player never binds FLV, so a
+            // quality the FLV side reports as active would render
+            // a wrong checkmark and swallow the matching tap.
+            let isHLS = stream.protocolName == "http_hls"
+                || stream.protocolName == "https_hls"
+            guard isHLS else { continue }
             for fmt in stream.format {
                 for codec in fmt.codec {
                     codec.acceptQn?.forEach { ladderSet.insert($0) }
