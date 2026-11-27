@@ -403,12 +403,17 @@ final class PlayerController: ObservableObject {
     /// short 4G hiccup without the buffer draining the 10 s
     /// `prolongedStall` watchdog, short enough that cold start
     /// still feels snappy.
-    private static let preferredForwardBufferSeconds: TimeInterval = 8.0
+    private static let preferredForwardBufferSeconds: TimeInterval = 4.0
     /// **B1**: explicit `automaticallyWaitsToMinimizeStalling`
     /// policy. Default is already `true` on iOS 10+ for HLS,
     /// but setting it explicitly keeps this knob visible in
     /// code review rather than implicitly inherited.
-    private static let automaticallyWaitsToMinimizeStalling: Bool = true
+    // Aggressive time-to-first-frame: the prefetch cache fills the
+    // track within ~0.5s of playback start and BTR chunks hedge
+    // across mirrors, so the conservative deep-buffer wait only
+    // delays the first frame. Stalls remain handled by the retry
+    // machinery if they happen at all.
+    private static let automaticallyWaitsToMinimizeStalling: Bool = false
     /// **Build 182**: the orchestration task that drives
     /// `LocalHLSProxyServer.serve(playback:) async throws ->
     /// URL` → endpoint self-test → `replaceCurrentItem` →
