@@ -127,8 +127,17 @@ final class HomeViewModel: ObservableObject {
         // the bundled list for a beat before the new data overwrites it.
         isShowingBundledFallback = false
         await loadPage(repository: repository, accountMid: accountMid, replacing: true, requestID: requestID)
-        guard isCurrentRequest(requestID) else { return }
+        guard isCurrentRequest(requestID) else {
+            diagLog(.network, "load discarded — stale request generation",
+                    details: ["category": category.rawValue])
+            return
+        }
         isLoading = false
+        if category == .search {
+            diagLog(.network, "search load finished",
+                    details: ["videos": videos.count, "users": searchUsers.count,
+                              "error": errorMessage ?? "none"])
+        }
         // Trigger the one-shot fan-in animation in `HomeView` only
         // when this is the first successful load of the session
         // (skip refreshes / category switches). The `!isShowingBundledFallback`

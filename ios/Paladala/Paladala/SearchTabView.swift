@@ -30,6 +30,7 @@ struct SearchTabView: View {
     private func submitSearch() {
         let query = model.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
+        diagLog(.network, "SearchTabView submit", details: ["query": query])
         submittedQuery = model.searchQuery
         model.clearSuggestions()
         model.category = .search
@@ -52,14 +53,31 @@ struct SearchTabView: View {
                         .padding(.bottom, 2)
                 }
                 if model.videos.isEmpty {
-                    ContentUnavailableView(
-                        "搜尋",
-                        systemImage: "magnifyingglass",
-                        description: Text(model.searchQuery.isEmpty
-                                          ? "輸入關鍵字搵影片、UP 主"
-                                          : "載入中…")
-                    )
-                    .padding(.top, 80)
+                    if model.isLoading {
+                        ProgressView("搜尋中…")
+                            .padding(.top, 80)
+                    } else if let error = model.errorMessage {
+                        ContentUnavailableView(
+                            "搜尋失敗",
+                            systemImage: "exclamationmark.triangle",
+                            description: Text(error)
+                        )
+                        .padding(.top, 80)
+                    } else if submittedQuery.isEmpty {
+                        ContentUnavailableView(
+                            "搜尋",
+                            systemImage: "magnifyingglass",
+                            description: Text("輸入關鍵字搵影片、UP 主")
+                        )
+                        .padding(.top, 80)
+                    } else {
+                        ContentUnavailableView(
+                            "冇結果",
+                            systemImage: "magnifyingglass",
+                            description: Text("試下其他關鍵字")
+                        )
+                        .padding(.top, 80)
+                    }
                 } else {
                     LazyVGrid(columns: columns, spacing: 24) {
                         ForEach(Array(model.videos.enumerated()), id: \.element.id) { index, video in

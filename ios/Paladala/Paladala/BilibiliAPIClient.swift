@@ -725,21 +725,54 @@ final class BilibiliAPIClient: @unchecked Sendable {
 
     func searchVideos(keyword: String, page: Int = 1) async throws -> [BiliVideo] {
         guard !keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
-        let payload: APIResponse<VideoListPayload> = try await get(
+        let searchQuery: [URLQueryItem] = [
+            URLQueryItem(name: "search_type", value: "video"),
+            URLQueryItem(name: "keyword", value: keyword),
+            URLQueryItem(name: "page", value: "\(page)"),
+            URLQueryItem(name: "page_size", value: "20"),
+            URLQueryItem(name: "platform", value: "pc"),
+            URLQueryItem(name: "web_location", value: "1430654")
+        ]
+        var payload: APIResponse<VideoListPayload> = try await get(
             baseURL: baseURL,
             path: "/x/web-interface/wbi/search/type",
-            queryItems: [
-                URLQueryItem(name: "search_type", value: "video"),
-                URLQueryItem(name: "keyword", value: keyword),
-                URLQueryItem(name: "page", value: "\(page)"),
-                URLQueryItem(name: "page_size", value: "20"),
-                URLQueryItem(name: "platform", value: "pc"),
-                URLQueryItem(name: "web_location", value: "1430654")
-            ],
+            queryItems: searchQuery,
             signWithWBI: true
         )
-        try payload.requireOK()
-        return payload.value?.videos.map(\.model) ?? []
+        if payload.value?.vVoucher != nil {
+            // Risk-control voucher wall — reproduced 2026-11-26: a
+            // stale `buvid3` in the shared cookie store trips B站's
+            // anti-bot on this endpoint while cookieless requests
+            // pass. Retry once anonymously rather than surfacing
+            // zero results.
+            diagLog(.network, "searchVideos voucher wall — retrying anonymous",
+                    details: ["keyword": keyword, "page": page])
+            payload = try await get(
+                baseURL: baseURL,
+                path: "/x/web-interface/wbi/search/type",
+                queryItems: searchQuery,
+                signWithWBI: true,
+                anonymousRequest: true
+            )
+        }
+        do {
+            try payload.requireOK()
+        } catch {
+            diagLog(.network, "searchVideos upstream error",
+                    details: ["keyword": keyword, "page": page, "error": "\(error)",
+                              "code": payload.code])
+            throw error
+        }
+        let decoded = payload.value?.videos.map(\.model) ?? []
+        diagLog(.network, "searchVideos completed",
+                details: ["keyword": keyword, "page": page, "decoded": decoded.count,
+                          "code": payload.code,
+                          "valueNil": payload.value == nil,
+                          "itemCount": payload.value?.item?.count ?? -1,
+                          "listCount": payload.value?.list?.count ?? -1,
+                          "resultCount": payload.value?.result?.count ?? -1,
+                          "bareCount": payload.value?.bareList?.count ?? -1])
+        return decoded
     }
 
     /// As-you-type search suggestions. Hits the dedicated
@@ -1171,19 +1204,31 @@ final class BilibiliAPIClient: @unchecked Sendable {
     /// strongly-typed `searchVideos` / `searchUsers` paths
     /// unchanged for the existing search-as-you-type code.
     private func _searchOne(keyword: String, searchType: String, page: Int) async throws -> [VideoDTO] {
-        let payload: APIResponse<SearchSlotPayload> = try await get(
+        let slotQuery: [URLQueryItem] = [
+            URLQueryItem(name: "search_type", value: searchType),
+            URLQueryItem(name: "keyword", value: keyword),
+            URLQueryItem(name: "page", value: "\(page)"),
+            URLQueryItem(name: "page_size", value: "10"),
+            URLQueryItem(name: "platform", value: "pc"),
+            URLQueryItem(name: "web_location", value: "1430654")
+        ]
+        var payload: APIResponse<SearchSlotPayload> = try await get(
             baseURL: baseURL,
             path: "/x/web-interface/wbi/search/type",
-            queryItems: [
-                URLQueryItem(name: "search_type", value: searchType),
-                URLQueryItem(name: "keyword", value: keyword),
-                URLQueryItem(name: "page", value: "\(page)"),
-                URLQueryItem(name: "page_size", value: "10"),
-                URLQueryItem(name: "platform", value: "pc"),
-                URLQueryItem(name: "web_location", value: "1430654")
-            ],
+            queryItems: slotQuery,
             signWithWBI: true
         )
+        if payload.value?.vVoucher != nil {
+            diagLog(.network, "searchAll voucher wall — retrying anonymous",
+                    details: ["keyword": keyword, "searchType": searchType])
+            payload = try await get(
+                baseURL: baseURL,
+                path: "/x/web-interface/wbi/search/type",
+                queryItems: slotQuery,
+                signWithWBI: true,
+                anonymousRequest: true
+            )
+        }
         try payload.requireOK()
         return payload.value?.result ?? []
     }
@@ -3294,6 +3339,13 @@ private struct VideoListPayload: Decodable, Sendable {
     let result: [VideoDTO]?
     let archives: [VideoDTO]?
     let bareList: [VideoDTO]?
+    /// Present when B站's risk control answers the request
+    /// with a `v_voucher` challenge instead of real data —
+    /// observed 2026-11-26: any stale `buvid3` cookie on the
+    /// search endpoint triggers this wall while cookieless
+    /// requests pass. Used by `searchVideos` to retry
+    /// anonymously instead of surfacing empty results.
+    let vVoucher: String?
 
     /// Tolerant decoder: walks the response looking for a known list
     /// key (`item` / `list` / `result` / `archives`) and decodes each
@@ -3307,6 +3359,7 @@ private struct VideoListPayload: Decodable, Sendable {
             self.result = nil
             self.archives = nil
             self.bareList = videos
+            self.vVoucher = nil
             return
         }
         let container = try decoder.container(keyedBy: DynamicKey.self)
@@ -3315,6 +3368,11 @@ private struct VideoListPayload: Decodable, Sendable {
         self.result = Self.decodeTolerant(in: container, key: "result")
         self.archives = Self.decodeTolerant(in: container, key: "archives")
         self.bareList = nil
+        if let voucherKey = DynamicKey(stringValue: "v_voucher") {
+            self.vVoucher = try? container.decodeIfPresent(String.self, forKey: voucherKey) ?? nil
+        } else {
+            self.vVoucher = nil
+        }
     }
 
     private static func decodeTolerantArray(from decoder: Decoder) -> [VideoDTO]? {
@@ -3577,6 +3635,12 @@ private struct SuggestResult: Decodable, Sendable {
 /// raw array and let the view layer decode per-slot.
 private struct SearchSlotPayload: Decodable, Sendable {
     let result: [VideoDTO]?
+    let vVoucher: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case result
+        case vVoucher = "v_voucher"
+    }
 }
 
 /// Internal decoder for the public profile-card endpoint
@@ -5094,7 +5158,7 @@ private struct UserFavoriteFolderDTO: Decodable, Sendable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicKey.self)
         id = container.decodeInt64(keys: ["id"]) ?? 0
-        title = container.decodeString(keys: ["title"]) ?? ""
+        title = String.decodingSearchTitle(container.decodeString(keys: ["title"]) ?? "")
         cover = container.decodeString(keys: ["cover"]) ?? ""
         mediaCount = container.decodeInt(keys: ["media_count", "cnt_info", "play"]) ?? 0
         // `upper` is sometimes a flat `{ name, mid }` object,
@@ -5327,6 +5391,14 @@ extension KeyedDecodingContainer where K == DynamicKey {
             }
             if let string = try? decode(String.self, forKey: DynamicKey(key)), let value = Int(string) {
                 return value
+            }
+            // The search endpoint writes durations as clock strings
+            // ("3:45", rarely "1:02:03") instead of numeric seconds.
+            if let string = try? decode(String.self, forKey: DynamicKey(key)), string.contains(":") {
+                let parts = string.split(separator: ":").compactMap { Int($0) }
+                if !parts.isEmpty, parts.count == string.split(separator: ":").count {
+                    return parts.reduce(0) { $0 * 60 + $1 }
+                }
             }
         }
         return nil
@@ -5606,3 +5678,34 @@ private enum BiliDanmakuProtobufDecoder {
     }
 }
 
+
+extension String {
+    /// The search/type endpoint HTML-escapes titles (`&#x27;` for an
+    /// apostrophe) and wraps keyword matches in `<em class="keyword">`
+    /// highlight tags. The regular feed does neither — decoding here is
+    /// safe because raw `&` never survives upstream encoding in the
+    /// entity form we rewrite.
+    static func decodingSearchTitle(_ raw: String) -> String {
+        var text = raw
+        text = text.replacingOccurrences(of: "<em class=\"keyword\">", with: "")
+        text = text.replacingOccurrences(of: "</em>", with: "")
+        text = text.replacingOccurrences(of: "&amp;", with: "&")
+        text = text.replacingOccurrences(of: "&lt;", with: "<")
+        text = text.replacingOccurrences(of: "&gt;", with: ">")
+        text = text.replacingOccurrences(of: "&quot;", with: "\"")
+        text = text.replacingOccurrences(of: "&#39;", with: "'")
+        // numeric hex entities — &#x27; style
+        if let regex = try? NSRegularExpression(pattern: "&#x([0-9A-Fa-f]{2,4});") {
+            let full = NSRange(text.startIndex..., in: text)
+            let matches = regex.matches(in: text, range: full).reversed()
+            for match in matches {
+                guard let hexRange = Range(match.range(at: 1), in: text),
+                      let scalar = UInt32(text[hexRange], radix: 16),
+                      let uni = Unicode.Scalar(scalar),
+                      let whole = Range(match.range, in: text) else { continue }
+                text.replaceSubrange(whole, with: String(Character(uni)))
+            }
+        }
+        return text
+    }
+}
