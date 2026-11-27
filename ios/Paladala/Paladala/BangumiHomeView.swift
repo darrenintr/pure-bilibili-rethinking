@@ -314,12 +314,19 @@ struct BangumiSeasonDetailView: View {
     @ViewBuilder
     private func contentView(detail: BangumiSeasonDetail) -> some View {
         VStack(spacing: 0) {
-            heroView(detail: detail)
-            Divider()
-                .background(PaladalaTheme.ink)
-            episodeList(detail: detail)
+            // Player pinned to the top at full width — the standard
+            // video-detail layout (bilibili / YouTube / Apple TV all
+            // pin playback above the metadata). Previously it sat at
+            // the bottom under the episode list at a fixed 220pt,
+            // which made watching anything in-app nearly useless.
             if let ep = selectedEpisode {
                 pgcPlayerPanel(ep: ep)
+            }
+            ScrollView {
+                VStack(spacing: 0) {
+                    heroView(detail: detail)
+                    episodeList(detail: detail)
+                }
             }
         }
         .background(PaladalaTheme.canvas)
@@ -440,7 +447,8 @@ struct BangumiSeasonDetailView: View {
     @ViewBuilder
     private func pgcPlayerSurface(controller: PlayerController) -> some View {
         VideoPlayer(player: controller.player)
-            .frame(height: 220)
+            .frame(maxWidth: .infinity)
+            .aspectRatio(16.0 / 9.0, contentMode: .fit)
             .background(Color.black)
     }
 
@@ -575,6 +583,13 @@ struct BangumiSeasonDetailView: View {
         do {
             let fetched = try await repository.pgcSeason(seasonId: seasonId)
             detail = fetched
+            // Auto-queue the first episode so the page opens as a
+            // player (the 看番 idiom) instead of a static episode
+            // list the user has to interpret. Region-locked episodes
+            // land in the panel's error state, same as a manual tap.
+            if selectedEpisode == nil, let first = fetched.episodes.first {
+                onEpisodeTap(first)
+            }
             diagLog(.bangumi, "BangumiSeasonDetail load succeeded",
                     details: [
                         "seasonId": seasonId,
