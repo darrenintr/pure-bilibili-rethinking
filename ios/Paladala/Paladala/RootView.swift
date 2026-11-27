@@ -237,7 +237,7 @@ private struct PhoneRootView: View {
                 // tab bar and expands with the system's Liquid Glass
                 // morph, auto-focusing the `.searchable` inside.
                 Tab(value: MainTab.search, role: .search) {
-                    NavigationStack {
+                    NavigationStack(path: $router.searchPath) {
                         SearchTabView(repository: repository, heroNamespace: heroNamespace)
                             .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
                     }
@@ -289,7 +289,7 @@ private struct PadRootView: View {
             // Liquid Glass morph animation (Apple Music pattern).
             // `.searchable` inside auto-focuses when the tab opens.
             Tab(value: MainTab.search, role: .search) {
-                NavigationStack {
+                NavigationStack(path: $router.searchPath) {
                     SearchTabView(repository: repository, heroNamespace: heroNamespace)
                         .paladalaNavDestinations(repository: repository, heroNamespace: heroNamespace)
                 }
