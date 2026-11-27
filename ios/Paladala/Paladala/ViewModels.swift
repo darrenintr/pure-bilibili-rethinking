@@ -1015,12 +1015,28 @@ final class VideoDetailViewModel: ObservableObject {
                     ])
         }
         do {
-            detail = try await repository.detail(for: detail)
-            self.playback = try await repository.playback(
-                for: detail,
-                qn: preferredQn,
-                preferredAudioQuality: preferredAudioQuality
-            )
+            // Fire the playurl fetch in parallel with the detail
+            // refresh whenever the card already carries a cid —
+            // playurl only needs aid+cid+qn, and waiting for the
+            // detail round-trip first costs a full RTT (~0.3-0.7s)
+            // of startup latency on every open.
+            if detail.cid > 0 {
+                async let playbackResult = repository.playback(
+                    for: detail,
+                    qn: preferredQn,
+                    preferredAudioQuality: preferredAudioQuality
+                )
+                async let detailResult = repository.detail(for: detail)
+                self.playback = try await playbackResult
+                detail = try await detailResult
+            } else {
+                detail = try await repository.detail(for: detail)
+                self.playback = try await repository.playback(
+                    for: detail,
+                    qn: preferredQn,
+                    preferredAudioQuality: preferredAudioQuality
+                )
+            }
             // Seed `resumeTime` from the local progress store
             // when present.  `repository.playback(...)` already
             // set the value from `BiliVideo.resumeTime` (the
