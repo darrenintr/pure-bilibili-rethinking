@@ -1107,6 +1107,26 @@ final class LocalHLSProxyServer: @unchecked Sendable {
     /// for the current playback.  Pulled out of `serve()`
     /// so `serveLocal()` and `serve(playback:) async`
     /// share the same probe behaviour.
+    /// Fire the CDN total-size probes the moment a playurl resolves —
+    /// normally they start inside `serve()`, but TLS+probe latency
+    /// (~0.5s) then sits squarely in the startup critical path. The
+    /// probes are keyed by URL and generation-independent, so warming
+    /// them while the view/controller machinery spins up is free
+    /// overlap: by the time `serve()` runs, results are hot.
+    func prewarmProbes(for playback: BiliPlayback) {
+        guard playback.localContext == nil else { return }
+        if prepSession == nil {
+            prepSession = Self.makePrepSession()
+        }
+        let referer = playback.referer.absoluteString
+        if let video = playback.dash?.video {
+            startMediaTotalProbe(for: video, referer: referer)
+        }
+        if let audio = playback.dash?.audio {
+            startMediaTotalProbe(for: audio, referer: referer)
+        }
+    }
+
     private func primeProbesForCurrentPlayback() {
         guard let playback = currentPlayback else { return }
         if let local = playback.localContext {

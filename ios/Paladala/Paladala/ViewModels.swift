@@ -1054,6 +1054,9 @@ final class VideoDetailViewModel: ObservableObject {
                saved.currentTime > self.playback?.resumeTime ?? 0 {
                 self.playback?.resumeTime = saved.currentTime
             }
+            if let playback = self.playback {
+                LocalHLSProxyServer.shared.prewarmProbes(for: playback)
+            }
             diagLog(.playback,
                     "VideoDetailViewModel.load succeeded",
                     details: [
