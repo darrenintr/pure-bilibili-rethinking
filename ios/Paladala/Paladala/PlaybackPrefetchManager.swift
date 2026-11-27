@@ -640,7 +640,11 @@ actor PlaybackPrefetchManager {
             req.setValue("*/*", forHTTPHeaderField: "Accept")
             return req
         }
-        let (probeData, probeResponse) = try await downloadSession.data(for: makeRequest(range: "bytes=0-0"))
+        // download(for:) streams to a temp file — a CDN that ignores
+        // the range probe answers with the whole track, which must
+        // never land in memory.
+        let (probeTmp, probeResponse) = try await downloadSession.download(for: makeRequest(range: "bytes=0-0"))
+        defer { try? FileManager.default.removeItem(at: probeTmp) }
         let probeStatus = (probeResponse as? HTTPURLResponse)?.statusCode ?? -1
         guard (200...299).contains(probeStatus) else {
             throw PrefetchError.upstreamStatus(probeStatus)
@@ -654,7 +658,6 @@ actor PlaybackPrefetchManager {
             // the whole-body stream so prefetch still works.
             return try await streamWholeBody(url: url, referer: referer, dst: dst)
         }
-        _ = probeData
 
         // Pre-allocate the destination file.
         FileManager.default.createFile(atPath: dst.path, contents: nil)
@@ -707,6 +710,16 @@ actor PlaybackPrefetchManager {
                     }
                     defer { try? FileManager.default.removeItem(at: tmp) }
                     let data = try Data(contentsOf: tmp, options: .mappedIfSafe)
+                    // A CDN that ignores the Range header answers 200
+                    // with the whole body — writing that at the part
+                    // offset would corrupt the cache file beyond
+                    // repair, and playback reads cache bytes without
+                    // revalidating. Exact-length or nothing.
+                    guard data.count == range.count else {
+                        throw PrefetchError.ioFailure(
+                            "part length mismatch: got \(data.count), want \(range.count)"
+                        )
+                    }
                     try writer.write(data, at: UInt64(range.lowerBound), handle: writeHandle)
                 }
             }
