@@ -635,9 +635,10 @@ actor PlaybackPrefetchManager {
         // upstream (206 with the whole body) so the download succeeds.
         req.setValue("bytes=0-", forHTTPHeaderField: "Range")
         req.setValue("*/*", forHTTPHeaderField: "Accept")
-        req.setValue("gzip, deflate", forHTTPHeaderField: "Accept-Encoding")
-        req.setValue("https://www.bilibili.com", forHTTPHeaderField: "Origin")
-        req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        // Header set intentionally mirrors the proxy's chunk fetch
+        // exactly: no Origin / Accept-Encoding / Cache-Control.
+        // The extra headers trip the CDN's hotlink protection
+        // (full-file GET with Origin answered HTTP 403).
 
         let (tmpFile, response) = try await downloadSession.download(for: req)
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
