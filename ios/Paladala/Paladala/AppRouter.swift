@@ -223,7 +223,7 @@ final class AppRouter: ObservableObject {
 
     func openSearch(_ query: String) {
         pendingSearchQuery = query
-        selectedTab = .home
+        selectedTab = .search
         path.removeLast(path.count)
     }
 
