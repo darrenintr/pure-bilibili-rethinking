@@ -176,9 +176,9 @@ enum L10n {
         static let audioQuality128 = String(localized: "player.audioQuality128", defaultValue: "128K")
         /// 192 kbps Dolby Atmos / 高码率 audio. Gated behind
         /// 大会员; the toolbar dims the row for non-VIP users.
-        static let audioQuality192 = String(localized: "player.audioQuality192", defaultValue: "192K 杜比")
+        static let audioQuality192 = String(localized: "player.audioQuality192", defaultValue: "192K")
         /// 320 kbps Hi-Res AAC. Gated behind 大会员.
-        static let audioQuality320 = String(localized: "player.audioQuality320", defaultValue: "320K Hi-Res")
+        static let audioQuality320 = String(localized: "player.audioQuality320", defaultValue: "320K")
         static let gestureHint = String(localized: "player.gestureHint", defaultValue: "雙擊左側後退 10s · 雙擊右側前進 10s · 雙擊中心點贊")
     }
 
