@@ -37,7 +37,7 @@ struct SearchTabView: View {
                     .padding(.top, 80)
                 } else {
                     LazyVGrid(columns: columns, spacing: 24) {
-                        ForEach(model.videos, id: \.id) { video in
+                        ForEach(Array(model.videos.enumerated()), id: \.element.id) { index, video in
                             VideoCard(
                                 video: video,
                                 repository: repository,
@@ -45,6 +45,11 @@ struct SearchTabView: View {
                                 action: { router.openVideo(video) }
                             )
                             .frame(maxWidth: .infinity)
+                            .onAppear {
+                                if index >= model.videos.count - 4 {
+                                    Task { await model.loadMore(repository: repository, accountMid: accountMid) }
+                                }
+                            }
                         }
                     }
                     if model.isLoadingMore {
@@ -54,6 +59,18 @@ struct SearchTabView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
+        }
+        .onAppear {
+            if !router.pendingSearchQuery.isEmpty {
+                model.searchQuery = router.pendingSearchQuery
+                router.pendingSearchQuery = ""
+                model.clearSuggestions()
+                model.category = .search
+                Task {
+                    await model.load(repository: repository, accountMid: accountMid)
+                    await model.runAllSearch(repository: repository)
+                }
+            }
         }
         .navigationTitle("搜尋")
         .navigationBarTitleDisplayMode(.large)
