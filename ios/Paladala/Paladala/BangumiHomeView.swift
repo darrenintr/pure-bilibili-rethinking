@@ -640,18 +640,12 @@ struct BangumiSeasonDetailView: View {
                     "epId": ep.epId,
                     "title": ep.title
                 ])
+        if let oldEp = selectedEpisode, oldEp.epId != ep.epId,
+           let position = pgcController?.currentTime, position > 10 {
+            Self.saveResumePosition(position, epId: oldEp.epId)
+        }
         selectedEpisode = ep
         pgcPlaybackError = nil
-        if let old = pgcController {
-            // Tear down the previous controller so the next
-            // episode gets a fresh AVPlayer / LocalHLSProxyServer
-            // reservation.  `PlayerController.loadPlayback` already
-            // calls cancel on the previous loadTask, but we want
-            // a clean teardown of the AVPlayer's nowPlayingInfo
-            // so the system control center doesn't keep showing
-            // the old track.
-            _ = old
-        }
         pgcController = nil
         isFetchingPgcPlayback = true
         Task { await fetchAndStartPgcPlayback(ep: ep) }
@@ -664,6 +658,10 @@ struct BangumiSeasonDetailView: View {
     private func closePgcPlayer() {
         diagLog(.bangumi, "BangumiSeasonDetail close pgc player",
                 details: ["epId": selectedEpisode?.epId ?? -1])
+        if let ep = selectedEpisode,
+           let position = pgcController?.currentTime, position > 10 {
+            Self.saveResumePosition(position, epId: ep.epId)
+        }
         pgcController = nil
         pgcPlaybackError = nil
         isFetchingPgcPlayback = false
@@ -707,6 +705,24 @@ struct BangumiSeasonDetailView: View {
             // episode.
             pgcController = controller
             isFetchingPgcPlayback = false
+            if let resume = Self.resumePosition(epId: ep.epId) {
+                // The seek only lands once the AVPlayerItem is
+                // ready — retry briefly instead of chaining into
+                // the controller's load lifecycle.
+                Task { @MainActor in
+                    for _ in 0..<10 {
+                        try? await Task.sleep(nanoseconds: 500_000_000)
+                        guard self.pgcController === controller else { return }
+                        if controller.playbackState == .ready {
+                            controller.seek(to: resume)
+                            return
+                        }
+                    }
+                    if self.pgcController === controller {
+                        controller.seek(to: resume)
+                    }
+                }
+            }
         } catch {
             diagLog(.bangumi, "BangumiSeasonDetail pgc playback failed",
                     details: [
@@ -718,6 +734,15 @@ struct BangumiSeasonDetailView: View {
                 ?? error.localizedDescription
             isFetchingPgcPlayback = false
         }
+    }
+
+    private static func saveResumePosition(_ position: Double, epId: Int64) {
+        UserDefaults.standard.set(position, forKey: "paladala.pgc.resume.\(epId)")
+    }
+
+    private static func resumePosition(epId: Int64) -> Double? {
+        let value = UserDefaults.standard.double(forKey: "paladala.pgc.resume.\(epId)")
+        return value > 10 ? value : nil
     }
 
     private func formatDuration(_ ms: Int64) -> String {
