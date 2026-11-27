@@ -30,7 +30,7 @@ struct SearchTabView: View {
     private func submitSearch() {
         let query = model.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
-        diagLog(.network, "SearchTabView submit", details: ["query": query])
+        diagLog(.network, "SearchTabView submit", details: ["queryLen": "\(query.count)"])
         submittedQuery = model.searchQuery
         model.clearSuggestions()
         model.category = .search

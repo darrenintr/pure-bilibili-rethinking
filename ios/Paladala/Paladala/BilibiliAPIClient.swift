@@ -746,7 +746,7 @@ final class BilibiliAPIClient: @unchecked Sendable {
             // pass. Retry once anonymously rather than surfacing
             // zero results.
             diagLog(.network, "searchVideos voucher wall — retrying anonymous",
-                    details: ["keyword": keyword, "page": page])
+                    details: ["keywordLen": "\(keyword.count)", "page": page])
             payload = try await get(
                 baseURL: baseURL,
                 path: "/x/web-interface/wbi/search/type",
@@ -759,13 +759,13 @@ final class BilibiliAPIClient: @unchecked Sendable {
             try payload.requireOK()
         } catch {
             diagLog(.network, "searchVideos upstream error",
-                    details: ["keyword": keyword, "page": page, "error": "\(error)",
+                    details: ["keywordLen": "\(keyword.count)", "page": page, "error": "\(error)",
                               "code": payload.code])
             throw error
         }
         let decoded = payload.value?.videos.map(\.model) ?? []
         diagLog(.network, "searchVideos completed",
-                details: ["keyword": keyword, "page": page, "decoded": decoded.count,
+                details: ["keywordLen": "\(keyword.count)", "page": page, "decoded": decoded.count,
                           "code": payload.code,
                           "valueNil": payload.value == nil,
                           "itemCount": payload.value?.item?.count ?? -1,
@@ -1220,7 +1220,7 @@ final class BilibiliAPIClient: @unchecked Sendable {
         )
         if payload.value?.vVoucher != nil {
             diagLog(.network, "searchAll voucher wall — retrying anonymous",
-                    details: ["keyword": keyword, "searchType": searchType])
+                    details: ["keywordLen": "\(keyword.count)", "searchType": searchType])
             payload = try await get(
                 baseURL: baseURL,
                 path: "/x/web-interface/wbi/search/type",
@@ -5158,7 +5158,7 @@ private struct UserFavoriteFolderDTO: Decodable, Sendable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicKey.self)
         id = container.decodeInt64(keys: ["id"]) ?? 0
-        title = String.decodingSearchTitle(container.decodeString(keys: ["title"]) ?? "")
+        title = (container.decodeString(keys: ["title"]) ?? "").strippingHTML
         cover = container.decodeString(keys: ["cover"]) ?? ""
         mediaCount = container.decodeInt(keys: ["media_count", "cnt_info", "play"]) ?? 0
         // `upper` is sometimes a flat `{ name, mid }` object,
@@ -5469,8 +5469,30 @@ extension KeyedDecodingContainer where K == DynamicKey {
 // `message` field. The extension is widened so the comment pipeline
 // can reach it without duplicating the regex.
 extension String {
+    /// Strips markup tags AND decodes HTML entities. Search results
+    /// entity-escape titles (`don&#x27;t`) and wrap keyword hits in
+    /// `<em>` highlight tags; other endpoints mix both shapes, so every
+    /// user-facing string goes through the one path.
     var strippingHTML: String {
-        replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        var text = replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        text = text.replacingOccurrences(of: "&lt;", with: "<")
+        text = text.replacingOccurrences(of: "&gt;", with: ">")
+        text = text.replacingOccurrences(of: "&quot;", with: "\"")
+        text = text.replacingOccurrences(of: "&#39;", with: "'")
+        // `&amp;` last — decoding it first would double-decode a
+        // literal `&amp;lt;` (user-typed "&lt;") into `<`.
+        text = text.replacingOccurrences(of: "&amp;", with: "&")
+        if let regex = try? NSRegularExpression(pattern: "&#x([0-9A-Fa-f]{2,4});") {
+            let full = NSRange(text.startIndex..., in: text)
+            for match in regex.matches(in: text, range: full).reversed() {
+                guard let hexRange = Range(match.range(at: 1), in: text),
+                      let scalar = UInt32(text[hexRange], radix: 16),
+                      let uni = Unicode.Scalar(scalar),
+                      let whole = Range(match.range, in: text) else { continue }
+                text.replaceSubrange(whole, with: String(Character(uni)))
+            }
+        }
+        return text
     }
 
     var httpsURL: URL? {
@@ -5679,33 +5701,3 @@ private enum BiliDanmakuProtobufDecoder {
 }
 
 
-extension String {
-    /// The search/type endpoint HTML-escapes titles (`&#x27;` for an
-    /// apostrophe) and wraps keyword matches in `<em class="keyword">`
-    /// highlight tags. The regular feed does neither — decoding here is
-    /// safe because raw `&` never survives upstream encoding in the
-    /// entity form we rewrite.
-    static func decodingSearchTitle(_ raw: String) -> String {
-        var text = raw
-        text = text.replacingOccurrences(of: "<em class=\"keyword\">", with: "")
-        text = text.replacingOccurrences(of: "</em>", with: "")
-        text = text.replacingOccurrences(of: "&amp;", with: "&")
-        text = text.replacingOccurrences(of: "&lt;", with: "<")
-        text = text.replacingOccurrences(of: "&gt;", with: ">")
-        text = text.replacingOccurrences(of: "&quot;", with: "\"")
-        text = text.replacingOccurrences(of: "&#39;", with: "'")
-        // numeric hex entities — &#x27; style
-        if let regex = try? NSRegularExpression(pattern: "&#x([0-9A-Fa-f]{2,4});") {
-            let full = NSRange(text.startIndex..., in: text)
-            let matches = regex.matches(in: text, range: full).reversed()
-            for match in matches {
-                guard let hexRange = Range(match.range(at: 1), in: text),
-                      let scalar = UInt32(text[hexRange], radix: 16),
-                      let uni = Unicode.Scalar(scalar),
-                      let whole = Range(match.range, in: text) else { continue }
-                text.replaceSubrange(whole, with: String(Character(uni)))
-            }
-        }
-        return text
-    }
-}
