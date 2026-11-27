@@ -1483,6 +1483,15 @@ final class PlayerController: ObservableObject {
                     guard self.player.currentItem === item else { return }
                     if change.newValue == true {
                         self.isBuffering = false
+                        // With `automaticallyWaitsToMinimizeStalling
+                        // = false` AVPlayer does NOT resume on its own
+                        // after a buffer underrun — it sits paused at
+                        // rate 0 forever. If the user never paused,
+                        // restart now that data is likely to keep up.
+                        if self.wantsToPlay, self.player.rate == 0 {
+                            diagLog(.playback, "buffer_recovered_auto_resume")
+                            self.player.play()
+                        }
                         // **PR-X**: clear any stale
                         // `.prolongedStall` (or other) error
                         // now that AVPlayer reports the item
