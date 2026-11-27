@@ -53,6 +53,10 @@ final class MiniPlayerStore: ObservableObject {
     /// `onChange(of:, initial: true)` + `onAppear` pair that
     /// both call `bind` on first appear.
     private var pendingPlayback: BiliPlayback?
+    /// Whether a detail view currently owns the inline surface.
+    /// Drives end-of-PiP teardown: when PiP stops and no inline
+    /// view is attached, the session has nowhere to go back to.
+    private var inlineAttached = false
 
     /// Bind a new playback to the store. Idempotent: if the same
     /// video is already bound **and the playback represents the
@@ -87,6 +91,11 @@ final class MiniPlayerStore: ObservableObject {
             // controller and watch session.  Hide the mini-player
             // if a previous navigation push surfaced it so the
             // inline player re-takes over.
+            // Re-entering the detail page (back from a child
+            // route like the creator profile) means the user is
+            // watching again — resume the paused session.
+            inlineAttached = true
+            controller?.player.play()
             diagLog(.playback, "MiniPlayerStore.bind: idempotent re-bind",
                     details: ["videoID": video.id])
             return
@@ -138,6 +147,22 @@ final class MiniPlayerStore: ObservableObject {
         // Start the history reporter. WatchSession reads
         // `currentTime` and `isPlaying` from the controller every
         // 30 seconds.
+        inlineAttached = true
+
+        // When PiP ends and no inline view is attached, the
+        // session has nowhere to surface — tear it down rather
+        // than leaking a paused controller forever.
+        cancellables.insert(
+            newController.$isPictureInPictureActive
+                .receive(on: RunLoop.main)
+                .sink { [weak self, weak newController] active in
+                    guard let self, !active, !self.inlineAttached else { return }
+                    guard self.controller === newController else { return }
+                    diagLog(.playback, "PlaybackStore: PiP ended without inline → teardown")
+                    self.teardownController()
+                }
+        )
+
         let session = WatchSession(
             repository: repository,
             aid: video.aid,
@@ -161,14 +186,24 @@ final class MiniPlayerStore: ObservableObject {
     /// video screen should fully stop playback, not leave a
     /// floating window behind.
     func detachInline() {
-        // The mini-player is gone: leaving the detail page now
-        // always tears playback down. Users who want to keep
-        // watching elsewhere use native Picture-in-Picture
-        // (available in the player controls), which covers the
-        // browse-while-watching case across the whole system.
-        guard controller != nil else { return }
-        diagLog(.playback, "PlaybackStore.detachInline: teardown")
-        teardownController()
+        // Leaving the detail page never leaves visible or audible
+        // playback behind, but the session is retained so a
+        // child-route round trip (creator profile, replies) comes
+        // back to exactly where the user left off instead of
+        // restarting at zero and overwriting the saved position.
+        // The controller is torn down when a different video
+        // binds, or when PiP ends without the inline view
+        // reclaiming the session.
+        guard let controller else { return }
+        inlineAttached = false
+        if controller.isPictureInPictureActive {
+            // PiP owns the surface now — keep the player running
+            // or the floating window freezes mid-playback.
+            diagLog(.playback, "PlaybackStore.detachInline: PiP active, keep running")
+            return
+        }
+        diagLog(.playback, "PlaybackStore.detachInline: pause + retain")
+        controller.player.pause()
     }
 
 
