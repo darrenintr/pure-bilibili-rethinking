@@ -1175,8 +1175,13 @@ final class LocalHLSProxyServer: @unchecked Sendable {
         currentBvid = nil
         currentCid = nil
         currentQn = nil
-        probedSizes.removeAll()
-        probeInFlight.removeAll()
+        // probedSizes / probeInFlight are deliberately NOT cleared:
+        // they are keyed by upstream URL (which embeds the auth
+        // token), so entries never go stale within a session, and
+        // `prewarmProbes` fires before this reset — clearing here
+        // would discard the warmed results and re-probe the same
+        // hosts inside the startup critical path. Memory cost is a
+        // handful of Int64s per video opened.
         failedProbes.removeAll()
         failoverIndex.removeAll()
         trackSegmentIndex.removeAll()
