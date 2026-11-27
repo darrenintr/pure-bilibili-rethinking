@@ -208,6 +208,10 @@ final class PlayerController: ObservableObject {
     /// paused placeholder, and mirroring that state used to suppress
     /// the initial play when the real item was installed.
     private var wantsToPlay = true
+    /// Last speed picked in the player speed menu; used to
+    /// restore the correct rate after a buffer-underrun
+    /// auto-resume (plain `play()` would snap back to 1x).
+    private var playbackRate: Float = 1.0
 
     // MARK: seek state machine (PR-A Group 1)
 
@@ -1488,9 +1492,13 @@ final class PlayerController: ObservableObject {
                         // after a buffer underrun — it sits paused at
                         // rate 0 forever. If the user never paused,
                         // restart now that data is likely to keep up.
-                        if self.wantsToPlay, self.player.rate == 0 {
+                        if self.wantsToPlay, self.player.rate == 0,
+                           self.player.timeControlStatus != .paused {
                             diagLog(.playback, "buffer_recovered_auto_resume")
-                            self.player.play()
+                            // `play()` would reset the rate to
+                            // `defaultRate` (1x); restore the speed
+                            // the viewer actually selected instead.
+                            self.player.rate = self.playbackRate
                         }
                         // **PR-X**: clear any stale
                         // `.prolongedStall` (or other) error
@@ -1944,6 +1952,7 @@ final class PlayerController: ObservableObject {
 
     /// Change the playback rate (e.g., 2.0 for 2x speed).
     func setRate(_ rate: Float) {
+        playbackRate = rate
         player.rate = rate
     }
 
