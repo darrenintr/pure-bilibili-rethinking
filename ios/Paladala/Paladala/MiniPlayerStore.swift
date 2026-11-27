@@ -89,10 +89,18 @@ final class MiniPlayerStore: ObservableObject {
         // with stale links would 403/expiry-loop on retry. A fresh
         // navigation re-fetches playurl anyway, so rebuilding costs
         // nothing in that path.
+        var resumePositionAfterRebuild: Double = 0
         if let current = currentVideo,
            current.id == video.id,
            Date().timeIntervalSince(controllerBoundAt) > 1800,
            controller != nil {
+            // Rebuilding for fresh signed URLs must not lose the
+            // playhead — the user is mid-video, and a restart at
+            // zero would overwrite their saved progress. Seeks
+            // issued before the item binds are replayed by the
+            // controller (`pendingUserSeek`), so this is safe to
+            // apply blindly right after construction.
+            resumePositionAfterRebuild = controller?.currentTime ?? 0
             teardownController()
         }
         if let current = currentVideo,
@@ -111,7 +119,13 @@ final class MiniPlayerStore: ObservableObject {
             // it rewinds first when the retained item is sitting
             // at its end, so reopening a finished video replays
             // from zero instead of sticking on the last frame.
-            controller?.play()
+            // …Unless the video already ENDED and the user never
+            // asked for a replay: the end card owns that state,
+            // so leave the player paused.
+            if let controller,
+               !(controller.duration > 0 && controller.currentTime >= controller.duration - 0.5) {
+                controller.play()
+            }
             diagLog(.playback, "MiniPlayerStore.bind: idempotent re-bind",
                     details: ["videoID": video.id])
             return
@@ -126,6 +140,9 @@ final class MiniPlayerStore: ObservableObject {
 
         let newController = PlayerController(playback: playback, video: video)
         controller = newController
+        if resumePositionAfterRebuild > 1 {
+            newController.seek(to: resumePositionAfterRebuild)
+        }
         currentVideo = video
         pendingPlayback = playback
 
