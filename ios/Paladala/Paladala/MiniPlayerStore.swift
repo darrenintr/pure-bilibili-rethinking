@@ -57,6 +57,7 @@ final class MiniPlayerStore: ObservableObject {
     /// Drives end-of-PiP teardown: when PiP stops and no inline
     /// view is attached, the session has nowhere to go back to.
     private var inlineAttached = false
+    private var controllerBoundAt = Date.distantPast
 
     /// Bind a new playback to the store. Idempotent: if the same
     /// video is already bound **and the playback represents the
@@ -83,6 +84,17 @@ final class MiniPlayerStore: ObservableObject {
     /// re-opens still trigger a clean teardown + rebuild, but a
     /// session-token-only re-fetch of the same video is a no-op.
     func bind(video: BiliVideo, playback: BiliPlayback, repository: PaladalaRepository) {
+        // A retained session older than this is rebuilt instead of
+        // resumed: CDN signed URLs carry a deadline, and resuming
+        // with stale links would 403/expiry-loop on retry. A fresh
+        // navigation re-fetches playurl anyway, so rebuilding costs
+        // nothing in that path.
+        if let current = currentVideo,
+           current.id == video.id,
+           Date().timeIntervalSince(controllerBoundAt) > 1800,
+           controller != nil {
+            teardownController()
+        }
         if let current = currentVideo,
            current.id == video.id,
            let pendingPlayback,
@@ -95,7 +107,11 @@ final class MiniPlayerStore: ObservableObject {
             // route like the creator profile) means the user is
             // watching again — resume the paused session.
             inlineAttached = true
-            controller?.player.play()
+            // `PlayerController.play()` (not raw `player.play()`):
+            // it rewinds first when the retained item is sitting
+            // at its end, so reopening a finished video replays
+            // from zero instead of sticking on the last frame.
+            controller?.play()
             diagLog(.playback, "MiniPlayerStore.bind: idempotent re-bind",
                     details: ["videoID": video.id])
             return
@@ -148,6 +164,7 @@ final class MiniPlayerStore: ObservableObject {
         // `currentTime` and `isPlaying` from the controller every
         // 30 seconds.
         inlineAttached = true
+        controllerBoundAt = Date()
 
         // When PiP ends and no inline view is attached, the
         // session has nowhere to surface — tear it down rather
@@ -203,7 +220,11 @@ final class MiniPlayerStore: ObservableObject {
             return
         }
         diagLog(.playback, "PlaybackStore.detachInline: pause + retain")
-        controller.player.pause()
+        // Controller-level pause clears `wantsToPlay` — pausing the
+        // raw player would leave the intent set, and a still-loading
+        // item would then auto-start (audibly!) after the user has
+        // already left the page.
+        controller.pause()
     }
 
 
