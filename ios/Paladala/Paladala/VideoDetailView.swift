@@ -316,7 +316,8 @@ struct VideoDetailView: View {
             } else {
             VStack(spacing: 0) {
                 playerSurface
-                    .frame(height: playerHeight)
+                    .frame(width: min(geo.size.width, playerHeight / playerAspectHeightOverWidth),
+                           height: playerHeight)
                     .frame(maxWidth: .infinity)
                     .clipped()
                     // Late-bind the sleep timer to the active
@@ -753,7 +754,8 @@ struct VideoDetailView: View {
         HStack(alignment: .top, spacing: 0) {
             VStack(spacing: 0) {
                 playerSurface
-                    .frame(height: columnPlayerHeight)
+                    .frame(width: min(leftWidth, columnPlayerHeight / playerAspectHeightOverWidth),
+                           height: columnPlayerHeight)
                     .frame(maxWidth: .infinity)
                     .clipped()
                     .onAppear { sleepTimer.setController(playerController) }
