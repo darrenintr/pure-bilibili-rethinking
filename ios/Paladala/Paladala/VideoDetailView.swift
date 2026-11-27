@@ -293,7 +293,12 @@ struct VideoDetailView: View {
             // The reference surface is a full-width 16:9 editorial block.
             // Immersive mode remains available, but the default no longer
             // consumes over half of a portrait screen before metadata appears.
-            let mediaHeight = geo.size.width * playerAspectHeightOverWidth
+            // Portrait streams can otherwise fill the entire
+            // viewport (9:16 vertical video ≈ 1.78× width), leaving
+            // no visible detail content below the fold. Cap the
+            // player at 60% of the viewport height — controls and
+            // comments stay discoverable without scrolling blind.
+            let mediaHeight = min(geo.size.width * playerAspectHeightOverWidth, geo.size.height * 0.6)
             let maxPlayerHeight = isImmersiveMode ? totalH * 0.8 : mediaHeight
             let minPlayerHeight = isImmersiveMode
                 ? totalH * 0.9
