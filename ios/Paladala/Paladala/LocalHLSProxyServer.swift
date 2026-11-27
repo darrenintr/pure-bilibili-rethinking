@@ -3661,6 +3661,55 @@ fileprivate func proxySegmentRange(
     private static let btrChunkBytes: Int64 = 256 * 1024
     private static let btrMaxChunks = 8
 
+    /// Milliseconds a chunk fetch may run on the primary mirror
+    /// before a hedged duplicate fires on the backup. Sized from
+    /// field data: p50 chunk latency is ~165ms, so 700ms only
+    /// duplicates genuinely slow connections.
+    private static let btrHedgeMs: UInt64 = 700
+
+    /// Race one chunk across mirrors: the primary starts
+    /// immediately, each backup joins after a staggered hedge
+    /// delay. First success wins; the losers are cancelled.
+    /// Falls back to throwing only when every mirror fails.
+    private func fetchChunkHedged(
+        index: Int,
+        chunk: Range<Int64>,
+        candidates: [URL],
+        referer: String,
+        purpose: String
+    ) async throws -> (Int, Data) {
+        try await withThrowingTaskGroup(of: (Int, Data).self) { race in
+            for (offset, url) in candidates.enumerated() {
+                race.addTask { [self] in
+                    if offset > 0 {
+                        try await Task.sleep(
+                            nanoseconds: Self.btrHedgeMs * 1_000_000 * UInt64(offset)
+                        )
+                        try Task.checkCancellation()
+                    }
+                    let outcome = try await self.fetchExactRange(
+                        url: url,
+                        range: chunk,
+                        referer: referer,
+                        purpose: purpose
+                    )
+                    return (index, outcome.data)
+                }
+            }
+            defer { race.cancelAll() }
+            var lastError: Error = RangeFetchError.timedOut
+            while let result = await race.nextResult() {
+                switch result {
+                case .success(let winner):
+                    return winner
+                case .failure(let error):
+                    lastError = error
+                }
+            }
+            throw lastError
+        }
+    }
+
     /// Fetch `byteRange` as N contiguous chunks, each issued to a
     /// different CDN mirror from `[track.baseURL] + backupURLs`
     /// round-robin, then splice the bodies in order and serve as
@@ -3758,22 +3807,22 @@ fileprivate func proxySegmentRange(
                 sentBytes = try await withThrowingTaskGroup(of: (Int, Data).self, returning: Int.self) { group in
                     for (index, chunk) in chunks_.enumerated() {
                         group.addTask { [self] in
-                            var lastError: Error = RangeFetchError.timedOut
-                            for attempt in 0..<candidates_.count {
-                                let url = candidates_[(index + attempt) % candidates_.count]
-                                do {
-                                    let outcome = try await self.fetchExactRange(
-                                        url: url,
-                                        range: chunk,
-                                        referer: referer_,
-                                        purpose: "segment[\(idx)] \(kind) chunk \(index)"
-                                    )
-                                    return (index, outcome.data)
-                                } catch {
-                                    lastError = error
-                                }
-                            }
-                            throw lastError
+                            // Hedged racing: start the fetch on the
+                            // primary mirror, then — if it hasn't
+                            // landed within the hedge delay — fire a
+                            // duplicate at the backup mirror and use
+                            // whichever finishes first. CDN slowness
+                            // is per-connection and heavy-tailed
+                            // (field data: p50 165ms, p90 5.8s), so
+                            // cutting the tail matters far more than
+                            // the duplicate bandwidth costs.
+                            try await self.fetchChunkHedged(
+                                index: index,
+                                chunk: chunk,
+                                candidates: candidates_,
+                                referer: referer_,
+                                purpose: "segment[\(idx)] \(kind) chunk \(index)"
+                            )
                         }
                     }
                     // Write in index order: out-of-order completions
