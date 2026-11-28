@@ -3317,7 +3317,15 @@ final class LocalHLSProxyServer: @unchecked Sendable {
             "#EXT-X-I-FRAMES-ONLY",
             "#EXT-X-MAP:URI=\"\(initURL)\"",
         ]
-        for (idx, frag) in index.fragments.enumerated() {
+        // Only fragments that begin on a keyframe (SAP) can
+        // yield a decodable trick-play frame — listing the rest
+        // would give AVPlayer byte ranges it cannot decode a
+        // preview from, so they are skipped here.  (In practice
+        // virtually every B站 DASH fragment starts with an IDR;
+        // this matters only for rare non-SAP streams.)
+        let keyframeIndices = index.fragments.enumerated()
+            .filter { $0.element.startsWithSAP }
+        for (idx, frag) in keyframeIndices {
             let segmentURL = localURL(
                 baseURL: baseURL,
                 path: "segment",
