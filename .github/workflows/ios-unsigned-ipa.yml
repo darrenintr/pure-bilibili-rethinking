@@ -32,6 +32,76 @@ permissions:
   contents: write
 
 jobs:
+  build-macos-catalyst:
+    name: Build macOS app (Catalyst)
+    runs-on: macos-15
+    env:
+      PROJECT_DIR: ios/Paladala
+      PROJECT_NAME: Paladala
+      DERIVED_DATA: build/macos-derived-data
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 26+
+        run: |
+          best=""
+          for app in /Applications/Xcode*.app; do
+            dv=$(/usr/bin/defaults read "$app/Contents/Info.plist" CFBundleShortVersionString 2>/dev/null)
+            major=$(echo "$dv" | cut -d. -f1)
+            if [ "$major" -ge 26 ] 2>/dev/null; then
+              if [ -z "$best" ] || [ "$major" -ge "$(/usr/bin/defaults read "$best/Contents/Info.plist" CFBundleShortVersionString | cut -d. -f1)" ]; then
+                best="$app"
+              fi
+            fi
+          done
+          if [ -z "$best" ]; then
+            echo "ERROR: no Xcode >= 26 found on this runner" >&2
+            exit 1
+          fi
+          sudo xcode-select -s "$best/Contents/Developer"
+          xcodebuild -version
+
+      - name: Build macOS Catalyst app
+        working-directory: ios/Paladala
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Paladala.xcodeproj \
+            -scheme Paladala \
+            -destination 'platform=macOS,variant=Mac Catalyst' \
+            -configuration Release \
+            -derivedDataPath "$GITHUB_WORKSPACE/$DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee "$GITHUB_WORKSPACE/build/macos-xcodebuild.log"
+
+      - name: Package Paladala.app
+        run: |
+          APP_PATH=$(find "$DERIVED_DATA/Build/Products/Release-maccatalyst" -maxdepth 1 -name "Paladala.app" | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::Paladala.app not found in derived data"
+            exit 1
+          fi
+          echo "found app at $APP_PATH"
+          cd "$(dirname "$APP_PATH")"
+          ditto -c -k --sequesterRsrc --keepParent Paladala.app "$GITHUB_WORKSPACE/build/Paladala-macOS.zip"
+          ls -lh "$GITHUB_WORKSPACE/build/Paladala-macOS.zip"
+
+      - name: Upload macOS app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Paladala-macOS-Catalyst
+          path: build/Paladala-macOS.zip
+          retention-days: 14
+
+      - name: Upload xcodebuild build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-xcodebuild-log
+          path: build/macos-xcodebuild.log
+          retention-days: 7
+
   build-unsigned-ipa:
     name: Build unsigned IPA
     runs-on: macos-15
