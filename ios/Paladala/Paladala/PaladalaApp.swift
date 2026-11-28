@@ -343,24 +343,36 @@ struct PaladalaApp: App {
         // themselves when nothing is playing.
         .commands {
             CommandMenu("播放控制") {
-                Button(miniPlayerStore.isPlaying ? "暫停" : "播放") {
+                // Buffering counts as playing for the toggle:
+                // `isPlaying` mirrors timeControlStatus, which is
+                // `.waitingToPlayAtSpecifiedRate` during a stall —
+                // treating that as "paused" would make the menu
+                // item call play() (a no-op) exactly when the user
+                // is trying to STOP the pending playback.
+                let activePlayback = miniPlayerStore.isPlaying || miniPlayerStore.isBuffering
+                // Gate on a visible surface: the controller is
+                // retained (paused) after leaving the detail page
+                // so a round trip can resume — without this, Play
+                // would restart audio with no player on screen.
+                let surfaceVisible = miniPlayerStore.hasVisiblePlayerSurface
+                Button(activePlayback ? "暫停" : "播放") {
                     guard let c = miniPlayerStore.controller else { return }
-                    if miniPlayerStore.isPlaying { c.pause() } else { c.play() }
+                    if activePlayback { c.pause() } else { c.play() }
                 }
                 .keyboardShortcut(.space, modifiers: [])
-                .disabled(miniPlayerStore.controller == nil)
+                .disabled(miniPlayerStore.controller == nil || !surfaceVisible)
 
                 Button("後退 10 秒") {
                     miniPlayerStore.controller?.seek(by: -10)
                 }
                 .keyboardShortcut(.leftArrow, modifiers: [])
-                .disabled(miniPlayerStore.controller == nil)
+                .disabled(miniPlayerStore.controller == nil || !surfaceVisible)
 
                 Button("前進 10 秒") {
                     miniPlayerStore.controller?.seek(by: 10)
                 }
                 .keyboardShortcut(.rightArrow, modifiers: [])
-                .disabled(miniPlayerStore.controller == nil)
+                .disabled(miniPlayerStore.controller == nil || !surfaceVisible)
 
                 Divider()
 
@@ -369,14 +381,14 @@ struct PaladalaApp: App {
                     c.setVolume(min(1.0, c.volume + 0.1))
                 }
                 .keyboardShortcut(.upArrow, modifiers: [])
-                .disabled(miniPlayerStore.controller == nil)
+                .disabled(miniPlayerStore.controller == nil || !surfaceVisible)
 
                 Button("聲音細") {
                     guard let c = miniPlayerStore.controller else { return }
                     c.setVolume(max(0.0, c.volume - 0.1))
                 }
                 .keyboardShortcut(.downArrow, modifiers: [])
-                .disabled(miniPlayerStore.controller == nil)
+                .disabled(miniPlayerStore.controller == nil || !surfaceVisible)
 
                 Divider()
 
@@ -388,7 +400,7 @@ struct PaladalaApp: App {
                         }
                     }
                 }
-                .disabled(miniPlayerStore.controller == nil)
+                .disabled(miniPlayerStore.controller == nil || !surfaceVisible)
             }
         }
 

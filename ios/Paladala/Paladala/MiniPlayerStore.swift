@@ -57,6 +57,17 @@ final class MiniPlayerStore: ObservableObject {
     /// Drives end-of-PiP teardown: when PiP stops and no inline
     /// view is attached, the session has nowhere to go back to.
     private var inlineAttached = false
+
+    /// Whether playback has any visible surface right now — the
+    /// inline detail player or an active PiP window.  The macOS
+    /// menu-bar playback commands gate on this: after leaving the
+    /// detail page the controller is *retained* (paused) so a
+    /// child-route round trip can resume, and without this gate
+    /// the menu's Play item would restart audio with no player
+    /// on screen.
+    var hasVisiblePlayerSurface: Bool {
+        inlineAttached || (controller?.isPictureInPictureActive ?? false)
+    }
     private var controllerBoundAt = Date.distantPast
 
     /// Bind a new playback to the store. Idempotent: if the same

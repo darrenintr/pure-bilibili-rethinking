@@ -172,7 +172,16 @@ struct VideoDetailView: View {
     // plain `@State` instead (cheap, localised invalidation) and
     // commit to storage once, on release.
     @State private var playerSizeBiasLive: Double? = nil
-    private var effectivePlayerSizeBias: Double { playerSizeBiasLive ?? playerSizeBias }
+    private var effectivePlayerSizeBias: Double {
+        // On macOS the window itself resizes freely and the
+        // drag grip is hidden — applying a persisted iOS bias
+        // here would zoom the player with no way to undo it.
+        #if targetEnvironment(macCatalyst)
+        return 1.0
+        #else
+        return playerSizeBiasLive ?? playerSizeBias
+        #endif
+    }
 
     /// Height÷width of the actual video stream (e.g. 16/9 for
     /// landscape, 16/9 flipped for vertical video). Falls back
