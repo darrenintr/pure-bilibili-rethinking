@@ -310,6 +310,16 @@ struct BangumiSeasonDetailView: View {
             // without this the episode position is lost when the
             // user leaves the season page mid-playback.
             persistLivePosition()
+            // Leaving the season must also STOP the episode:
+            // the controller is registered app-wide now, so
+            // without this it keeps playing audibly with no
+            // visible surface — the same rule the
+            // miniplayer-removal applied to regular videos.
+            if let c = pgcController {
+                miniPlayerStore.unregisterExternalController(c)
+                c.tearDown()
+                pgcController = nil
+            }
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.visible, for: .navigationBar)

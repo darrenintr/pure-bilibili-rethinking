@@ -362,17 +362,20 @@ struct PaladalaApp: App {
                 .keyboardShortcut(.space, modifiers: [])
                 .disabled(miniPlayerStore.controller == nil || !surfaceVisible)
 
+                // Seek items require a finite duration: for
+                // open-ended live streams a skip either no-ops
+                // or parks in pendingUserSeek forever.
                 Button("後退 10 秒") {
                     miniPlayerStore.controller?.seek(by: -10)
                 }
                 .keyboardShortcut(.leftArrow, modifiers: [])
-                .disabled(miniPlayerStore.controller == nil || !surfaceVisible)
+                .disabled(miniPlayerStore.controller == nil || !surfaceVisible || !(miniPlayerStore.duration > 0))
 
                 Button("前進 10 秒") {
                     miniPlayerStore.controller?.seek(by: 10)
                 }
                 .keyboardShortcut(.rightArrow, modifiers: [])
-                .disabled(miniPlayerStore.controller == nil || !surfaceVisible)
+                .disabled(miniPlayerStore.controller == nil || !surfaceVisible || !(miniPlayerStore.duration > 0))
 
                 Divider()
 
