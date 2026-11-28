@@ -17,7 +17,7 @@ import SwiftUI
 ///    `PlayerController` (which starts the local HLS proxy for VOD
 ///    DASH) and starts a `WatchSession`.
 /// 2. `VideoDetailView.onDisappear` calls `detachInline()`. The
-///    store flips `isShowingMiniPlayer` to `true`; the player keeps
+///    playback is torn down (the mini-player was removed in
 ///    playing. The `MiniPlayerOverlay` becomes visible.
 /// 3. The user taps the mini-player; `MiniPlayerOverlay` calls
 ///    `router.openVideo(currentVideo)` which re-pushes the video
@@ -27,12 +27,11 @@ import SwiftUI
 ///    the playhead is continuous and `progress=0` is not re-fired.
 /// 4. The user taps the mini-player's "X" — `close()` tears down the
 ///    controller and the watch session. The local HLS proxy is
-///    stopped, and `isShowingMiniPlayer` flips back to `false`.
+///    stopped; native PiP covers continue-watching.
 @MainActor
 final class MiniPlayerStore: ObservableObject {
     @Published private(set) var currentVideo: BiliVideo?
     @Published private(set) var controller: PlayerController?
-    @Published private(set) var isShowingMiniPlayer: Bool = false
 
     /// Mirror of the controller's `@Published` state so SwiftUI
     /// views observing the store can react to playhead changes
@@ -54,6 +53,22 @@ final class MiniPlayerStore: ObservableObject {
     /// `onChange(of:, initial: true)` + `onAppear` pair that
     /// both call `bind` on first appear.
     private var pendingPlayback: BiliPlayback?
+    /// Whether a detail view currently owns the inline surface.
+    /// Drives end-of-PiP teardown: when PiP stops and no inline
+    /// view is attached, the session has nowhere to go back to.
+    private var inlineAttached = false
+
+    /// Whether playback has any visible surface right now — the
+    /// inline detail player or an active PiP window.  The macOS
+    /// menu-bar playback commands gate on this: after leaving the
+    /// detail page the controller is *retained* (paused) so a
+    /// child-route round trip can resume, and without this gate
+    /// the menu's Play item would restart audio with no player
+    /// on screen.
+    var hasVisiblePlayerSurface: Bool {
+        inlineAttached || (controller?.isPictureInPictureActive ?? false)
+    }
+    private var controllerBoundAt = Date.distantPast
 
     /// Bind a new playback to the store. Idempotent: if the same
     /// video is already bound **and the playback represents the
@@ -80,6 +95,25 @@ final class MiniPlayerStore: ObservableObject {
     /// re-opens still trigger a clean teardown + rebuild, but a
     /// session-token-only re-fetch of the same video is a no-op.
     func bind(video: BiliVideo, playback: BiliPlayback, repository: PaladalaRepository) {
+        // A retained session older than this is rebuilt instead of
+        // resumed: CDN signed URLs carry a deadline, and resuming
+        // with stale links would 403/expiry-loop on retry. A fresh
+        // navigation re-fetches playurl anyway, so rebuilding costs
+        // nothing in that path.
+        var resumePositionAfterRebuild: Double = 0
+        if let current = currentVideo,
+           current.id == video.id,
+           Date().timeIntervalSince(controllerBoundAt) > 1800,
+           controller != nil {
+            // Rebuilding for fresh signed URLs must not lose the
+            // playhead — the user is mid-video, and a restart at
+            // zero would overwrite their saved progress. Seeks
+            // issued before the item binds are replayed by the
+            // controller (`pendingUserSeek`), so this is safe to
+            // apply blindly right after construction.
+            resumePositionAfterRebuild = controller?.currentTime ?? 0
+            teardownController()
+        }
         if let current = currentVideo,
            current.id == video.id,
            let pendingPlayback,
@@ -88,10 +122,20 @@ final class MiniPlayerStore: ObservableObject {
             // controller and watch session.  Hide the mini-player
             // if a previous navigation push surfaced it so the
             // inline player re-takes over.
-            if isShowingMiniPlayer {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                    isShowingMiniPlayer = false
-                }
+            // Re-entering the detail page (back from a child
+            // route like the creator profile) means the user is
+            // watching again — resume the paused session.
+            inlineAttached = true
+            // `PlayerController.play()` (not raw `player.play()`):
+            // it rewinds first when the retained item is sitting
+            // at its end, so reopening a finished video replays
+            // from zero instead of sticking on the last frame.
+            // …Unless the video already ENDED and the user never
+            // asked for a replay: the end card owns that state,
+            // so leave the player paused.
+            if let controller,
+               !(controller.duration > 0 && controller.currentTime >= controller.duration - 0.5) {
+                controller.play()
             }
             diagLog(.playback, "MiniPlayerStore.bind: idempotent re-bind",
                     details: ["videoID": video.id])
@@ -107,6 +151,9 @@ final class MiniPlayerStore: ObservableObject {
 
         let newController = PlayerController(playback: playback, video: video)
         controller = newController
+        if resumePositionAfterRebuild > 1 {
+            newController.seek(to: resumePositionAfterRebuild)
+        }
         currentVideo = video
         pendingPlayback = playback
 
@@ -144,6 +191,23 @@ final class MiniPlayerStore: ObservableObject {
         // Start the history reporter. WatchSession reads
         // `currentTime` and `isPlaying` from the controller every
         // 30 seconds.
+        inlineAttached = true
+        controllerBoundAt = Date()
+
+        // When PiP ends and no inline view is attached, the
+        // session has nowhere to surface — tear it down rather
+        // than leaking a paused controller forever.
+        cancellables.insert(
+            newController.$isPictureInPictureActive
+                .receive(on: RunLoop.main)
+                .sink { [weak self, weak newController] active in
+                    guard let self, !active, !self.inlineAttached else { return }
+                    guard self.controller === newController else { return }
+                    diagLog(.playback, "PlaybackStore: PiP ended without inline → teardown")
+                    self.teardownController()
+                }
+        )
+
         let session = WatchSession(
             repository: repository,
             aid: video.aid,
@@ -159,6 +223,62 @@ final class MiniPlayerStore: ObservableObject {
     /// Called by `VideoDetailView.onDisappear` (outside the
     /// fullscreen grace window) to surface the mini-player. The
     /// controller keeps running; only the inline surface goes
+    /// Register a playback controller owned by a surface outside
+    /// the store — bangumi episodes and live rooms build their
+    /// own `PlayerController` today.  Registration lets the macOS
+    /// menu-bar playback commands (and any future unified control
+    /// surface) drive them exactly like regular video sessions.
+    /// Whatever the store currently holds is torn down first:
+    /// two audible playbacks must never coexist.
+    func registerExternalController(_ newController: PlayerController) {
+        teardownController()
+        controller = newController
+        currentVideo = nil
+        pendingPlayback = nil
+        inlineAttached = true
+        controllerBoundAt = Date()
+        cancellables.removeAll()
+        cancellables.insert(
+            newController.$currentTime
+                .receive(on: RunLoop.main)
+                .sink { [weak self] in self?.currentTime = $0 }
+        )
+        cancellables.insert(
+            newController.$duration
+                .receive(on: RunLoop.main)
+                .sink { [weak self] in self?.duration = $0 }
+        )
+        cancellables.insert(
+            newController.$isPlaying
+                .receive(on: RunLoop.main)
+                .sink { [weak self] in self?.isPlaying = $0 }
+        )
+        cancellables.insert(
+            newController.$isBuffering
+                .receive(on: RunLoop.main)
+                .sink { [weak self] in self?.isBuffering = $0 }
+        )
+        cancellables.insert(
+            newController.$networkSpeed
+                .receive(on: RunLoop.main)
+                .sink { [weak self] in self?.networkSpeed = $0 }
+        )
+        diagLog(.playback, "PlaybackStore.registerExternalController")
+    }
+
+    /// Drop the registration when the owning surface closes —
+    /// but only if the store still points at that same controller,
+    /// so a late closePgcPlayer can't clobber a newer session.
+    func unregisterExternalController(_ old: PlayerController) {
+        guard controller === old else { return }
+        controller = nil
+        currentVideo = nil
+        pendingPlayback = nil
+        inlineAttached = false
+        cancellables.removeAll()
+        diagLog(.playback, "PlaybackStore.unregisterExternalController")
+    }
+
     /// away.
     ///
     /// If the user has disabled `miniPlayerOnExit` in
@@ -167,44 +287,30 @@ final class MiniPlayerStore: ObservableObject {
     /// video screen should fully stop playback, not leave a
     /// floating window behind.
     func detachInline() {
-        guard controller != nil else { return }
-        guard !isShowingMiniPlayer else { return }
-        let defaults = UserDefaults.standard
-        let key = "paladala.miniPlayerOnExit"
-        let miniPlayerOnExit = defaults.object(forKey: key) as? Bool ?? true
-        if miniPlayerOnExit == false {
-            // Default is "on" — `@AppStorage` writes `true` on
-            // first toggle but leaves the key absent otherwise.
-            // Treat the absent state as "on" so existing users
-            // don't suddenly lose the mini-player after the upgrade.
-            diagLog(.playback, "MiniPlayerStore.detachInline: miniPlayerOnExit=false → teardown")
-            teardownController()
+        // Leaving the detail page never leaves visible or audible
+        // playback behind, but the session is retained so a
+        // child-route round trip (creator profile, replies) comes
+        // back to exactly where the user left off instead of
+        // restarting at zero and overwriting the saved position.
+        // The controller is torn down when a different video
+        // binds, or when PiP ends without the inline view
+        // reclaiming the session.
+        guard let controller else { return }
+        inlineAttached = false
+        if controller.isPictureInPictureActive {
+            // PiP owns the surface now — keep the player running
+            // or the floating window freezes mid-playback.
+            diagLog(.playback, "PlaybackStore.detachInline: PiP active, keep running")
             return
         }
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            isShowingMiniPlayer = true
-        }
+        diagLog(.playback, "PlaybackStore.detachInline: pause + retain")
+        // Controller-level pause clears `wantsToPlay` — pausing the
+        // raw player would leave the intent set, and a still-loading
+        // item would then auto-start (audibly!) after the user has
+        // already left the page.
+        controller.pause()
     }
 
-    /// User tapped the mini-player's "X". Tear down the controller
-    /// and stop the watch session. The local HLS proxy is shut
-    /// down inside `PlayerController.tearDown()`.
-    func close() {
-        teardownController()
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            isShowingMiniPlayer = false
-        }
-    }
-
-    /// User tapped the mini-player to expand back into the inline
-    /// surface. We just flip the flag; the parent's navigation
-    /// push re-mounts `VideoDetailView` which calls `bind` (which
-    /// is idempotent).
-    func expand() {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            isShowingMiniPlayer = false
-        }
-    }
 
     func play() {
         controller?.player.play()

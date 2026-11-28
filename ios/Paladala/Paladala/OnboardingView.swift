@@ -9,7 +9,7 @@ struct OnboardingView: View {
 
     private static let pages: [OnboardingPage] = [
         OnboardingPage(title: "為 B 站而生", subtitle: "首頁 · 推薦 · 動態 · 直播，一個 App 走完", symbol: "play.rectangle.on.rectangle.fill", tint: PaladalaTheme.biliPink),
-        OnboardingPage(title: "順手就走的播放", subtitle: "看到一半切走，影片縮成小窗繼續放；想看再點開", symbol: "pip.exit", tint: PaladalaTheme.biliPink),
+        OnboardingPage(title: "順手就走的播放", subtitle: "用原生畫中畫，影片浮喺任何 App 上面繼續播", symbol: "pip.exit", tint: PaladalaTheme.biliPink),
         OnboardingPage.preferences,
         OnboardingPage(title: "登入後更強", subtitle: "同步歷史、收藏、追番和稍後再看", symbol: "person.crop.circle.badge.checkmark", tint: PaladalaTheme.biliPink),
     ]
@@ -643,7 +643,26 @@ private struct OnboardingNativePageView: View {
                 .font(.system(size: 64, weight: .bold))
                 .foregroundStyle(.white)
         }
+        .modifier(OnboardingHeroGlass())
     }
+
+/// iOS 26: a subtle interactive glass sheen over the hero
+/// squircle so it reads as part of the same material system
+/// as the rest of the app. Older SDKs render it plain.
+private struct OnboardingHeroGlass: ViewModifier {
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(.clear, in: .rect(cornerRadius: 32))
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
+    }
+}
 
     /// Per-page gradient chosen to match the page's icon.  Mirrors
     /// the mockup's pink / purple / green swatches; the .pink and
@@ -699,11 +718,33 @@ private struct OnboardingNativePageView: View {
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
+        }
+        .modifier(OnboardingCTAStyle())
+    }
+}
+
+/// Liquid-glass capsule CTA on iOS 26; solid accent rounded
+/// rect on older SDKs where glass doesn't exist.
+private struct OnboardingCTAStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(.regular.tint(Color.accentColor).interactive(), in: Capsule())
+        } else {
+            content
                 .background(
                     Color.accentColor,
                     in: RoundedRectangle(cornerRadius: 14, style: .continuous)
                 )
         }
+        #else
+        content
+            .background(
+                Color.accentColor,
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+        #endif
     }
 }
 
@@ -740,7 +781,7 @@ private struct OnboardingNativePreferencesView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                Slider(value: $glassLevel, in: 0...4, step: 1)
+                Slider(value: $glassLevel, in: 0...4)
                     .onChange(of: glassLevel) { _, newValue in
                         glassStyleRaw = GlassStyle(level: Int(newValue)).rawValue
                         Haptics.selection()

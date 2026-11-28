@@ -6,6 +6,7 @@ enum MainTab: String, CaseIterable, Identifiable, Codable {
     case dynamic
     case live
     case profile
+    case search
 
     var id: String { rawValue }
 
@@ -19,6 +20,8 @@ enum MainTab: String, CaseIterable, Identifiable, Codable {
             return "直播"
         case .profile:
             return "我的"
+        case .search:
+            return "搜尋"
         }
     }
 
@@ -37,6 +40,8 @@ enum MainTab: String, CaseIterable, Identifiable, Codable {
             return "play.tv"
         case .profile:
             return "person.crop.circle"
+        case .search:
+            return "magnifyingglass"
         }
     }
 
@@ -55,6 +60,8 @@ enum MainTab: String, CaseIterable, Identifiable, Codable {
             return "dot.radiowaves.left.and.right"
         case .profile:
             return "person.crop.circle"
+        case .search:
+            return "magnifyingglass"
         }
     }
 }
@@ -134,6 +141,7 @@ final class AppRouter: ObservableObject {
     @Published var dynamicPath = NavigationPath()
     @Published var livePath = NavigationPath()
     @Published var profilePath = NavigationPath()
+    @Published var searchPath = NavigationPath()
 
     /// Proxy forwarding to the currently selected tab's path so the
     /// existing push helpers (`openVideo`, `open`, ...) keep working
@@ -145,6 +153,7 @@ final class AppRouter: ObservableObject {
             case .dynamic: return dynamicPath
             case .live: return livePath
             case .profile: return profilePath
+            case .search: return searchPath
             }
         }
         set {
@@ -153,6 +162,7 @@ final class AppRouter: ObservableObject {
             case .dynamic: dynamicPath = newValue
             case .live: livePath = newValue
             case .profile: profilePath = newValue
+            case .search: searchPath = newValue
             }
         }
     }
@@ -213,7 +223,7 @@ final class AppRouter: ObservableObject {
 
     func openSearch(_ query: String) {
         pendingSearchQuery = query
-        selectedTab = .home
+        selectedTab = .search
         path.removeLast(path.count)
     }
 

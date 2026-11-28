@@ -80,6 +80,74 @@ extension ProxyServerError: LocalizedError {
 /// A 127.0.0.1-only HTTP server that exposes an HLS manifest
 /// for a single `BiliPlayback`.  Always access through
 /// `LocalHLSProxyServer.shared`.
+/// Rolling per-host throughput measurements collected from real
+/// chunk fetches. B站 throttles per connection, and mirror quality
+/// differs by an order of magnitude on the same network (field
+/// measurement: akam 2.8 MB/s vs cosov 1.2 MB/s) — yet the playurl
+/// backup list is unordered. Steering chunk rotation by measured
+/// throughput makes fast hosts serve the majority of chunks while
+/// the hedge race keeps measuring the rest for free.
+final class BtrHostThroughput: @unchecked Sendable {
+    static let shared = BtrHostThroughput()
+
+    private struct Stat {
+        /// EWMA of bytes/second. Alpha is high enough to react to
+        /// congestion within a few chunks, low enough that one
+        /// slow chunk doesn't sink a host.
+        var ewma: Double
+    }
+
+    private let lock = NSLock()
+    private var stats: [String: Stat] = [:]
+
+    func record(host: String, bytes: Int, elapsedMs: Int) {
+        guard elapsedMs > 0, bytes > 0, !host.isEmpty else { return }
+        let bps = Double(bytes) / (Double(elapsedMs) / 1000.0)
+        lock.lock()
+        if var existing = stats[host] {
+            existing.ewma = existing.ewma * 0.6 + bps * 0.4
+            stats[host] = existing
+        } else {
+            stats[host] = Stat(ewma: bps)
+        }
+        lock.unlock()
+    }
+
+    func score(host: String) -> Double? {
+        lock.lock()
+        let value = stats[host]?.ewma
+        lock.unlock()
+        return value
+    }
+
+    /// Order candidates fastest-first. Hosts with no measurement
+    /// yet sort ahead of measured-but-slow ones (optimistic
+    /// exploration) but behind measured-fast ones; ties keep the
+    /// upstream order so the first chunk of a session looks
+    /// identical to the pre-steering behaviour.
+    func ordered(_ candidates: [URL]) -> [URL] {
+        guard candidates.count > 1 else { return candidates }
+        return candidates.enumerated().sorted { lhs, rhs in
+            let ls = score(host: lhs.element.host ?? "")
+            let rs = score(host: rhs.element.host ?? "")
+            switch (ls, rs) {
+            case let (l?, r?):
+                if l != r { return l > r }
+                return lhs.offset < rhs.offset
+            case (nil, nil):
+                return lhs.offset < rhs.offset
+            case (_?, nil):
+                // Measured beats unmeasured only when the
+                // measurement is decent (> 300 KB/s); a host we
+                // know is slow yields to the unknown.
+                return (ls ?? 0) >= 300_000
+            case (nil, _?):
+                return (rs ?? 0) < 300_000
+            }
+        }.map { $0.element }
+    }
+}
+
 final class LocalHLSProxyServer: @unchecked Sendable {
     /// OS-chosen port (`0`).  `NWListener.start` picks a real
     /// loopback port on its own; the `requiredLocalEndpoint`
@@ -1039,6 +1107,26 @@ final class LocalHLSProxyServer: @unchecked Sendable {
     /// for the current playback.  Pulled out of `serve()`
     /// so `serveLocal()` and `serve(playback:) async`
     /// share the same probe behaviour.
+    /// Fire the CDN total-size probes the moment a playurl resolves —
+    /// normally they start inside `serve()`, but TLS+probe latency
+    /// (~0.5s) then sits squarely in the startup critical path. The
+    /// probes are keyed by URL and generation-independent, so warming
+    /// them while the view/controller machinery spins up is free
+    /// overlap: by the time `serve()` runs, results are hot.
+    func prewarmProbes(for playback: BiliPlayback) {
+        guard playback.localContext == nil else { return }
+        if prepSession == nil {
+            prepSession = Self.makePrepSession()
+        }
+        let referer = playback.referer.absoluteString
+        if let video = playback.dash?.video {
+            startMediaTotalProbe(for: video, referer: referer)
+        }
+        if let audio = playback.dash?.audio {
+            startMediaTotalProbe(for: audio, referer: referer)
+        }
+    }
+
     private func primeProbesForCurrentPlayback() {
         guard let playback = currentPlayback else { return }
         if let local = playback.localContext {
@@ -1087,8 +1175,13 @@ final class LocalHLSProxyServer: @unchecked Sendable {
         currentBvid = nil
         currentCid = nil
         currentQn = nil
-        probedSizes.removeAll()
-        probeInFlight.removeAll()
+        // probedSizes / probeInFlight are deliberately NOT cleared:
+        // they are keyed by upstream URL (which embeds the auth
+        // token), so entries never go stale within a session, and
+        // `prewarmProbes` fires before this reset — clearing here
+        // would discard the warmed results and re-probe the same
+        // hosts inside the startup critical path. Memory cost is a
+        // handful of Int64s per video opened.
         failedProbes.removeAll()
         failoverIndex.removeAll()
         trackSegmentIndex.removeAll()
@@ -2879,6 +2972,8 @@ final class LocalHLSProxyServer: @unchecked Sendable {
         case "/video.m3u8":
             respondMediaPlaylist(for: .video, connection: connection,
                                  connID: connID)
+        case "/video-iframe.m3u8":
+            respondIFramePlaylist(connection: connection, connID: connID)
         case "/audio.m3u8":
             respondMediaPlaylist(for: .audio, connection: connection,
                                  connID: connID)
@@ -3144,6 +3239,123 @@ final class LocalHLSProxyServer: @unchecked Sendable {
         }
         lines.append(streamInf)
         lines.append(localURL(baseURL: baseURL, path: "video.m3u8"))
+        // Trick-play entry: without an EXT-X-I-FRAME-STREAM-INF
+        // the AVPlayerItem reports canPlayFastForward=false and
+        // AVPlayer clamps every rate to 1x, which is why the
+        // 3x-5x speed menu never had any effect.  The I-frame
+        // media playlist is built from the same validated SIDX
+        // fragments — each DASH fragment begins on a keyframe.
+        var iframeInf = "#EXT-X-I-FRAME-STREAM-INF:"
+        iframeInf += "BANDWIDTH=\(decision.videoPeakBps > 0 ? decision.videoPeakBps : Int64(max(source.video.bandwidth, 1)))"
+        iframeInf += ",CODECS=\"\(source.video.codecs)\""
+        if let width = source.video.width, width > 0,
+           let height = source.video.height, height > 0 {
+            iframeInf += ",RESOLUTION=\(width)x\(height)"
+        }
+        iframeInf += ",URI=\"\(localURL(baseURL: baseURL, path: "video-iframe.m3u8"))\""
+        lines.append(iframeInf)
+        lines.append("")
+        respondText(connection: connection, connID: connID,
+                    body: lines.joined(separator: "\n"))
+    }
+
+    /// Trick-play media playlist for AVPlayer fast-forward/rewind.
+    /// Mirrors the SIDX-driven video playlist but tags every
+    /// fragment with EXT-X-BYTERANGE and marks the playlist
+    /// EXT-X-I-FRAMES-ONLY so AVPlayer enables rates above 1x
+    /// (without any I-frame playlist in the master, the item
+    /// reports canPlayFastForward=false and all rates clamp to
+    /// 1x).  Each DASH fragment starts on a keyframe; the
+    /// segments served are the same fragment byte ranges the
+    /// normal playlist uses.
+    private func respondIFramePlaylist(connection: NWConnection,
+                                       connID: String) {
+        guard let (source, _) = snapshot(),
+              let baseURL = safeBaseURL else {
+            respondError(connection: connection, status: 503,
+                         reason: "no playback", connID: connID)
+            return
+        }
+        let track = source.video
+        let encoded = base64urlEncode(activeUpstream(for: track).absoluteString)
+        let initRange = playlistInitializationRange(for: track)
+        guard initRange.lowerBound < initRange.upperBound else {
+            respondError(connection: connection, status: 503,
+                         reason: "invalid init range",
+                         extraHeaders: ["Retry-After": "0"],
+                         connID: connID)
+            return
+        }
+        let initURL = localURL(
+            baseURL: baseURL,
+            path: "init",
+            queryItems: [
+                URLQueryItem(name: "u", value: encoded),
+                URLQueryItem(
+                    name: "range",
+                    value: "\(initRange.lowerBound)"
+                        + "-\(initRange.upperBound - 1)"
+                )
+            ]
+        )
+        guard let index = cachedSegmentIndex(for: track) else {
+            respondError(connection: connection, status: 503,
+                         reason: "sidx not ready",
+                         extraHeaders: ["Retry-After": "0"],
+                         connID: connID)
+            return
+        }
+        let targetDuration = max(1, Int(
+            index.maxFragmentDuration.rounded(.up)
+        ))
+        var lines: [String] = [
+            "#EXTM3U",
+            "#EXT-X-VERSION:7",
+            "#EXT-X-PLAYLIST-TYPE:VOD",
+            "#EXT-X-TARGETDURATION:\(targetDuration)",
+            "#EXT-X-MEDIA-SEQUENCE:0",
+            "#EXT-X-I-FRAMES-ONLY",
+            "#EXT-X-MAP:URI=\"\(initURL)\"",
+        ]
+        // Only fragments that begin on a keyframe (SAP) can
+        // yield a decodable trick-play frame, so non-SAP
+        // fragments are not listed.  (In practice virtually
+        // every B站 DASH fragment starts with an IDR; this
+        // matters only for rare non-SAP streams.)  EXTINF in
+        // an I-frame playlist spans the time up to the NEXT
+        // LISTED keyframe, so each skipped fragment's duration
+        // is folded into the preceding entry — otherwise the
+        // trick-play timeline would compress and previews
+        // would map to positions ahead of where they belong.
+        var entries: [(idx: Int, length: Int64, span: Double)] = []
+        for (idx, frag) in index.fragments.enumerated() {
+            if frag.startsWithSAP {
+                entries.append((
+                    idx: idx,
+                    length: frag.byteRange.upperBound - frag.byteRange.lowerBound,
+                    span: frag.duration
+                ))
+            } else if !entries.isEmpty {
+                entries[entries.count - 1].span += frag.duration
+            }
+        }
+        for entry in entries {
+            let segmentURL = localURL(
+                baseURL: baseURL,
+                path: "segment",
+                queryItems: [
+                    URLQueryItem(name: "u", value: encoded),
+                    URLQueryItem(name: "k", value: "video"),
+                    URLQueryItem(name: "n", value: "\(entry.idx)")
+                ]
+            )
+            lines.append(
+                "#EXTINF:\(String(format: "%.3f", entry.span)),"
+            )
+            lines.append("#EXT-X-BYTERANGE:\(entry.length)@0")
+            lines.append(segmentURL)
+        }
+        lines.append("#EXT-X-ENDLIST")
         lines.append("")
         respondText(connection: connection, connID: connID,
                     body: lines.joined(separator: "\n"))
@@ -3661,6 +3873,80 @@ fileprivate func proxySegmentRange(
     private static let btrChunkBytes: Int64 = 256 * 1024
     private static let btrMaxChunks = 8
 
+    /// Milliseconds a chunk fetch may run on the primary mirror
+    /// before a hedged duplicate fires on the backup. Sized from
+    /// field data: p50 chunk latency is ~165ms, so 700ms only
+    /// duplicates genuinely slow connections.
+    private static let btrHedgeMs: UInt64 = 700
+
+    /// Race one chunk across mirrors: the primary starts
+    /// immediately, each backup joins after a staggered hedge
+    /// delay. First success wins; the losers are cancelled.
+    /// Falls back to throwing only when every mirror fails.
+    private func fetchChunkHedged(
+        index: Int,
+        chunk: Range<Int64>,
+        candidates: [URL],
+        referer: String,
+        purpose: String
+    ) async throws -> (Int, Data) {
+        // Rotate the starting mirror per chunk so the segment's
+        // chunks spread across every CDN mirror immediately —
+        // without this all chunks pile onto the primary mirror
+        // and the backups sit idle until the hedge fires.
+        // Throughput-steered ordering: measured-fast hosts lead
+        // the race for most chunks. The per-chunk rotation is
+        // kept as a fallback offset ONLY while no host has any
+        // measurement yet (first chunks of a session) — after
+        // that, ordering comes from real fetch data.
+        let steered = BtrHostThroughput.shared.ordered(candidates)
+        let ordered: [URL]
+        if candidates.count > 1, steered == candidates {
+            let shift = index % candidates.count
+            ordered = Array(candidates[shift...]) + Array(candidates[..<shift])
+        } else {
+            ordered = steered
+        }
+        return try await withThrowingTaskGroup(of: (Int, Data).self) { race in
+            for (offset, url) in ordered.enumerated() {
+                race.addTask { [self] in
+                    if offset > 0 {
+                        try await Task.sleep(
+                            nanoseconds: Self.btrHedgeMs * 1_000_000 * UInt64(offset)
+                        )
+                        try Task.checkCancellation()
+                    }
+                    let outcome = try await self.fetchExactRange(
+                        url: url,
+                        range: chunk,
+                        referer: referer,
+                        purpose: purpose
+                    )
+                    // Feed the steering table even when this task
+                    // loses the race — a completed fetch is a valid
+                    // throughput sample for its host either way.
+                    BtrHostThroughput.shared.record(
+                        host: url.host ?? "",
+                        bytes: outcome.data.count,
+                        elapsedMs: outcome.elapsedMs
+                    )
+                    return (index, outcome.data)
+                }
+            }
+            defer { race.cancelAll() }
+            var lastError: Error = RangeFetchError.timedOut
+            while let result = await race.nextResult() {
+                switch result {
+                case .success(let winner):
+                    return winner
+                case .failure(let error):
+                    lastError = error
+                }
+            }
+            throw lastError
+        }
+    }
+
     /// Fetch `byteRange` as N contiguous chunks, each issued to a
     /// different CDN mirror from `[track.baseURL] + backupURLs`
     /// round-robin, then splice the bodies in order and serve as
@@ -3758,22 +4044,22 @@ fileprivate func proxySegmentRange(
                 sentBytes = try await withThrowingTaskGroup(of: (Int, Data).self, returning: Int.self) { group in
                     for (index, chunk) in chunks_.enumerated() {
                         group.addTask { [self] in
-                            var lastError: Error = RangeFetchError.timedOut
-                            for attempt in 0..<candidates_.count {
-                                let url = candidates_[(index + attempt) % candidates_.count]
-                                do {
-                                    let outcome = try await self.fetchExactRange(
-                                        url: url,
-                                        range: chunk,
-                                        referer: referer_,
-                                        purpose: "segment[\(idx)] \(kind) chunk \(index)"
-                                    )
-                                    return (index, outcome.data)
-                                } catch {
-                                    lastError = error
-                                }
-                            }
-                            throw lastError
+                            // Hedged racing: start the fetch on the
+                            // primary mirror, then — if it hasn't
+                            // landed within the hedge delay — fire a
+                            // duplicate at the backup mirror and use
+                            // whichever finishes first. CDN slowness
+                            // is per-connection and heavy-tailed
+                            // (field data: p50 165ms, p90 5.8s), so
+                            // cutting the tail matters far more than
+                            // the duplicate bandwidth costs.
+                            try await self.fetchChunkHedged(
+                                index: index,
+                                chunk: chunk,
+                                candidates: candidates_,
+                                referer: referer_,
+                                purpose: "segment[\(idx)] \(kind) chunk \(index)"
+                            )
                         }
                     }
                     // Write in index order: out-of-order completions

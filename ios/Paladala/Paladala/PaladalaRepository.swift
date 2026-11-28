@@ -298,8 +298,8 @@ final class PaladalaRepository: ObservableObject, @unchecked Sendable {
     /// contains zero, one, or both HLS and FLV slots depending on
     /// what the room's CDN exposes — the player UI is responsible for
     /// disabling whichever toggle is unavailable.
-    func livePlayback(for room: BiliLiveRoom) async throws -> BiliLivePlayback {
-        try await apiClient.livePlaybackURL(roomID: room.id)
+    func livePlayback(for room: BiliLiveRoom, qn: Int = 10000) async throws -> BiliLivePlayback {
+        try await apiClient.livePlaybackURL(roomID: room.id, qn: qn)
     }
 
     /// Fetch one page of comments for the given video.

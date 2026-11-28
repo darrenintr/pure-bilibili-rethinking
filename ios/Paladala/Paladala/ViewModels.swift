@@ -127,8 +127,17 @@ final class HomeViewModel: ObservableObject {
         // the bundled list for a beat before the new data overwrites it.
         isShowingBundledFallback = false
         await loadPage(repository: repository, accountMid: accountMid, replacing: true, requestID: requestID)
-        guard isCurrentRequest(requestID) else { return }
+        guard isCurrentRequest(requestID) else {
+            diagLog(.network, "load discarded — stale request generation",
+                    details: ["category": category.rawValue])
+            return
+        }
         isLoading = false
+        if category == .search {
+            diagLog(.network, "search load finished",
+                    details: ["videos": videos.count, "users": searchUsers.count,
+                              "error": errorMessage ?? "none"])
+        }
         // Trigger the one-shot fan-in animation in `HomeView` only
         // when this is the first successful load of the session
         // (skip refreshes / category switches). The `!isShowingBundledFallback`
@@ -1006,12 +1015,33 @@ final class VideoDetailViewModel: ObservableObject {
                     ])
         }
         do {
-            detail = try await repository.detail(for: detail)
-            self.playback = try await repository.playback(
-                for: detail,
-                qn: preferredQn,
-                preferredAudioQuality: preferredAudioQuality
-            )
+            // Fire the playurl fetch in parallel with the detail
+            // refresh whenever the card already carries a cid —
+            // playurl only needs aid+cid+qn, and waiting for the
+            // detail round-trip first costs a full RTT (~0.3-0.7s)
+            // of startup latency on every open.
+            // Remember the cid playback actually opened with: for a
+            // multi-part video the card carries the requested part's
+            // cid while the refreshed detail resets to the first part
+            // — the history report below must use the opened part.
+            let openedCid = detail.cid
+            if detail.cid > 0 {
+                async let playbackResult = repository.playback(
+                    for: detail,
+                    qn: preferredQn,
+                    preferredAudioQuality: preferredAudioQuality
+                )
+                async let detailResult = repository.detail(for: detail)
+                self.playback = try await playbackResult
+                detail = try await detailResult
+            } else {
+                detail = try await repository.detail(for: detail)
+                self.playback = try await repository.playback(
+                    for: detail,
+                    qn: preferredQn,
+                    preferredAudioQuality: preferredAudioQuality
+                )
+            }
             // Seed `resumeTime` from the local progress store
             // when present.  `repository.playback(...)` already
             // set the value from `BiliVideo.resumeTime` (the
@@ -1023,6 +1053,9 @@ final class VideoDetailViewModel: ObservableObject {
             if let saved = PlayProgressStore.shared.lastProgress(for: detail.bvid),
                saved.currentTime > self.playback?.resumeTime ?? 0 {
                 self.playback?.resumeTime = saved.currentTime
+            }
+            if let playback = self.playback {
+                LocalHLSProxyServer.shared.prewarmProbes(for: playback)
             }
             diagLog(.playback,
                     "VideoDetailViewModel.load succeeded",
@@ -1063,7 +1096,7 @@ final class VideoDetailViewModel: ObservableObject {
             // Start of playback: report progress=0 to mark it in the history list.
             // The periodic 30s heartbeat is handled by WatchSession in the View layer.
             Task {
-                try? await repository.reportHistory(for: detail, cid: detail.cid, progress: 0)
+                try? await repository.reportHistory(for: detail, cid: openedCid > 0 ? openedCid : detail.cid, progress: 0)
             }
         } catch let error as BilibiliAPIError {
             // Funnel drop — record the failure to Crashlytics

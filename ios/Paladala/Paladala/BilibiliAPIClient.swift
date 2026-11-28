@@ -725,21 +725,54 @@ final class BilibiliAPIClient: @unchecked Sendable {
 
     func searchVideos(keyword: String, page: Int = 1) async throws -> [BiliVideo] {
         guard !keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
-        let payload: APIResponse<VideoListPayload> = try await get(
+        let searchQuery: [URLQueryItem] = [
+            URLQueryItem(name: "search_type", value: "video"),
+            URLQueryItem(name: "keyword", value: keyword),
+            URLQueryItem(name: "page", value: "\(page)"),
+            URLQueryItem(name: "page_size", value: "20"),
+            URLQueryItem(name: "platform", value: "pc"),
+            URLQueryItem(name: "web_location", value: "1430654")
+        ]
+        var payload: APIResponse<VideoListPayload> = try await get(
             baseURL: baseURL,
             path: "/x/web-interface/wbi/search/type",
-            queryItems: [
-                URLQueryItem(name: "search_type", value: "video"),
-                URLQueryItem(name: "keyword", value: keyword),
-                URLQueryItem(name: "page", value: "\(page)"),
-                URLQueryItem(name: "page_size", value: "20"),
-                URLQueryItem(name: "platform", value: "pc"),
-                URLQueryItem(name: "web_location", value: "1430654")
-            ],
+            queryItems: searchQuery,
             signWithWBI: true
         )
-        try payload.requireOK()
-        return payload.value?.videos.map(\.model) ?? []
+        if payload.value?.vVoucher != nil {
+            // Risk-control voucher wall — reproduced 2026-11-26: a
+            // stale `buvid3` in the shared cookie store trips B站's
+            // anti-bot on this endpoint while cookieless requests
+            // pass. Retry once anonymously rather than surfacing
+            // zero results.
+            diagLog(.network, "searchVideos voucher wall — retrying anonymous",
+                    details: ["keywordLen": "\(keyword.count)", "page": page])
+            payload = try await get(
+                baseURL: baseURL,
+                path: "/x/web-interface/wbi/search/type",
+                queryItems: searchQuery,
+                signWithWBI: true,
+                anonymousRequest: true
+            )
+        }
+        do {
+            try payload.requireOK()
+        } catch {
+            diagLog(.network, "searchVideos upstream error",
+                    details: ["keywordLen": "\(keyword.count)", "page": page, "error": "\(error)",
+                              "code": payload.code])
+            throw error
+        }
+        let decoded = payload.value?.videos.map(\.model) ?? []
+        diagLog(.network, "searchVideos completed",
+                details: ["keywordLen": "\(keyword.count)", "page": page, "decoded": decoded.count,
+                          "code": payload.code,
+                          "valueNil": payload.value == nil,
+                          "itemCount": payload.value?.item?.count ?? -1,
+                          "listCount": payload.value?.list?.count ?? -1,
+                          "resultCount": payload.value?.result?.count ?? -1,
+                          "bareCount": payload.value?.bareList?.count ?? -1])
+        return decoded
     }
 
     /// As-you-type search suggestions. Hits the dedicated
@@ -1171,19 +1204,31 @@ final class BilibiliAPIClient: @unchecked Sendable {
     /// strongly-typed `searchVideos` / `searchUsers` paths
     /// unchanged for the existing search-as-you-type code.
     private func _searchOne(keyword: String, searchType: String, page: Int) async throws -> [VideoDTO] {
-        let payload: APIResponse<SearchSlotPayload> = try await get(
+        let slotQuery: [URLQueryItem] = [
+            URLQueryItem(name: "search_type", value: searchType),
+            URLQueryItem(name: "keyword", value: keyword),
+            URLQueryItem(name: "page", value: "\(page)"),
+            URLQueryItem(name: "page_size", value: "10"),
+            URLQueryItem(name: "platform", value: "pc"),
+            URLQueryItem(name: "web_location", value: "1430654")
+        ]
+        var payload: APIResponse<SearchSlotPayload> = try await get(
             baseURL: baseURL,
             path: "/x/web-interface/wbi/search/type",
-            queryItems: [
-                URLQueryItem(name: "search_type", value: searchType),
-                URLQueryItem(name: "keyword", value: keyword),
-                URLQueryItem(name: "page", value: "\(page)"),
-                URLQueryItem(name: "page_size", value: "10"),
-                URLQueryItem(name: "platform", value: "pc"),
-                URLQueryItem(name: "web_location", value: "1430654")
-            ],
+            queryItems: slotQuery,
             signWithWBI: true
         )
+        if payload.value?.vVoucher != nil {
+            diagLog(.network, "searchAll voucher wall — retrying anonymous",
+                    details: ["keywordLen": "\(keyword.count)", "searchType": searchType])
+            payload = try await get(
+                baseURL: baseURL,
+                path: "/x/web-interface/wbi/search/type",
+                queryItems: slotQuery,
+                signWithWBI: true,
+                anonymousRequest: true
+            )
+        }
         try payload.requireOK()
         return payload.value?.result ?? []
     }
@@ -1508,7 +1553,7 @@ final class BilibiliAPIClient: @unchecked Sendable {
     /// Throws when the room is offline (code != 0 or no playable
     /// streams) so the caller can show a specific "未开播" message
     /// instead of pretending playback failed.
-    func livePlaybackURL(roomID: Int) async throws -> BiliLivePlayback {
+    func livePlaybackURL(roomID: Int, qn: Int = 10000) async throws -> BiliLivePlayback {
         // `data` may be `nil` when the room is offline (code != 0).
         // `LivePlayInfoPayload` is the same either way; we just
         // re-check `code` after the optional chain.
@@ -1523,10 +1568,10 @@ final class BilibiliAPIClient: @unchecked Sendable {
                 URLQueryItem(name: "format", value: "0,1,2"),
                 // codec: 0=AVC, 1=HEVC
                 URLQueryItem(name: "codec", value: "0,1"),
-                // qn 10000 = "原画" (highest). The room usually
-                // returns a single qn here; the player can step
-                // down via the quality sheet if it wants.
-                URLQueryItem(name: "qn", value: "10000"),
+                // qn 10000 = "原画" (highest). The player re-
+                // issues this fetch with a lower qn when the
+                // user picks a quality from the menu.
+                URLQueryItem(name: "qn", value: "\(qn)"),
                 URLQueryItem(name: "platform", value: "web"),
                 URLQueryItem(name: "ptype", value: "8")
             ]
@@ -1582,6 +1627,28 @@ final class BilibiliAPIClient: @unchecked Sendable {
         // for a future FLV-enabled player.
         let hls = hlsTS + hlsFMP4 + hlsOther
 
+        // Quality ladder: union of every codec's accept_qn,
+        // highest first. Most rooms publish the same ladder on
+        // each codec, so this is effectively the first codec's
+        // list; the union protects mixed-codec rooms.
+        var ladderSet = Set<Int>()
+        var currentQn: Int? = nil
+        for stream in data.playurlInfo?.playurl.stream ?? [] {
+            // HLS streams only — the player never binds FLV, so a
+            // quality the FLV side reports as active would render
+            // a wrong checkmark and swallow the matching tap.
+            let isHLS = stream.protocolName == "http_hls"
+                || stream.protocolName == "https_hls"
+            guard isHLS else { continue }
+            for fmt in stream.format {
+                for codec in fmt.codec {
+                    codec.acceptQn?.forEach { ladderSet.insert($0) }
+                    if currentQn == nil { currentQn = codec.currentQPS }
+                }
+            }
+        }
+        let acceptQn = ladderSet.sorted(by: >)
+
         let referer = URL(string: "https://live.bilibili.com/\(roomID)")!
         let info = data.roomInfo
         return BiliLivePlayback(
@@ -1590,7 +1657,9 @@ final class BilibiliAPIClient: @unchecked Sendable {
             hostName: info?.areaName ?? "",
             hlsCandidates: hls,
             flvCandidates: flv,
-            referer: referer
+            referer: referer,
+            acceptQn: acceptQn,
+            currentQn: currentQn ?? qn
         )
     }
 
@@ -3270,6 +3339,13 @@ private struct VideoListPayload: Decodable, Sendable {
     let result: [VideoDTO]?
     let archives: [VideoDTO]?
     let bareList: [VideoDTO]?
+    /// Present when B站's risk control answers the request
+    /// with a `v_voucher` challenge instead of real data —
+    /// observed 2026-11-26: any stale `buvid3` cookie on the
+    /// search endpoint triggers this wall while cookieless
+    /// requests pass. Used by `searchVideos` to retry
+    /// anonymously instead of surfacing empty results.
+    let vVoucher: String?
 
     /// Tolerant decoder: walks the response looking for a known list
     /// key (`item` / `list` / `result` / `archives`) and decodes each
@@ -3283,6 +3359,7 @@ private struct VideoListPayload: Decodable, Sendable {
             self.result = nil
             self.archives = nil
             self.bareList = videos
+            self.vVoucher = nil
             return
         }
         let container = try decoder.container(keyedBy: DynamicKey.self)
@@ -3291,6 +3368,11 @@ private struct VideoListPayload: Decodable, Sendable {
         self.result = Self.decodeTolerant(in: container, key: "result")
         self.archives = Self.decodeTolerant(in: container, key: "archives")
         self.bareList = nil
+        if let voucherKey = DynamicKey(stringValue: "v_voucher") {
+            self.vVoucher = try? container.decodeIfPresent(String.self, forKey: voucherKey) ?? nil
+        } else {
+            self.vVoucher = nil
+        }
     }
 
     private static func decodeTolerantArray(from decoder: Decoder) -> [VideoDTO]? {
@@ -3553,6 +3635,12 @@ private struct SuggestResult: Decodable, Sendable {
 /// raw array and let the view layer decode per-slot.
 private struct SearchSlotPayload: Decodable, Sendable {
     let result: [VideoDTO]?
+    let vVoucher: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case result
+        case vVoucher = "v_voucher"
+    }
 }
 
 /// Internal decoder for the public profile-card endpoint
@@ -4641,12 +4729,17 @@ private struct LivePlayCodec: Decodable, Sendable {
     let currentQPS: Int?
     let baseURL: String
     let urlInfo: [LivePlayURLHost]
+    /// Quality ladder the room is willing to serve (e.g.
+    /// [10000, 400, 250, 150, 80]) — the live player's
+    /// quality menu renders exactly these.
+    let acceptQn: [Int]?
 
     enum CodingKeys: String, CodingKey {
         case codecName = "codec_name"
         case currentQPS = "current_qn"
         case baseURL = "base_url"
         case urlInfo = "url_info"
+        case acceptQn = "accept_qn"
     }
 }
 
@@ -5065,7 +5158,7 @@ private struct UserFavoriteFolderDTO: Decodable, Sendable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicKey.self)
         id = container.decodeInt64(keys: ["id"]) ?? 0
-        title = container.decodeString(keys: ["title"]) ?? ""
+        title = (container.decodeString(keys: ["title"]) ?? "").strippingHTML
         cover = container.decodeString(keys: ["cover"]) ?? ""
         mediaCount = container.decodeInt(keys: ["media_count", "cnt_info", "play"]) ?? 0
         // `upper` is sometimes a flat `{ name, mid }` object,
@@ -5299,6 +5392,14 @@ extension KeyedDecodingContainer where K == DynamicKey {
             if let string = try? decode(String.self, forKey: DynamicKey(key)), let value = Int(string) {
                 return value
             }
+            // The search endpoint writes durations as clock strings
+            // ("3:45", rarely "1:02:03") instead of numeric seconds.
+            if let string = try? decode(String.self, forKey: DynamicKey(key)), string.contains(":") {
+                let parts = string.split(separator: ":").compactMap { Int($0) }
+                if !parts.isEmpty, parts.count == string.split(separator: ":").count {
+                    return parts.reduce(0) { $0 * 60 + $1 }
+                }
+            }
         }
         return nil
     }
@@ -5368,8 +5469,30 @@ extension KeyedDecodingContainer where K == DynamicKey {
 // `message` field. The extension is widened so the comment pipeline
 // can reach it without duplicating the regex.
 extension String {
+    /// Strips markup tags AND decodes HTML entities. Search results
+    /// entity-escape titles (`don&#x27;t`) and wrap keyword hits in
+    /// `<em>` highlight tags; other endpoints mix both shapes, so every
+    /// user-facing string goes through the one path.
     var strippingHTML: String {
-        replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        var text = replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        text = text.replacingOccurrences(of: "&lt;", with: "<")
+        text = text.replacingOccurrences(of: "&gt;", with: ">")
+        text = text.replacingOccurrences(of: "&quot;", with: "\"")
+        text = text.replacingOccurrences(of: "&#39;", with: "'")
+        // `&amp;` last — decoding it first would double-decode a
+        // literal `&amp;lt;` (user-typed "&lt;") into `<`.
+        text = text.replacingOccurrences(of: "&amp;", with: "&")
+        if let regex = try? NSRegularExpression(pattern: "&#x([0-9A-Fa-f]{2,4});") {
+            let full = NSRange(text.startIndex..., in: text)
+            for match in regex.matches(in: text, range: full).reversed() {
+                guard let hexRange = Range(match.range(at: 1), in: text),
+                      let scalar = UInt32(text[hexRange], radix: 16),
+                      let uni = Unicode.Scalar(scalar),
+                      let whole = Range(match.range, in: text) else { continue }
+                text.replaceSubrange(whole, with: String(Character(uni)))
+            }
+        }
+        return text
     }
 
     var httpsURL: URL? {
@@ -5576,4 +5699,5 @@ private enum BiliDanmakuProtobufDecoder {
         }
     }
 }
+
 

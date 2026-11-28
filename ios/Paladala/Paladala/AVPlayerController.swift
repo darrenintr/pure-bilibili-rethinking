@@ -208,6 +208,20 @@ final class PlayerController: ObservableObject {
     /// paused placeholder, and mirroring that state used to suppress
     /// the initial play when the real item was installed.
     private var wantsToPlay = true
+    /// Last speed picked in the player speed menu; used to
+    /// restore the correct rate after a buffer-underrun
+    /// auto-resume (plain `play()` would snap back to 1x).
+    private var playbackRate: Float = 1.0
+
+    /// Resume playback at the viewer-selected speed.  Plain
+    /// `player.play()` is equivalent to `rate = defaultRate`
+    /// (1x), so every stall recovery, seek refresh and item
+    /// rebind silently snapped playback back to 1x and the
+    /// speed menu appeared broken.  Setting `.rate` directly
+    /// both starts playback and honors the chosen speed.
+    private func resumeAtSelectedRate() {
+        player.rate = playbackRate
+    }
 
     // MARK: seek state machine (PR-A Group 1)
 
@@ -403,12 +417,17 @@ final class PlayerController: ObservableObject {
     /// short 4G hiccup without the buffer draining the 10 s
     /// `prolongedStall` watchdog, short enough that cold start
     /// still feels snappy.
-    private static let preferredForwardBufferSeconds: TimeInterval = 8.0
+    private static let preferredForwardBufferSeconds: TimeInterval = 4.0
     /// **B1**: explicit `automaticallyWaitsToMinimizeStalling`
     /// policy. Default is already `true` on iOS 10+ for HLS,
     /// but setting it explicitly keeps this knob visible in
     /// code review rather than implicitly inherited.
-    private static let automaticallyWaitsToMinimizeStalling: Bool = true
+    // Aggressive time-to-first-frame: the prefetch cache fills the
+    // track within ~0.5s of playback start and BTR chunks hedge
+    // across mirrors, so the conservative deep-buffer wait only
+    // delays the first frame. Stalls remain handled by the retry
+    // machinery if they happen at all.
+    private static let automaticallyWaitsToMinimizeStalling: Bool = false
     /// **Build 182**: the orchestration task that drives
     /// `LocalHLSProxyServer.serve(playback:) async throws ->
     /// URL` → endpoint self-test → `replaceCurrentItem` →
@@ -1031,7 +1050,7 @@ final class PlayerController: ObservableObject {
             SponsorBlockManager.shared.loadSegments(for: sbBvid)
         }
         if wantsToPlay {
-            player.play()
+            resumeAtSelectedRate()
         }
         // Replay any user seek (`seek(to:)` / `seek(by:)`) that
         // arrived before the real item was bound.  Higher
@@ -1410,7 +1429,7 @@ final class PlayerController: ObservableObject {
             performSeek(target.isFinite ? target : currentTime, fromRestore: true)
             wantsToPlay = true
             isPlaying = true
-            player.play()
+            resumeAtSelectedRate()
         case .sessionRestart:
             restartPlaybackSession(trigger: trigger, resetAttempts: false)
         }
@@ -1478,6 +1497,19 @@ final class PlayerController: ObservableObject {
                     guard self.player.currentItem === item else { return }
                     if change.newValue == true {
                         self.isBuffering = false
+                        // With `automaticallyWaitsToMinimizeStalling
+                        // = false` AVPlayer does NOT resume on its own
+                        // after a buffer underrun — it sits paused at
+                        // rate 0 forever. If the user never paused,
+                        // restart now that data is likely to keep up.
+                        if self.wantsToPlay, self.player.rate == 0,
+                           self.player.timeControlStatus != .paused {
+                            diagLog(.playback, "buffer_recovered_auto_resume")
+                            // `play()` would reset the rate to
+                            // `defaultRate` (1x); restore the speed
+                            // the viewer actually selected instead.
+                            self.player.rate = self.playbackRate
+                        }
                         // **PR-X**: clear any stale
                         // `.prolongedStall` (or other) error
                         // now that AVPlayer reports the item
@@ -1915,11 +1947,11 @@ final class PlayerController: ObservableObject {
                     guard finished, let self, let item,
                           self.player.currentItem === item, self.wantsToPlay else { return }
                     self.currentTime = 0
-                    self.player.play()
+                    self.resumeAtSelectedRate()
                 }
             }
         } else {
-            player.play()
+            resumeAtSelectedRate()
         }
     }
 
@@ -1930,13 +1962,31 @@ final class PlayerController: ObservableObject {
 
     /// Change the playback rate (e.g., 2.0 for 2x speed).
     func setRate(_ rate: Float) {
+        playbackRate = rate
         player.rate = rate
+        // Instrumentation for the rate-propagation investigation:
+        // logs what the UI asked for and what AVPlayer actually
+        // reports back — if the readback diverges, AVKit/HLS is
+        // clamping the rate (e.g. no I-frame playlist for >2x).
+        let readback = player.rate
+        diagLog(.playback, "setRate applied", details: [
+            "requested": rate,
+            "playerRateReadback": readback,
+            "hasItem": player.currentItem != nil,
+            "timeControlStatus": player.timeControlStatus.rawValue,
+            "canPlayFastForward": player.currentItem?.canPlayFastForward ?? false,
+            "canPlaySlowForward": player.currentItem?.canPlaySlowForward ?? false
+        ])
     }
 
     /// Set the linear audio gain. Clamped to `0.0 ... 1.0` so
     /// a buggy caller can't over-drive `AVPlayer.volume`. Used
     /// by `SleepTimer` to fade audio before pausing; not
     /// observed externally, so no `@Published` wrapper.
+    /// Current linear audio gain (0…1) — exposed for the macOS
+    /// menu-bar volume commands which need to read-then-write.
+    var volume: Float { player.volume }
+
     func setVolume(_ volume: Float) {
         player.volume = max(0, min(1, volume))
     }
@@ -2496,6 +2546,17 @@ final class PlayerController: ObservableObject {
         // can pause on its own when the buffer empties, and we
         // do not want to fight that — we mirror it.  `WatchSession`
         // reads this every 30 seconds.
+        // Keep `playbackRate` in sync with the player's actual
+        // rate so a speed picked in the NATIVE fullscreen
+        // transport (AVKit writes `rate`/`defaultRate` directly,
+        // bypassing `setRate`) is honored by the auto-resume
+        // paths instead of snapping back to the last in-app
+        // choice.  No feedback loop: our own resumes set
+        // `rate = playbackRate`, so the values already match.
+        let r = player.rate
+        if r > 0, r != playbackRate {
+            playbackRate = r
+        }
         let playing = (player.timeControlStatus == .playing)
         if playing != isPlaying {
             isPlaying = playing

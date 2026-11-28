@@ -56,8 +56,6 @@ struct ProfileSettingsView: View {
     /// overlay; the user can re-tap to expand. When `false`,
     /// the controller tears down immediately so the audio
     /// stops and no floating window is left behind. Read by
-    /// `MiniPlayerStore.detachInline()`.
-    @AppStorage("paladala.miniPlayerOnExit") private var miniPlayerOnExit: Bool = true
     @AppStorage("paladala.autoPlayNext") private var autoPlayNext: Bool = false
     @AppStorage("paladala.btrEnabled") private var btrEnabled = true
     @AppStorage("paladala.btrThreads") private var btrThreads = 0
@@ -227,7 +225,6 @@ struct ProfileSettingsView: View {
                 // navigates away from a playing video. Default
                 // on. Disabling tears the controller down on
                 // `VideoDetailView.onDisappear` instead.
-                Toggle("離開後保留小窗播放", isOn: $miniPlayerOnExit)
                 Toggle("線程撕裂加速", isOn: $btrEnabled)
                 if btrEnabled {
                     Stepper("並行線程：\(btrThreads == 0 ? "自動" : "\(btrThreads)")",

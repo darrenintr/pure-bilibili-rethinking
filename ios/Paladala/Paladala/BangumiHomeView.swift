@@ -260,6 +260,8 @@ struct BangumiSeasonDetailView: View {
     let repository: PaladalaRepository
     let seasonId: Int64
 
+    @EnvironmentObject private var miniPlayerStore: MiniPlayerStore
+
     @State private var detail: BangumiSeasonDetail?
     @State private var isLoading: Bool = false
     @State private var loadError: String? = nil
@@ -278,6 +280,13 @@ struct BangumiSeasonDetailView: View {
     /// so the next episode gets a fresh AVPlayer + a fresh
     /// `LocalHLSProxyServer` reservation.
     @State private var pgcController: PlayerController?
+    /// Whether the episode was playing when a tab switch
+    /// tore it down — the rebind on return must not autoplay
+    /// an episode the viewer had paused.
+    @State private var episodeWasPlayingOnTeardown = true
+    /// One-shot flag: pause the next rebound controller right
+    /// after construction (before its startup auto-play).
+    @State private var pauseReboundEpisode = false
     /// `true` while the in-app PGC playurl fetch is in
     /// flight, false once `pgcController` is set or the
     /// fetch fails.  Drives the in-view spinner before the
@@ -303,6 +312,28 @@ struct BangumiSeasonDetailView: View {
             }
         }
         .navigationTitle(detail?.title ?? "番劇詳情")
+        .onDisappear {
+            // Back navigation never goes through closePgcPlayer —
+            // without this the episode position is lost when the
+            // user leaves the season page mid-playback.
+            persistLivePosition()
+            // Leaving the season must also STOP the episode:
+            // the controller is registered app-wide now, so
+            // without this it keeps playing audibly with no
+            // visible surface — the same rule the
+            // miniplayer-removal applied to regular videos.
+            if let c = pgcController {
+                // Buffering counts as playing: isPlaying mirrors
+                // timeControlStatus, which reads false while
+                // AVPlayer waits for data — the viewer never
+                // pressed pause in that case, and the rebind
+                // must not strand them on a paused episode.
+                episodeWasPlayingOnTeardown = c.isPlaying || c.isBuffering
+                miniPlayerStore.unregisterExternalController(c)
+                c.tearDown()
+                pgcController = nil
+            }
+        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.visible, for: .navigationBar)
         .task(id: seasonId) { await load() }
@@ -314,12 +345,19 @@ struct BangumiSeasonDetailView: View {
     @ViewBuilder
     private func contentView(detail: BangumiSeasonDetail) -> some View {
         VStack(spacing: 0) {
-            heroView(detail: detail)
-            Divider()
-                .background(PaladalaTheme.ink)
-            episodeList(detail: detail)
+            // Player pinned to the top at full width — the standard
+            // video-detail layout (bilibili / YouTube / Apple TV all
+            // pin playback above the metadata). Previously it sat at
+            // the bottom under the episode list at a fixed 220pt,
+            // which made watching anything in-app nearly useless.
             if let ep = selectedEpisode {
                 pgcPlayerPanel(ep: ep)
+            }
+            ScrollView {
+                VStack(spacing: 0) {
+                    heroView(detail: detail)
+                    episodeList(detail: detail)
+                }
             }
         }
         .background(PaladalaTheme.canvas)
@@ -440,7 +478,8 @@ struct BangumiSeasonDetailView: View {
     @ViewBuilder
     private func pgcPlayerSurface(controller: PlayerController) -> some View {
         VideoPlayer(player: controller.player)
-            .frame(height: 220)
+            .frame(maxWidth: .infinity)
+            .aspectRatio(16.0 / 9.0, contentMode: .fit)
             .background(Color.black)
     }
 
@@ -575,6 +614,33 @@ struct BangumiSeasonDetailView: View {
         do {
             let fetched = try await repository.pgcSeason(seasonId: seasonId)
             detail = fetched
+            // Auto-queue the first episode so the page opens as a
+            // player (the 看番 idiom) instead of a static episode
+            // list the user has to interpret. Region-locked episodes
+            // land in the panel's error state, same as a manual tap.
+            // Skip the autoplay while another video is floating in
+            // Picture-in-Picture — starting a DASH episode would
+            // re-reserve the shared proxy underneath it and cut the
+            // floating stream off mid-playback.
+            let pipActive = miniPlayerStore.controller?.isPictureInPictureActive ?? false
+            if selectedEpisode == nil, !pipActive, let first = fetched.episodes.first {
+                onEpisodeTap(first)
+            } else if let ep = selectedEpisode, pgcController == nil,
+                      !isFetchingPgcPlayback, !pipActive {
+                // Return after a tab switch: onDisappear tore the
+                // controller down but the episode is still
+                // selected — rebind it so the page comes back as
+                // a player, not a header with no controls.  The
+                // saved resume position restores the playhead.
+                // If the viewer had PAUSED before switching away,
+                // the rebound controller must stay paused too —
+                // auto-play is only right for an episode that was
+                // actually playing (or a fresh selection).
+                if !episodeWasPlayingOnTeardown {
+                    pauseReboundEpisode = true
+                }
+                onEpisodeTap(ep)
+            }
             diagLog(.bangumi, "BangumiSeasonDetail load succeeded",
                     details: [
                         "seasonId": seasonId,
@@ -618,18 +684,11 @@ struct BangumiSeasonDetailView: View {
                     "epId": ep.epId,
                     "title": ep.title
                 ])
+        if let oldEp = selectedEpisode, oldEp.epId != ep.epId {
+            persistLivePosition()
+        }
         selectedEpisode = ep
         pgcPlaybackError = nil
-        if let old = pgcController {
-            // Tear down the previous controller so the next
-            // episode gets a fresh AVPlayer / LocalHLSProxyServer
-            // reservation.  `PlayerController.loadPlayback` already
-            // calls cancel on the previous loadTask, but we want
-            // a clean teardown of the AVPlayer's nowPlayingInfo
-            // so the system control center doesn't keep showing
-            // the old track.
-            _ = old
-        }
         pgcController = nil
         isFetchingPgcPlayback = true
         Task { await fetchAndStartPgcPlayback(ep: ep) }
@@ -642,6 +701,10 @@ struct BangumiSeasonDetailView: View {
     private func closePgcPlayer() {
         diagLog(.bangumi, "BangumiSeasonDetail close pgc player",
                 details: ["epId": selectedEpisode?.epId ?? -1])
+        persistLivePosition()
+        if let c = pgcController {
+            miniPlayerStore.unregisterExternalController(c)
+        }
         pgcController = nil
         pgcPlaybackError = nil
         isFetchingPgcPlayback = false
@@ -666,6 +729,15 @@ struct BangumiSeasonDetailView: View {
             // skips the `WatchSession` history reporter (PGC
             // episodes don't expose a usable `BiliVideo` /
             // `B站 v2 aid+cid`).
+            // The fetch outlives the panel: if the user closed
+            // the player (or tapped a different episode) while
+            // the playurl was in flight, binding now would start
+            // audible playback with no visible controls. Only
+            // bind when this episode is still the selected one.
+            guard selectedEpisode?.epId == ep.epId else {
+                isFetchingPgcPlayback = false
+                return
+            }
             let controller = PlayerController(
                 playback: playback,
                 video: nil
@@ -675,7 +747,34 @@ struct BangumiSeasonDetailView: View {
             // `closePgcPlayer` or the user opens a different
             // episode.
             pgcController = controller
+            miniPlayerStore.registerExternalController(controller)
+            if pauseReboundEpisode {
+                pauseReboundEpisode = false
+                // Controller-level pause clears wantsToPlay before
+                // startup auto-play fires, so the rebound episode
+                // stays paused exactly as the viewer left it.
+                controller.pause()
+            }
             isFetchingPgcPlayback = false
+            if let resume = Self.resumePosition(epId: ep.epId) {
+                // The seek only lands once the AVPlayerItem is
+                // ready — retry briefly instead of chaining into
+                // the controller's load lifecycle.
+                Task { @MainActor in
+                    // Wait for a real duration: `seek(to:)` performs
+                    // immediately only when duration > 0 — earlier it
+                    // would park in `pendingUserSeek`, whose drain
+                    // already ran during startup, stranding the seek.
+                    for _ in 0..<20 {
+                        try? await Task.sleep(nanoseconds: 500_000_000)
+                        guard self.pgcController === controller else { return }
+                        if controller.duration > 0 {
+                            controller.seek(to: resume)
+                            return
+                        }
+                    }
+                }
+            }
         } catch {
             diagLog(.bangumi, "BangumiSeasonDetail pgc playback failed",
                     details: [
@@ -687,6 +786,35 @@ struct BangumiSeasonDetailView: View {
                 ?? error.localizedDescription
             isFetchingPgcPlayback = false
         }
+    }
+
+    private static func saveResumePosition(_ position: Double, epId: Int64, duration: Double = 0) {
+        // Finished (or effectively finished) episodes must not
+        // reopen at the end credits — clear any stored position
+        // instead so the next open replays from the start.
+        // Ratio-only: a seconds-remaining clause would clear
+        // bookmarks on short episodes (11s into a 40s episode has
+        // under 30s remaining yet most of it is unwatched).
+        if duration > 0, position / duration >= 0.95 {
+            UserDefaults.standard.removeObject(forKey: "paladala.pgc.resume.\(epId)")
+            return
+        }
+        UserDefaults.standard.set(position, forKey: "paladala.pgc.resume.\(epId)")
+    }
+
+    /// Snapshot the live position for the currently-playing episode.
+    /// Called on close, on episode switch, and on disappear (back
+    /// navigation bypasses `closePgcPlayer` entirely).
+    private func persistLivePosition() {
+        guard let ep = selectedEpisode,
+              let controller = pgcController,
+              controller.currentTime > 10 else { return }
+        Self.saveResumePosition(controller.currentTime, epId: ep.epId, duration: controller.duration)
+    }
+
+    private static func resumePosition(epId: Int64) -> Double? {
+        let value = UserDefaults.standard.double(forKey: "paladala.pgc.resume.\(epId)")
+        return value > 10 ? value : nil
     }
 
     private func formatDuration(_ ms: Int64) -> String {

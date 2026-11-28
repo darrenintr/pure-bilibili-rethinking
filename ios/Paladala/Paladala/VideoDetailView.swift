@@ -172,7 +172,29 @@ struct VideoDetailView: View {
     // plain `@State` instead (cheap, localised invalidation) and
     // commit to storage once, on release.
     @State private var playerSizeBiasLive: Double? = nil
-    private var effectivePlayerSizeBias: Double { playerSizeBiasLive ?? playerSizeBias }
+    private var effectivePlayerSizeBias: Double {
+        // On macOS the window itself resizes freely and the
+        // drag grip is hidden — applying a persisted iOS bias
+        // here would zoom the player with no way to undo it.
+        #if targetEnvironment(macCatalyst)
+        return 1.0
+        #else
+        return playerSizeBiasLive ?? playerSizeBias
+        #endif
+    }
+
+    /// Height÷width of the actual video stream (e.g. 16/9 for
+    /// landscape, 16/9 flipped for vertical video). Falls back
+    /// to 9:16 landscape ratio while the manifest is loading.
+    /// Using the real aspect stops vertical videos letterboxing
+    /// inside a hard-coded 16:9 box.
+    private var playerAspectHeightOverWidth: CGFloat {
+        if let track = model.playback?.dash?.video,
+           let w = track.width, let h = track.height, w > 0 {
+            return CGFloat(h) / CGFloat(w)
+        }
+        return 9.0 / 16.0
+    }
     /// User's preferred comment sort, persisted across launches. The
     /// view writes through to the model and to the underlying fetch
     /// whenever the user toggles the picker.
@@ -280,7 +302,12 @@ struct VideoDetailView: View {
             // The reference surface is a full-width 16:9 editorial block.
             // Immersive mode remains available, but the default no longer
             // consumes over half of a portrait screen before metadata appears.
-            let mediaHeight = geo.size.width * 9 / 16
+            // Portrait streams can otherwise fill the entire
+            // viewport (9:16 vertical video ≈ 1.78× width), leaving
+            // no visible detail content below the fold. Cap the
+            // player at 60% of the viewport height — controls and
+            // comments stay discoverable without scrolling blind.
+            let mediaHeight = min(geo.size.width * playerAspectHeightOverWidth, geo.size.height * 0.6)
             let maxPlayerHeight = isImmersiveMode ? totalH * 0.8 : mediaHeight
             let minPlayerHeight = isImmersiveMode
                 ? totalH * 0.9
@@ -298,7 +325,8 @@ struct VideoDetailView: View {
             } else {
             VStack(spacing: 0) {
                 playerSurface
-                    .frame(height: playerHeight)
+                    .frame(width: min(geo.size.width, playerHeight / playerAspectHeightOverWidth),
+                           height: playerHeight)
                     .frame(maxWidth: .infinity)
                     .clipped()
                     // Late-bind the sleep timer to the active
@@ -721,16 +749,22 @@ struct VideoDetailView: View {
     /// modifier as the single-column layout when it is visible.
     @ViewBuilder
     private func iPadSplitBody(geo: GeometryProxy, playerHeight: CGFloat) -> some View {
-        let panelWidth: CGFloat = 380
+        // Enlarging the player squeezes the recommendation
+        // panel instead of only growing downward — the split
+        // width is a fixed budget, so a bigger player means a
+        // narrower rail (clamped so it never collapses or
+        // swallows the screen).
+        let panelWidth: CGFloat = min(460, max(260, 380 / effectivePlayerSizeBias))
         let leftWidth = geo.size.width - panelWidth
         // Re-derive the player height from the *left column* width —
         // the parent computed it against the full screen width,
         // which would make the 16:9 surface far too tall here.
-        let columnPlayerHeight = leftWidth * 9 / 16 * playerScale * effectivePlayerSizeBias
+        let columnPlayerHeight = leftWidth * playerAspectHeightOverWidth * playerScale * effectivePlayerSizeBias
         HStack(alignment: .top, spacing: 0) {
             VStack(spacing: 0) {
                 playerSurface
-                    .frame(height: columnPlayerHeight)
+                    .frame(width: min(leftWidth, columnPlayerHeight / playerAspectHeightOverWidth),
+                           height: columnPlayerHeight)
                     .frame(maxWidth: .infinity)
                     .clipped()
                     .onAppear { sleepTimer.setController(playerController) }
@@ -947,7 +981,9 @@ struct VideoDetailView: View {
         // are not clipped by the rounded rectangle.
         .clipShape(RoundedRectangle(cornerRadius: PaladalaTheme.cardRadius, style: PaladalaTheme.cornerStyle))
         .overlay(alignment: .bottomTrailing) {
+            #if !targetEnvironment(macCatalyst)
             playerResizeGrip
+            #endif
         }
     }
 

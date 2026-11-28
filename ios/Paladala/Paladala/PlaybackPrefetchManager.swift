@@ -626,28 +626,128 @@ actor PlaybackPrefetchManager {
         referer: String,
         dst: URL
     ) async throws -> Int64 {
+        // Parallel chunked download: the CDN throttles per-connection,
+        // so a single sequential stream fills the cache slower than
+        // realtime playback for long videos — defeating the purpose.
+        // Probe the total size with a 1-byte range request, then fetch
+        // N contiguous parts concurrently and write each into the
+        // destination file at its offset as it completes.
+        func makeRequest(range: String) -> URLRequest {
+            var req = URLRequest(url: url)
+            req.setValue(referer, forHTTPHeaderField: "Referer")
+            req.setValue(Self.biliUserAgent, forHTTPHeaderField: "User-Agent")
+            req.setValue(range, forHTTPHeaderField: "Range")
+            req.setValue("*/*", forHTTPHeaderField: "Accept")
+            return req
+        }
+        // download(for:) streams to a temp file — a CDN that ignores
+        // the range probe answers with the whole track, which must
+        // never land in memory.
+        let (probeTmp, probeResponse) = try await downloadSession.download(for: makeRequest(range: "bytes=0-0"))
+        defer { try? FileManager.default.removeItem(at: probeTmp) }
+        let probeStatus = (probeResponse as? HTTPURLResponse)?.statusCode ?? -1
+        guard (200...299).contains(probeStatus) else {
+            throw PrefetchError.upstreamStatus(probeStatus)
+        }
+        guard let contentRange = (probeResponse as? HTTPURLResponse)?
+            .value(forHTTPHeaderField: "Content-Range"),
+              let totalStr = contentRange.split(separator: "/").last,
+              let total = Int64(totalStr.trimmingCharacters(in: .whitespaces)),
+              total > 0 else {
+            // Upstream did not honour the range probe — fall back to
+            // the whole-body stream so prefetch still works.
+            return try await streamWholeBody(url: url, referer: referer, dst: dst)
+        }
+
+        // Pre-allocate the destination file.
+        FileManager.default.createFile(atPath: dst.path, contents: nil)
+        let handle = try FileHandle(forWritingTo: dst)
+        try handle.truncate(atOffset: UInt64(total))
+
+        let partCount = total < 4 * 1024 * 1024
+            ? 2
+            : min(8, max(2, Int(total / (4 * 1024 * 1024))))
+        let partSize = total / Int64(partCount)
+        var ranges: [Range<Int64>] = []
+        for i in 0..<partCount {
+            let lower = Int64(i) * partSize
+            let upper = i == partCount - 1 ? total : lower + partSize
+            ranges.append(lower..<upper)
+        }
+
+        nonisolated(unsafe) let writeHandle = handle
+        final class OffsetWriter: @unchecked Sendable {
+            private let lock = NSLock()
+            func write(_ data: Data, at offset: UInt64, handle: FileHandle) throws {
+                lock.lock()
+                defer { lock.unlock() }
+                try handle.seek(toOffset: offset)
+                try handle.write(contentsOf: data)
+            }
+        }
+        let writer = OffsetWriter()
+        let session = downloadSession
+        let ref = referer
+        let ua = Self.biliUserAgent
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for range in ranges {
+                group.addTask {
+                    var req = URLRequest(url: url)
+                    req.setValue(ref, forHTTPHeaderField: "Referer")
+                    req.setValue(ua, forHTTPHeaderField: "User-Agent")
+                    req.setValue("bytes=\(range.lowerBound)-\(range.upperBound - 1)", forHTTPHeaderField: "Range")
+                    req.setValue("*/*", forHTTPHeaderField: "Accept")
+                    req.timeoutInterval = 120
+                    // download(for:) streams to a temp file — parts of
+                    // long videos are tens of MB and must not sit in
+                    // memory times eight concurrent tasks.
+                    let (tmp, response) = try await session.download(for: req)
+                    let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+                    guard (200...299).contains(status) else {
+                        try? FileManager.default.removeItem(at: tmp)
+                        throw PrefetchError.upstreamStatus(status)
+                    }
+                    defer { try? FileManager.default.removeItem(at: tmp) }
+                    let data = try Data(contentsOf: tmp, options: .mappedIfSafe)
+                    // A CDN that ignores the Range header answers 200
+                    // with the whole body — writing that at the part
+                    // offset would corrupt the cache file beyond
+                    // repair, and playback reads cache bytes without
+                    // revalidating. Exact-length or nothing.
+                    guard data.count == range.count else {
+                        throw PrefetchError.ioFailure(
+                            "part length mismatch: got \(data.count), want \(range.count)"
+                        )
+                    }
+                    try writer.write(data, at: UInt64(range.lowerBound), handle: writeHandle)
+                }
+            }
+            try await group.waitForAll()
+        }
+        try? handle.synchronize()
+        try? handle.close()
+        return total
+    }
+
+    private func streamWholeBody(
+        url: URL,
+        referer: String,
+        dst: URL
+    ) async throws -> Int64 {
         var req = URLRequest(url: url)
         req.setValue(referer, forHTTPHeaderField: "Referer")
         req.setValue(Self.biliUserAgent, forHTTPHeaderField: "User-Agent")
+        req.setValue("bytes=0-", forHTTPHeaderField: "Range")
         req.setValue("*/*", forHTTPHeaderField: "Accept")
-        req.setValue("gzip, deflate", forHTTPHeaderField: "Accept-Encoding")
-        req.setValue("https://www.bilibili.com", forHTTPHeaderField: "Origin")
-        req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-
         let (tmpFile, response) = try await downloadSession.download(for: req)
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
         guard (200...299).contains(status) else {
-            // Clean up the temp file even on HTTP error.
             try? FileManager.default.removeItem(at: tmpFile)
             throw PrefetchError.upstreamStatus(status)
         }
         let attrs = try? FileManager.default.attributesOfItem(atPath: tmpFile.path)
         let size = (attrs?[.size] as? Int64) ?? 0
-        // Move (not copy) the temp file to the staging
-        // location.  `moveItem` is atomic on the same
-        // volume, so a crash mid-commit leaves the
-        // staging dir as the only artifact and the cache
-        // stays consistent.
         do {
             if FileManager.default.fileExists(atPath: dst.path) {
                 try FileManager.default.removeItem(at: dst)
@@ -659,11 +759,6 @@ actor PlaybackPrefetchManager {
         }
         return size
     }
-
-    // MARK: - helpers
-
-    /// Cache key builder.  Public-static so the test
-    /// target can pin the format independently.
     static func cacheKey(
         bvid: String, qn: Int, cid: Int64
     ) -> String {
