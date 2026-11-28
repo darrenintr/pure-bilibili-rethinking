@@ -80,6 +80,7 @@ jobs:
         working-directory: ios/Paladala
         run: |
           set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/build"
           xcodebuild build \
             -project Paladala.xcodeproj \
             -scheme Paladala \
