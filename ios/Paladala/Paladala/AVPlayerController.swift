@@ -213,6 +213,16 @@ final class PlayerController: ObservableObject {
     /// auto-resume (plain `play()` would snap back to 1x).
     private var playbackRate: Float = 1.0
 
+    /// Resume playback at the viewer-selected speed.  Plain
+    /// `player.play()` is equivalent to `rate = defaultRate`
+    /// (1x), so every stall recovery, seek refresh and item
+    /// rebind silently snapped playback back to 1x and the
+    /// speed menu appeared broken.  Setting `.rate` directly
+    /// both starts playback and honors the chosen speed.
+    private func resumeAtSelectedRate() {
+        player.rate = playbackRate
+    }
+
     // MARK: seek state machine (PR-A Group 1)
 
     /// `true` while an `AVPlayer.seek(to:)` is in flight.  Used
@@ -1040,7 +1050,7 @@ final class PlayerController: ObservableObject {
             SponsorBlockManager.shared.loadSegments(for: sbBvid)
         }
         if wantsToPlay {
-            player.play()
+            resumeAtSelectedRate()
         }
         // Replay any user seek (`seek(to:)` / `seek(by:)`) that
         // arrived before the real item was bound.  Higher
@@ -1419,7 +1429,7 @@ final class PlayerController: ObservableObject {
             performSeek(target.isFinite ? target : currentTime, fromRestore: true)
             wantsToPlay = true
             isPlaying = true
-            player.play()
+            resumeAtSelectedRate()
         case .sessionRestart:
             restartPlaybackSession(trigger: trigger, resetAttempts: false)
         }
@@ -1937,11 +1947,11 @@ final class PlayerController: ObservableObject {
                     guard finished, let self, let item,
                           self.player.currentItem === item, self.wantsToPlay else { return }
                     self.currentTime = 0
-                    self.player.play()
+                    self.resumeAtSelectedRate()
                 }
             }
         } else {
-            player.play()
+            resumeAtSelectedRate()
         }
     }
 
