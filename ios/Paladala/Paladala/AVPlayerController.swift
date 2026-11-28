@@ -2529,6 +2529,17 @@ final class PlayerController: ObservableObject {
         // can pause on its own when the buffer empties, and we
         // do not want to fight that — we mirror it.  `WatchSession`
         // reads this every 30 seconds.
+        // Keep `playbackRate` in sync with the player's actual
+        // rate so a speed picked in the NATIVE fullscreen
+        // transport (AVKit writes `rate`/`defaultRate` directly,
+        // bypassing `setRate`) is honored by the auto-resume
+        // paths instead of snapping back to the last in-app
+        // choice.  No feedback loop: our own resumes set
+        // `rate = playbackRate`, so the values already match.
+        let r = player.rate
+        if r > 0, r != playbackRate {
+            playbackRate = r
+        }
         let playing = (player.timeControlStatus == .playing)
         if playing != isPlaying {
             isPlaying = playing
