@@ -664,6 +664,9 @@ struct BangumiSeasonDetailView: View {
         diagLog(.bangumi, "BangumiSeasonDetail close pgc player",
                 details: ["epId": selectedEpisode?.epId ?? -1])
         persistLivePosition()
+        if let c = pgcController {
+            miniPlayerStore.unregisterExternalController(c)
+        }
         pgcController = nil
         pgcPlaybackError = nil
         isFetchingPgcPlayback = false
@@ -706,6 +709,7 @@ struct BangumiSeasonDetailView: View {
             // `closePgcPlayer` or the user opens a different
             // episode.
             pgcController = controller
+            miniPlayerStore.registerExternalController(controller)
             isFetchingPgcPlayback = false
             if let resume = Self.resumePosition(epId: ep.epId) {
                 // The seek only lands once the AVPlayerItem is

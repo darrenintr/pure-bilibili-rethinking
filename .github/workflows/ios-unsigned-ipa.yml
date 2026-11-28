@@ -62,6 +62,20 @@ jobs:
           sudo xcode-select -s "$best/Contents/Developer"
           xcodebuild -version
 
+      - name: Write Opspad xcconfig without signing secret
+        run: |
+          mkdir -p ios/Paladala/Config
+          {
+            printf 'OPSPAD_HMAC_SECRET =\n'
+            printf 'OPSPAD_ENDPOINT = https://paladala-portal.darrenintr.workers.dev\n'
+            printf 'OPSPAD_ENABLED_KEY = diag.ops.enabled\n'
+          } > ios/Paladala/Config/Opspad.Release.xcconfig
+          {
+            printf 'OPSPAD_HMAC_SECRET =\n'
+            printf 'OPSPAD_ENDPOINT = http://localhost:8787\n'
+            printf 'OPSPAD_ENABLED_KEY = diag.ops.enabled\n'
+          } > ios/Paladala/Config/Opspad.Debug.xcconfig
+
       - name: Build macOS Catalyst app
         working-directory: ios/Paladala
         run: |

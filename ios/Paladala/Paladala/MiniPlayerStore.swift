@@ -223,6 +223,62 @@ final class MiniPlayerStore: ObservableObject {
     /// Called by `VideoDetailView.onDisappear` (outside the
     /// fullscreen grace window) to surface the mini-player. The
     /// controller keeps running; only the inline surface goes
+    /// Register a playback controller owned by a surface outside
+    /// the store — bangumi episodes and live rooms build their
+    /// own `PlayerController` today.  Registration lets the macOS
+    /// menu-bar playback commands (and any future unified control
+    /// surface) drive them exactly like regular video sessions.
+    /// Whatever the store currently holds is torn down first:
+    /// two audible playbacks must never coexist.
+    func registerExternalController(_ newController: PlayerController) {
+        teardownController()
+        controller = newController
+        currentVideo = nil
+        pendingPlayback = nil
+        inlineAttached = true
+        controllerBoundAt = Date()
+        cancellables.removeAll()
+        cancellables.insert(
+            newController.$currentTime
+                .receive(on: RunLoop.main)
+                .sink { [weak self] in self?.currentTime = $0 }
+        )
+        cancellables.insert(
+            newController.$duration
+                .receive(on: RunLoop.main)
+                .sink { [weak self] in self?.duration = $0 }
+        )
+        cancellables.insert(
+            newController.$isPlaying
+                .receive(on: RunLoop.main)
+                .sink { [weak self] in self?.isPlaying = $0 }
+        )
+        cancellables.insert(
+            newController.$isBuffering
+                .receive(on: RunLoop.main)
+                .sink { [weak self] in self?.isBuffering = $0 }
+        )
+        cancellables.insert(
+            newController.$networkSpeed
+                .receive(on: RunLoop.main)
+                .sink { [weak self] in self?.networkSpeed = $0 }
+        )
+        diagLog(.playback, "PlaybackStore.registerExternalController")
+    }
+
+    /// Drop the registration when the owning surface closes —
+    /// but only if the store still points at that same controller,
+    /// so a late closePgcPlayer can't clobber a newer session.
+    func unregisterExternalController(_ old: PlayerController) {
+        guard controller === old else { return }
+        controller = nil
+        currentVideo = nil
+        pendingPlayback = nil
+        inlineAttached = false
+        cancellables.removeAll()
+        diagLog(.playback, "PlaybackStore.unregisterExternalController")
+    }
+
     /// away.
     ///
     /// If the user has disabled `miniPlayerOnExit` in

@@ -109,6 +109,7 @@ private struct LivePlayerView: View {
     let repository: PaladalaRepository
 
     @EnvironmentObject private var router: AppRouter
+    @EnvironmentObject private var miniPlayerStore: MiniPlayerStore
     @State private var playback: BiliLivePlayback?
     @State private var errorMessage: String?
     /// Created lazily once `playback` is loaded, because the
@@ -156,6 +157,9 @@ private struct LivePlayerView: View {
             }
         }
         .onDisappear {
+            if let c = controller {
+                miniPlayerStore.unregisterExternalController(c)
+            }
             controller?.tearDown()
             controller = nil
             if #available(iOS 16.1, *) {
@@ -337,7 +341,9 @@ private struct LivePlayerView: View {
         } else {
             livePlayback = BiliPlayback(dash: nil, fallbackURL: hlsURL, referer: resolved.referer)
         }
-        controller = PlayerController(playback: livePlayback)
+        let newController = PlayerController(playback: livePlayback)
+        controller = newController
+        miniPlayerStore.registerExternalController(newController)
     }
 
     private func loadPlayback() async {
