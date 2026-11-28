@@ -612,6 +612,14 @@ struct BangumiSeasonDetailView: View {
             let pipActive = miniPlayerStore.controller?.isPictureInPictureActive ?? false
             if selectedEpisode == nil, !pipActive, let first = fetched.episodes.first {
                 onEpisodeTap(first)
+            } else if let ep = selectedEpisode, pgcController == nil,
+                      !isFetchingPgcPlayback, !pipActive {
+                // Return after a tab switch: onDisappear tore the
+                // controller down but the episode is still
+                // selected — rebind it so the page comes back as
+                // a player, not a header with no controls.  The
+                // saved resume position restores the playhead.
+                onEpisodeTap(ep)
             }
             diagLog(.bangumi, "BangumiSeasonDetail load succeeded",
                     details: [
