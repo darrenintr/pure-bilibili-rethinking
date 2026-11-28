@@ -280,6 +280,13 @@ struct BangumiSeasonDetailView: View {
     /// so the next episode gets a fresh AVPlayer + a fresh
     /// `LocalHLSProxyServer` reservation.
     @State private var pgcController: PlayerController?
+    /// Whether the episode was playing when a tab switch
+    /// tore it down — the rebind on return must not autoplay
+    /// an episode the viewer had paused.
+    @State private var episodeWasPlayingOnTeardown = true
+    /// One-shot flag: pause the next rebound controller right
+    /// after construction (before its startup auto-play).
+    @State private var pauseReboundEpisode = false
     /// `true` while the in-app PGC playurl fetch is in
     /// flight, false once `pgcController` is set or the
     /// fetch fails.  Drives the in-view spinner before the
@@ -316,6 +323,7 @@ struct BangumiSeasonDetailView: View {
             // visible surface — the same rule the
             // miniplayer-removal applied to regular videos.
             if let c = pgcController {
+                episodeWasPlayingOnTeardown = c.isPlaying
                 miniPlayerStore.unregisterExternalController(c)
                 c.tearDown()
                 pgcController = nil
@@ -619,6 +627,13 @@ struct BangumiSeasonDetailView: View {
                 // selected — rebind it so the page comes back as
                 // a player, not a header with no controls.  The
                 // saved resume position restores the playhead.
+                // If the viewer had PAUSED before switching away,
+                // the rebound controller must stay paused too —
+                // auto-play is only right for an episode that was
+                // actually playing (or a fresh selection).
+                if !episodeWasPlayingOnTeardown {
+                    pauseReboundEpisode = true
+                }
                 onEpisodeTap(ep)
             }
             diagLog(.bangumi, "BangumiSeasonDetail load succeeded",
@@ -728,6 +743,13 @@ struct BangumiSeasonDetailView: View {
             // episode.
             pgcController = controller
             miniPlayerStore.registerExternalController(controller)
+            if pauseReboundEpisode {
+                pauseReboundEpisode = false
+                // Controller-level pause clears wantsToPlay before
+                // startup auto-play fires, so the rebound episode
+                // stays paused exactly as the viewer left it.
+                controller.pause()
+            }
             isFetchingPgcPlayback = false
             if let resume = Self.resumePosition(epId: ep.epId) {
                 // The seek only lands once the AVPlayerItem is
