@@ -2972,6 +2972,8 @@ final class LocalHLSProxyServer: @unchecked Sendable {
         case "/video.m3u8":
             respondMediaPlaylist(for: .video, connection: connection,
                                  connID: connID)
+        case "/video-iframe.m3u8":
+            respondIFramePlaylist(connection: connection, connID: connID)
         case "/audio.m3u8":
             respondMediaPlaylist(for: .audio, connection: connection,
                                  connID: connID)
@@ -3237,6 +3239,102 @@ final class LocalHLSProxyServer: @unchecked Sendable {
         }
         lines.append(streamInf)
         lines.append(localURL(baseURL: baseURL, path: "video.m3u8"))
+        // Trick-play entry: without an EXT-X-I-FRAME-STREAM-INF
+        // the AVPlayerItem reports canPlayFastForward=false and
+        // AVPlayer clamps every rate to 1x, which is why the
+        // 3x-5x speed menu never had any effect.  The I-frame
+        // media playlist is built from the same validated SIDX
+        // fragments — each DASH fragment begins on a keyframe.
+        var iframeInf = "#EXT-X-I-FRAME-STREAM-INF:"
+        iframeInf += "BANDWIDTH=\(decision.videoPeakBps > 0 ? decision.videoPeakBps : Int64(max(source.video.bandwidth, 1)))"
+        iframeInf += ",CODECS=\"\(source.video.codecs)\""
+        if let width = source.video.width, width > 0,
+           let height = source.video.height, height > 0 {
+            iframeInf += ",RESOLUTION=\(width)x\(height)"
+        }
+        iframeInf += ",URI=\"\(localURL(baseURL: baseURL, path: "video-iframe.m3u8"))\""
+        lines.append(iframeInf)
+        lines.append("")
+        respondText(connection: connection, connID: connID,
+                    body: lines.joined(separator: "\n"))
+    }
+
+    /// Trick-play media playlist for AVPlayer fast-forward/rewind.
+    /// Mirrors the SIDX-driven video playlist but tags every
+    /// fragment with EXT-X-BYTERANGE and marks the playlist
+    /// EXT-X-I-FRAMES-ONLY so AVPlayer enables rates above 1x
+    /// (without any I-frame playlist in the master, the item
+    /// reports canPlayFastForward=false and all rates clamp to
+    /// 1x).  Each DASH fragment starts on a keyframe; the
+    /// segments served are the same fragment byte ranges the
+    /// normal playlist uses.
+    private func respondIFramePlaylist(connection: NWConnection,
+                                       connID: String) {
+        guard let (source, _) = snapshot(),
+              let baseURL = safeBaseURL else {
+            respondError(connection: connection, status: 503,
+                         reason: "no playback", connID: connID)
+            return
+        }
+        let track = source.video
+        let encoded = base64urlEncode(activeUpstream(for: track).absoluteString)
+        let initRange = playlistInitializationRange(for: track)
+        guard initRange.lowerBound < initRange.upperBound else {
+            respondError(connection: connection, status: 503,
+                         reason: "invalid init range",
+                         extraHeaders: ["Retry-After": "0"],
+                         connID: connID)
+            return
+        }
+        let initURL = localURL(
+            baseURL: baseURL,
+            path: "init",
+            queryItems: [
+                URLQueryItem(name: "u", value: encoded),
+                URLQueryItem(
+                    name: "range",
+                    value: "\(initRange.lowerBound)"
+                        + "-\(initRange.upperBound - 1)"
+                )
+            ]
+        )
+        guard let index = cachedSegmentIndex(for: track) else {
+            respondError(connection: connection, status: 503,
+                         reason: "sidx not ready",
+                         extraHeaders: ["Retry-After": "0"],
+                         connID: connID)
+            return
+        }
+        let targetDuration = max(1, Int(
+            index.maxFragmentDuration.rounded(.up)
+        ))
+        var lines: [String] = [
+            "#EXTM3U",
+            "#EXT-X-VERSION:7",
+            "#EXT-X-PLAYLIST-TYPE:VOD",
+            "#EXT-X-TARGETDURATION:\(targetDuration)",
+            "#EXT-X-MEDIA-SEQUENCE:0",
+            "#EXT-X-I-FRAMES-ONLY",
+            "#EXT-X-MAP:URI=\"\(initURL)\"",
+        ]
+        for (idx, frag) in index.fragments.enumerated() {
+            let segmentURL = localURL(
+                baseURL: baseURL,
+                path: "segment",
+                queryItems: [
+                    URLQueryItem(name: "u", value: encoded),
+                    URLQueryItem(name: "k", value: "video"),
+                    URLQueryItem(name: "n", value: "\(idx)")
+                ]
+            )
+            let length = frag.byteRange.upperBound - frag.byteRange.lowerBound
+            lines.append(
+                "#EXTINF:\(String(format: "%.3f", frag.duration)),"
+            )
+            lines.append("#EXT-X-BYTERANGE:\(length)@0")
+            lines.append(segmentURL)
+        }
+        lines.append("#EXT-X-ENDLIST")
         lines.append("")
         respondText(connection: connection, connID: connID,
                     body: lines.joined(separator: "\n"))

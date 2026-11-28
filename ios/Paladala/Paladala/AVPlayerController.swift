@@ -1964,6 +1964,19 @@ final class PlayerController: ObservableObject {
     func setRate(_ rate: Float) {
         playbackRate = rate
         player.rate = rate
+        // Instrumentation for the rate-propagation investigation:
+        // logs what the UI asked for and what AVPlayer actually
+        // reports back — if the readback diverges, AVKit/HLS is
+        // clamping the rate (e.g. no I-frame playlist for >2x).
+        let readback = player.rate
+        diagLog(.playback, "setRate applied", details: [
+            "requested": rate,
+            "playerRateReadback": readback,
+            "hasItem": player.currentItem != nil,
+            "timeControlStatus": player.timeControlStatus.rawValue,
+            "canPlayFastForward": player.currentItem?.canPlayFastForward ?? false,
+            "canPlaySlowForward": player.currentItem?.canPlaySlowForward ?? false
+        ])
     }
 
     /// Set the linear audio gain. Clamped to `0.0 ... 1.0` so
