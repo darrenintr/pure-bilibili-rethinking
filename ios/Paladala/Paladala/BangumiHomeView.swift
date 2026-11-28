@@ -323,7 +323,12 @@ struct BangumiSeasonDetailView: View {
             // visible surface — the same rule the
             // miniplayer-removal applied to regular videos.
             if let c = pgcController {
-                episodeWasPlayingOnTeardown = c.isPlaying
+                // Buffering counts as playing: isPlaying mirrors
+                // timeControlStatus, which reads false while
+                // AVPlayer waits for data — the viewer never
+                // pressed pause in that case, and the rebind
+                // must not strand them on a paused episode.
+                episodeWasPlayingOnTeardown = c.isPlaying || c.isBuffering
                 miniPlayerStore.unregisterExternalController(c)
                 c.tearDown()
                 pgcController = nil
