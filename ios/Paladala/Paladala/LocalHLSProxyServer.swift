@@ -3318,28 +3318,41 @@ final class LocalHLSProxyServer: @unchecked Sendable {
             "#EXT-X-MAP:URI=\"\(initURL)\"",
         ]
         // Only fragments that begin on a keyframe (SAP) can
-        // yield a decodable trick-play frame — listing the rest
-        // would give AVPlayer byte ranges it cannot decode a
-        // preview from, so they are skipped here.  (In practice
-        // virtually every B站 DASH fragment starts with an IDR;
-        // this matters only for rare non-SAP streams.)
-        let keyframeIndices = index.fragments.enumerated()
-            .filter { $0.element.startsWithSAP }
-        for (idx, frag) in keyframeIndices {
+        // yield a decodable trick-play frame, so non-SAP
+        // fragments are not listed.  (In practice virtually
+        // every B站 DASH fragment starts with an IDR; this
+        // matters only for rare non-SAP streams.)  EXTINF in
+        // an I-frame playlist spans the time up to the NEXT
+        // LISTED keyframe, so each skipped fragment's duration
+        // is folded into the preceding entry — otherwise the
+        // trick-play timeline would compress and previews
+        // would map to positions ahead of where they belong.
+        var entries: [(idx: Int, length: Int64, span: Double)] = []
+        for (idx, frag) in index.fragments.enumerated() {
+            if frag.startsWithSAP {
+                entries.append((
+                    idx: idx,
+                    length: frag.byteRange.upperBound - frag.byteRange.lowerBound,
+                    span: frag.duration
+                ))
+            } else if !entries.isEmpty {
+                entries[entries.count - 1].span += frag.duration
+            }
+        }
+        for entry in entries {
             let segmentURL = localURL(
                 baseURL: baseURL,
                 path: "segment",
                 queryItems: [
                     URLQueryItem(name: "u", value: encoded),
                     URLQueryItem(name: "k", value: "video"),
-                    URLQueryItem(name: "n", value: "\(idx)")
+                    URLQueryItem(name: "n", value: "\(entry.idx)")
                 ]
             )
-            let length = frag.byteRange.upperBound - frag.byteRange.lowerBound
             lines.append(
-                "#EXTINF:\(String(format: "%.3f", frag.duration)),"
+                "#EXTINF:\(String(format: "%.3f", entry.span)),"
             )
-            lines.append("#EXT-X-BYTERANGE:\(length)@0")
+            lines.append("#EXT-X-BYTERANGE:\(entry.length)@0")
             lines.append(segmentURL)
         }
         lines.append("#EXT-X-ENDLIST")
