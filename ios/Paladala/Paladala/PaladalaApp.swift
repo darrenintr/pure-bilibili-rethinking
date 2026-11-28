@@ -332,6 +332,66 @@ struct PaladalaApp: App {
                     router.openLogin()
                 }
         }
+        // **macOS (Catalyst) 播放控制菜單 + 鍵盤快捷鍵** —
+        // on the Mac these become real menu-bar items; unmodified
+        // keys (space/arrows) only reach the menu when no text
+        // field or control consumes them first, so typing in the
+        // search box is unaffected.  On iOS the commands are
+        // inert (no menu bar) but hardware keyboards gain the
+        // same shortcuts.  Everything routes through the active
+        // `MiniPlayerStore` controller, so the items disable
+        // themselves when nothing is playing.
+        .commands {
+            CommandMenu("播放控制") {
+                Button(miniPlayerStore.isPlaying ? "暫停" : "播放") {
+                    guard let c = miniPlayerStore.controller else { return }
+                    if miniPlayerStore.isPlaying { c.pause() } else { c.play() }
+                }
+                .keyboardShortcut(.space, modifiers: [])
+                .disabled(miniPlayerStore.controller == nil)
+
+                Button("後退 10 秒") {
+                    miniPlayerStore.controller?.seek(by: -10)
+                }
+                .keyboardShortcut(.leftArrow, modifiers: [])
+                .disabled(miniPlayerStore.controller == nil)
+
+                Button("前進 10 秒") {
+                    miniPlayerStore.controller?.seek(by: 10)
+                }
+                .keyboardShortcut(.rightArrow, modifiers: [])
+                .disabled(miniPlayerStore.controller == nil)
+
+                Divider()
+
+                Button("聲音大") {
+                    guard let c = miniPlayerStore.controller else { return }
+                    c.setVolume(min(1.0, c.volume + 0.1))
+                }
+                .keyboardShortcut(.upArrow, modifiers: [])
+                .disabled(miniPlayerStore.controller == nil)
+
+                Button("聲音細") {
+                    guard let c = miniPlayerStore.controller else { return }
+                    c.setVolume(max(0.0, c.volume - 0.1))
+                }
+                .keyboardShortcut(.downArrow, modifiers: [])
+                .disabled(miniPlayerStore.controller == nil)
+
+                Divider()
+
+                Menu("播放速度") {
+                    ForEach([0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0], id: \.self) { rate in
+                        Button(rate == floor(rate) ? "\(Int(rate))x" : String(format: "%gx", rate)) {
+                            UserDefaults.standard.set(rate, forKey: "paladala.playbackRate")
+                            miniPlayerStore.controller?.setRate(Float(rate))
+                        }
+                    }
+                }
+                .disabled(miniPlayerStore.controller == nil)
+            }
+        }
+
     }
 
     /// System chrome is left at UIKit defaults so navigation and

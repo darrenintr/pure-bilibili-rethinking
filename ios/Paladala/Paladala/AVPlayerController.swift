@@ -1983,6 +1983,10 @@ final class PlayerController: ObservableObject {
     /// a buggy caller can't over-drive `AVPlayer.volume`. Used
     /// by `SleepTimer` to fade audio before pausing; not
     /// observed externally, so no `@Published` wrapper.
+    /// Current linear audio gain (0…1) — exposed for the macOS
+    /// menu-bar volume commands which need to read-then-write.
+    var volume: Float { player.volume }
+
     func setVolume(_ volume: Float) {
         player.volume = max(0, min(1, volume))
     }

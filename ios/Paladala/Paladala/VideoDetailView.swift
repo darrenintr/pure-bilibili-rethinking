@@ -972,7 +972,9 @@ struct VideoDetailView: View {
         // are not clipped by the rounded rectangle.
         .clipShape(RoundedRectangle(cornerRadius: PaladalaTheme.cardRadius, style: PaladalaTheme.cornerStyle))
         .overlay(alignment: .bottomTrailing) {
+            #if !targetEnvironment(macCatalyst)
             playerResizeGrip
+            #endif
         }
     }
 
